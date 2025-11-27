@@ -108,6 +108,28 @@ function printRichIssue(issue: ValidationIssue, index: number): void {
       console.log('\n    Full Context (the problematic object):');
       printFullObject(issue.context.fullObject);
     }
+    // Schema-based expected usage (narrowed to relevant path + delta)
+    if (issue.context.expectedSchema !== undefined) {
+      const schemaPath = issue.context.schemaPath || 'parameters';
+      const narrowedSchema = getByPath(issue.context.expectedSchema, schemaPath) 
+        ?? issue.context.expectedSchema;
+      const narrowedUser = getByPath(issue.context.fullObject, schemaPath);
+
+      // Compute shallow delta
+      const delta = computeSchemaDelta(narrowedUser, narrowedSchema);
+      if (delta.missing.length || delta.extra.length) {
+        console.log('\n    Schema Delta:');
+        if (delta.missing.length) {
+          console.log(`      • Missing keys: ${delta.missing.join(', ')}`);
+        }
+        if (delta.extra.length) {
+          console.log(`      • Extra keys: ${delta.extra.join(', ')}`);
+        }
+      }
+
+      console.log('\n    Correct Usage:');
+      printFullObject(narrowedSchema);
+    }
   }
   
   // Valid alternatives - helps understand what SHOULD be there
@@ -181,5 +203,59 @@ function formatContextValue(value: unknown): string {
     }
   }
   return String(value);
+}
+
+/**
+ * Walk an object by dot-separated path, treating arrays by picking index 0.
+ */
+function getByPath(obj: unknown, path: string): unknown {
+  if (!path || !obj || typeof obj !== 'object') return obj;
+  const parts = path.replace(/^parameters\.?/, '').split('.').filter(Boolean);
+  let current: unknown = obj;
+  for (const part of parts) {
+    if (current === null || current === undefined) return undefined;
+    if (Array.isArray(current)) {
+      current = current[0];
+      if (current === null || current === undefined) return undefined;
+    }
+    if (typeof current === 'object' && current !== null) {
+      current = (current as Record<string, unknown>)[part];
+    } else {
+      return undefined;
+    }
+  }
+  return current;
+}
+
+/**
+ * Compute shallow delta between user object and schema at the same path.
+ * Returns { missing: string[], extra: string[] }
+ */
+function computeSchemaDelta(
+  userObj: unknown,
+  schemaObj: unknown,
+): { missing: string[]; extra: string[] } {
+  const missing: string[] = [];
+  const extra: string[] = [];
+
+  if (
+    !userObj || typeof userObj !== 'object' ||
+    !schemaObj || typeof schemaObj !== 'object' ||
+    Array.isArray(userObj) || Array.isArray(schemaObj)
+  ) {
+    return { missing, extra };
+  }
+
+  const userKeys = new Set(Object.keys(userObj as Record<string, unknown>));
+  const schemaKeys = new Set(Object.keys(schemaObj as Record<string, unknown>));
+
+  for (const k of schemaKeys) {
+    if (!userKeys.has(k)) missing.push(k);
+  }
+  for (const k of userKeys) {
+    if (!schemaKeys.has(k)) extra.push(k);
+  }
+
+  return { missing, extra };
 }
 

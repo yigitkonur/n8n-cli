@@ -70,6 +70,9 @@ export interface ValidationIssue {
     expected?: string;
     n8nError?: string;
     fullObject?: unknown;
+    // Schema-based hints: expected structure and where it applies
+    expectedSchema?: unknown;
+    schemaPath?: string;
   };
   
   // Valid alternatives for the problematic value

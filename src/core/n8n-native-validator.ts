@@ -15,6 +15,23 @@ function mapSeverity(_type: string): IssueSeverity {
   return 'error';
 }
 
+function buildExpectedSchema(nodeTypeDescription: any, node: WorkflowNode): unknown {
+  try {
+    // Use empty parameters to let n8n compute the full default parameter structure
+    const expected = CjsNodeHelpers.getNodeParameters(
+      nodeTypeDescription.properties,
+      {},
+      true,
+      true,
+      { typeVersion: node.typeVersion } as any,
+      nodeTypeDescription,
+    );
+    return expected ?? undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export function validateNodeWithN8n(node: WorkflowNode): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
 
@@ -49,6 +66,9 @@ export function validateNodeWithN8n(node: WorkflowNode): ValidationIssue[] {
     position: node.position,
   } as INode;
 
+  // Precompute expected schema once per node for hinting
+  const expectedSchema = buildExpectedSchema(nodeTypeDescription, node);
+
   // First, let n8n compute normalized parameters (this will throw on severe schema issues)
   try {
     CjsNodeHelpers.getNodeParameters(
@@ -72,6 +92,8 @@ export function validateNodeWithN8n(node: WorkflowNode): ValidationIssue[] {
       context: {
         n8nError: error?.message,
         fullObject: node.parameters,
+        expectedSchema,
+        schemaPath: 'parameters',
       },
     });
     // If getNodeParameters throws, getNodeParametersIssues is unlikely to add more value.
@@ -107,6 +129,8 @@ export function validateNodeWithN8n(node: WorkflowNode): ValidationIssue[] {
           },
           context: {
             fullObject: node.parameters,
+            expectedSchema,
+            schemaPath: `parameters.${paramName}`,
           },
         });
       }

@@ -3,19 +3,25 @@
 [![npm version](https://img.shields.io/npm/v/n8n-workflow-validator.svg)](https://www.npmjs.com/package/n8n-workflow-validator)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-Standalone CLI tool that validates n8n workflow JSON files with **rich error diagnostics** including source locations, code snippets, and root cause analysis. Perfect for LLM-powered self-healing agents that builds n8n workflows. As n8n does not have official validation utils, I have extracted the exactly same logic from n8n's source code that used for validation by source code of canvas editor.
+Standalone CLI tool that validates n8n workflow JSON files using **n8n's native validation engine**. Provides rich error diagnostics with schema-based hints—ideal for LLM-powered agents that generate n8n workflows.
+
+## Features
+
+- **Native n8n validation**: Uses `NodeHelpers.getNodeParameters` from `n8n-workflow`
+- **Schema-aware hints**: Shows correct parameter structure derived from node schemas  
+- **Delta detection**: Identifies missing/extra keys vs expected schema
+- **Source locations**: Line/column numbers with code snippets
+- **Auto-fixers**: Repairs common schema issues (Switch v3 conditions, etc.)
 
 ## Quick Start
 
 ```bash
 npx n8n-workflow-validator workflow.json
 npx n8n-workflow-validator workflow.json --fix --out fixed.json
-npx n8n-workflow-validator workflow.json --json  # For programmatic use
+npx n8n-workflow-validator workflow.json --json  # For LLM consumption
 ```
 
 ## Rich Error Output
-
-The validator provides detailed, self-contained error reports:
 
 ```
 ❌ INVALID: workflow.json
@@ -24,41 +30,43 @@ The validator provides detailed, self-contained error reports:
 🛑 ERRORS (1)
 
 ────────────────────────────────────────────────────────────────────────────────
-[1] INVALID_IF_SWITCH_OPTIONS_ROOT
-    Path: nodes[4].parameters.options
-    Location: Line 129, Column 20
-    Node: "check-document-exists" (n8n-nodes-base.if)
+[1] N8N_PARAMETER_VALIDATION_ERROR
+    Path: nodes[12]
+    Location: Line 305, Column 5
+    Node: "route-by-format" (n8n-nodes-base.switch)
 
-    Message: Found unexpected "options" key at parameters root level.
+    Message: Could not find property option
 
     Source:
     ┌──────┬────────────────────────────────────────────────────────────
-    │ 126 │            "typeValidation": "strict"
-    │ 127 │          }
-    │ 128 │        },
-    │ 129 │>>>     "options": {}
-    │ 130 │      },
-    │ 131 │      "id": "f6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b0c",
-    │ 132 │      "name": "check-document-exists",
+    │ 302 │          "typeVersion": 2,
+    │ 303 │          "onError": "continueErrorOutput"
+    │ 304 │        },
+    │ 305 │>>>     {
+    │ 306 │          "parameters": {
     └──────┴────────────────────────────────────────────────────────────
 
     Root Cause Analysis:
       • n8n Runtime Error: "Could not find property option"
-      • Expected: This node type does not define "options" as a root-level parameter.
-      • Found: {}
 
-    Full Context (the problematic object):
+    Schema Delta:
+      • Missing keys: options
+      • Extra keys: fallbackOutput
+
+    Correct Usage:
     ```json
     {
-      "conditions": { "options": {...} },
-      "options": {}
+      "conditions": {
+        "options": {
+          "caseSensitive": true,
+          "leftValue": "",
+          "typeValidation": "strict"
+        },
+        "conditions": [...],
+        "combinator": "and"
+      }
     }
     ```
-
-    Valid Alternatives: [conditions, looseTypeValidation]
-
-    Note: Observed parameter keys: [conditions, options]. Known valid keys for
-    n8n-nodes-base.if: [conditions, looseTypeValidation].
 ```
 
 ## JSON Output for LLMs & Automation
@@ -67,32 +75,27 @@ The validator provides detailed, self-contained error reports:
 npx n8n-workflow-validator workflow.json --json
 ```
 
-Returns structured data with all diagnostic information:
+Returns structured data with schema hints for programmatic consumption:
 
 ```json
 {
   "valid": false,
   "issues": [{
-    "code": "INVALID_IF_SWITCH_OPTIONS_ROOT",
+    "code": "N8N_PARAMETER_VALIDATION_ERROR",
     "severity": "error",
-    "message": "Found unexpected \"options\" key at parameters root level.",
+    "message": "Could not find property option",
     "location": {
-      "nodeName": "check-document-exists",
-      "nodeType": "n8n-nodes-base.if",
-      "path": "nodes[4].parameters.options"
+      "nodeName": "route-by-format",
+      "nodeType": "n8n-nodes-base.switch",
+      "path": "nodes[12]"
     },
-    "sourceLocation": { "line": 129, "column": 20 },
-    "sourceSnippet": {
-      "lines": [
-        { "lineNumber": 129, "content": "        \"options\": {}", "isHighlighted": true }
-      ]
-    },
+    "sourceLocation": { "line": 305, "column": 5 },
     "context": {
-      "value": {},
       "n8nError": "Could not find property option",
-      "fullObject": { "conditions": {...}, "options": {} }
-    },
-    "validAlternatives": ["conditions", "looseTypeValidation"]
+      "fullObject": { "mode": "rules", "rules": {...} },
+      "expectedSchema": { "mode": "rules", "rules": {...}, "options": {...} },
+      "schemaPath": "parameters"
+    }
   }]
 }
 ```
@@ -121,9 +124,10 @@ n8n-validate workflow.json
 
 ## What It Validates
 
-- **Structure**: `nodes` array, `connections` object
-- **Node fields**: `type`, `typeVersion`, `position`, `parameters`
-- **Known issues**: Invalid `options` in IF/Switch nodes
+- **Native n8n schema**: Uses actual node definitions from `n8n-nodes-base`
+- **Parameter validation**: `NodeHelpers.getNodeParameters` + `getNodeParametersIssues`
+- **Structure**: `nodes` array, `connections` object, required fields
+- **Auto-fixes**: Switch v3 filter options, fallbackOutput location
 
 ## Exit Codes
 
@@ -133,7 +137,12 @@ n8n-validate workflow.json
 ## API Usage
 
 ```typescript
-import { validateWorkflowStructure, jsonParse } from 'n8n-workflow-validator';
+import { 
+  validateWorkflowStructure, 
+  validateNodeWithN8n,
+  nodeRegistry,
+  jsonParse 
+} from 'n8n-workflow-validator';
 
 const raw = fs.readFileSync('workflow.json', 'utf8');
 const workflow = jsonParse(raw);
@@ -141,8 +150,9 @@ const result = validateWorkflowStructure(workflow, { rawSource: raw });
 
 for (const issue of result.issues) {
   console.log(`[${issue.code}] ${issue.message}`);
-  console.log(`  Line ${issue.sourceLocation?.line}`);
-  console.log(`  ${issue.context?.n8nError}`);
+  if (issue.context?.expectedSchema) {
+    console.log('Expected:', JSON.stringify(issue.context.expectedSchema, null, 2));
+  }
 }
 ```
 
