@@ -1,0 +1,52 @@
+{
+  "name": "n8n-workflow-validator",
+  "version": "1.0.0",
+  "description": "Standalone CLI validator for n8n workflow JSON files - mirrors official n8n import validation",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "n8n-validate": "dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "validate": "node dist/cli.js",
+    "test": "node dist/cli.js test/fixtures/*.json"
+  },
+  "keywords": [
+    "n8n",
+    "workflow",
+    "validation",
+    "cli",
+    "json",
+    "validator",
+    "automation"
+  ],
+  "author": "Yigit Konur",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yigitkonur/n8n-workflow-validator.git"
+  },
+  "bugs": {
+    "url": "https://github.com/yigitkonur/n8n-workflow-validator/issues"
+  },
+  "homepage": "https://github.com/yigitkonur/n8n-workflow-validator#readme",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "esprima-next": "^5.8.4",
+    "jsonrepair": "^3.8.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.3.0"
+  }
+}
