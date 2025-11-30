@@ -1,128 +1,209 @@
-<h1 align="center">🔍 n8n-workflow-validator 🔍</h1>
-<h3 align="center">Stop praying your workflow JSON is valid. Start getting real answers.</h3>
+<h1 align="center">🤖 n8n-cli 🤖</h1>
+<h3 align="center">The AI-first CLI for n8n. Because MCP shouldn't be this hard.</h3>
 
 <p align="center">
   <strong>
-    <em>The CLI + library that validates n8n workflows using n8n's actual engine. It tells you exactly what's wrong, shows the correct schema, and auto-fixes common mistakes.</em>
+    <em>Built for AI agents that need to create, validate, and deploy n8n workflows. Not another CLI for humans—this is infrastructure for your autonomous coding assistant.</em>
   </strong>
 </p>
 
 <p align="center">
   <!-- Package Info -->
-  <a href="https://www.npmjs.com/package/n8n-workflow-validator"><img alt="npm" src="https://img.shields.io/npm/v/n8n-workflow-validator.svg?style=flat-square&color=4D87E6"></a>
+  <a href="https://www.npmjs.com/package/n8n-cli"><img alt="npm" src="https://img.shields.io/npm/v/n8n-cli.svg?style=flat-square&color=4D87E6"></a>
   <a href="#"><img alt="node" src="https://img.shields.io/badge/node-18+-4D87E6.svg?style=flat-square"></a>
   <a href="#"><img alt="typescript" src="https://img.shields.io/badge/TypeScript-first-4D87E6.svg?style=flat-square"></a>
   &nbsp;&nbsp;•&nbsp;&nbsp;
   <!-- Features -->
   <a href="https://opensource.org/licenses/MIT"><img alt="license" src="https://img.shields.io/badge/License-MIT-F9A825.svg?style=flat-square"></a>
-  <a href="#"><img alt="platform" src="https://img.shields.io/badge/platform-CLI_|_API_|_MCP-2ED573.svg?style=flat-square"></a>
+  <a href="#"><img alt="platform" src="https://img.shields.io/badge/platform-macOS_|_Linux_|_Windows-2ED573.svg?style=flat-square"></a>
 </p>
 
 <p align="center">
-  <img alt="native n8n engine" src="https://img.shields.io/badge/⚡_native_n8n_engine-real_validation-2ED573.svg?style=for-the-badge">
-  <img alt="llm friendly" src="https://img.shields.io/badge/🤖_llm_friendly-json_output_+_schema_hints-2ED573.svg?style=for-the-badge">
+  <img alt="agent first" src="https://img.shields.io/badge/🤖_agent_first-built_for_ai_workflows-2ED573.svg?style=for-the-badge">
+  <img alt="schema hints" src="https://img.shields.io/badge/💡_schema_hints-fix_errors_instantly-2ED573.svg?style=for-the-badge">
 </p>
 
 <div align="center">
 
 ### 🧭 Quick Navigation
 
-[**⚡ Get Started**](#-get-started-in-10-seconds) •
+[**⚡ Get Started**](#-get-started-in-30-seconds) •
 [**✨ Key Features**](#-feature-breakdown-the-secret-sauce) •
 [**🎮 CLI Usage**](#-cli-usage) •
-[**📦 API Reference**](#-api-usage) •
-[**🆚 Why This Exists**](#-why-this-exists)
+[**🤖 Agent Workflow**](#-the-agent-workflow-why-this-exists) •
+[**🆚 CLI vs MCP**](#-why-cli-beats-mcp-for-agents)
 
 </div>
 
 ---
 
-**`n8n-workflow-validator`** is the validation layer your n8n tooling deserves. Building an MCP server? A workflow generator? An AI agent that creates automations? This tool uses **n8n's actual validation engine** (`n8n-workflow` + `n8n-nodes-base`) to give you the exact same errors you'd see in the n8n editor—plus schema hints that show exactly how to fix them.
+**`n8n-cli`** is the missing piece for AI agents building n8n automations. While MCP servers try to do everything through complex tool calls, we take a different approach: **simple CLI commands that any agent can execute**.
+
+Your AI assistant writes a workflow JSON locally → validates it → gets schema-aware error hints → iterates until valid → pushes to n8n. No streaming hallucinations. No complex MCP gymnastics. Just solid, predictable infrastructure.
 
 <div align="center">
 <table>
 <tr>
 <td align="center">
-<h3>⚙️</h3>
-<b>Native n8n Engine</b><br/>
-<sub>Uses actual n8n-workflow</sub>
+<h3>🤖</h3>
+<b>Agent-First Design</b><br/>
+<sub>Built for AI, usable by humans</sub>
 </td>
 <td align="center">
-<h3>🎯</h3>
-<b>Schema Delta Detection</b><br/>
-<sub>Shows missing/extra keys</sub>
+<h3>💡</h3>
+<b>Schema Hints</b><br/>
+<sub>Fix errors with actual guidance</sub>
+</td>
+<td align="center">
+<h3>📦</h3>
+<b>544 Nodes Bundled</b><br/>
+<sub>Offline node search & validation</sub>
 </td>
 <td align="center">
 <h3>🔧</h3>
 <b>Auto-Fix Mode</b><br/>
-<sub>Repairs common issues</sub>
-</td>
-<td align="center">
-<h3>🤖</h3>
-<b>LLM-Friendly Output</b><br/>
-<sub>JSON with schema hints</sub>
+<sub>Repairs common mistakes</sub>
 </td>
 </tr>
 </table>
 </div>
 
 How it slaps:
-- **You:** LLM generates a workflow. Is it valid?
-- **Old way:** Paste into n8n. Get `"Could not find property option"`. Cry.
-- **Validator way:** `npx n8n-workflow-validator workflow.json`
-- **Result:** Line numbers. Schema diff. Correct usage example. Fix and ship.
+- **Agent:** Creates `workflow.json` locally
+- **Agent:** `npx n8n-cli workflows validate workflow.json --json`
+- **CLI:** Returns structured errors with schema hints
+- **Agent:** Fixes issues, re-validates, iterates
+- **Agent:** `npx n8n-cli workflows create --file workflow.json`
+- **Result:** Clean workflow deployed. Zero hallucinations. ☕
 
 ---
 
-## 💥 Why This Exists
+## 💥 Why CLI Beats MCP for Agents
 
-LLMs generate n8n workflows. Workflows have complex schemas. Validation errors are cryptic. This tool fixes all of that.
+MCP is powerful, but it's overkill for many agent workflows. Here's the reality:
 
 <table align="center">
 <tr>
-<td align="center"><b>❌ The Old Way (Pain)</b></td>
-<td align="center"><b>✅ The Validator Way (Glory)</b></td>
+<td align="center"><b>❌ The MCP Way (Complexity)</b></td>
+<td align="center"><b>✅ The CLI Way (Simplicity)</b></td>
 </tr>
 <tr>
 <td>
 <ol>
-  <li>LLM generates workflow JSON.</li>
-  <li>Paste into n8n editor.</li>
-  <li>Get cryptic error: "Could not find property"</li>
-  <li>Hunt through n8n docs for schema.</li>
-  <li>Manually fix. Repeat 10 times.</li>
+  <li>Configure MCP server connection</li>
+  <li>Stream large workflow JSON through tool calls</li>
+  <li>LLM hallucinates mid-stream on big payloads</li>
+  <li>Debug cryptic MCP protocol errors</li>
+  <li>Add Filepad just to write temp files</li>
+  <li>Overcomplicated for what should be simple</li>
 </ol>
 </td>
 <td>
 <ol>
-  <li>LLM generates workflow JSON.</li>
-  <li><code>npx n8n-workflow-validator --json</code></li>
-  <li>Get exact schema diff + correct example.</li>
-  <li><code>--fix</code> auto-repairs common issues.</li>
-  <li>Ship with confidence. ☕</li>
+  <li><code>echo '{...}' > workflow.json</code></li>
+  <li><code>npx n8n-cli workflows validate workflow.json</code></li>
+  <li>Get clear errors with fix suggestions</li>
+  <li>Iterate locally until valid</li>
+  <li><code>npx n8n-cli workflows create --file workflow.json</code></li>
+  <li>Done. Ship it. ☕</li>
 </ol>
 </td>
 </tr>
 </table>
 
-We use **actual n8n packages** (`n8n-workflow`, `n8n-nodes-base`) to validate. Same engine as the n8n editor. Zero guesswork.
+**The key insight:** When your agent writes a JSON file locally and validates it with CLI commands, you eliminate the streaming hallucination problem entirely. The agent can iterate on errors in a tight feedback loop without token-heavy round trips.
 
 ---
 
-## 🚀 Get Started in 10 Seconds
+## 🤖 The Agent Workflow (Why This Exists)
 
-```bash
-# Validate any workflow JSON
-npx n8n-workflow-validator workflow.json
+This CLI was built for one specific use case: **AI agents that generate n8n workflows**.
 
-# Auto-fix and save
-npx n8n-workflow-validator workflow.json --fix --out fixed.json
-
-# JSON output for LLMs/automation
-npx n8n-workflow-validator workflow.json --json
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                        AGENT WORKFLOW                                │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  1. Agent generates workflow JSON                                    │
+│     └─> Writes to local file: workflow.json                         │
+│                                                                      │
+│  2. Agent validates locally                                          │
+│     └─> npx n8n-cli workflows validate workflow.json --json         │
+│                                                                      │
+│  3. CLI returns structured feedback                                  │
+│     └─> { "valid": false, "errors": [...], "hints": [...] }         │
+│                                                                      │
+│  4. Agent fixes issues based on hints                                │
+│     └─> Schema delta shows exactly what's wrong                      │
+│                                                                      │
+│  5. Agent re-validates (repeat until valid)                          │
+│     └─> Tight local loop, no network latency                         │
+│                                                                      │
+│  6. Agent deploys to n8n                                             │
+│     └─> npx n8n-cli workflows create --file workflow.json           │
+│                                                                      │
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
-No config. No setup. Just works.
+### Why This Beats Streaming Workflows Through MCP
+
+When you stream a large workflow JSON through MCP tool calls:
+- LLMs tend to **hallucinate** mid-stream on large payloads
+- Token limits force **chunking** which breaks context
+- Error handling is **complex** and brittle
+
+When you write locally and validate with CLI:
+- Agent has **full control** over the file
+- Validation is **instant** and deterministic
+- Error hints include **schema examples** to copy
+- Iteration happens **locally** before any network calls
+
+---
+
+## 🚀 Get Started in 30 Seconds
+
+```bash
+# Run directly with npx (no install needed)
+npx n8n-cli --help
+
+# Or install globally
+npm install -g n8n-cli
+n8n --help
+```
+
+### For AI Agents
+
+Your agent just needs to execute shell commands. That's it.
+
+```bash
+# Search for nodes (offline, 544 nodes bundled)
+npx n8n-cli nodes search "webhook" --json
+
+# Get node schema for reference
+npx n8n-cli nodes get webhook --json
+
+# Validate a workflow file
+npx n8n-cli workflows validate workflow.json --json
+
+# Auto-fix common issues
+npx n8n-cli workflows autofix workflow.json --save fixed.json
+
+# Deploy to n8n (requires N8N_HOST and N8N_API_KEY)
+npx n8n-cli workflows create --file workflow.json
+```
+
+### Environment Setup (for n8n API commands)
+
+```bash
+export N8N_HOST="https://your-n8n-instance.com"
+export N8N_API_KEY="your-api-key"
+```
+
+Or create a `.n8nrc` file:
+```bash
+N8N_HOST=https://your-n8n-instance.com
+N8N_API_KEY=your-api-key
+```
 
 ---
 
@@ -130,14 +211,15 @@ No config. No setup. Just works.
 
 <div align="center">
 
-| Feature | What It Does | Why You Care |
+| Feature | What It Does | Why Agents Care |
 | :---: | :--- | :--- |
-| **⚙️ Native Engine**<br/>`n8n-workflow + n8n-nodes-base` | Uses `NodeHelpers.getNodeParameters` from n8n | Same validation as n8n editor—identical errors |
-| **🎯 Schema Delta**<br/>`Missing/extra key detection` | Shows exactly which keys are wrong vs schema | Fix the right thing the first time |
-| **📍 Source Locations**<br/>`Line & column numbers` | Points to exact JSON location with code snippet | No hunting through 1000-line files |
-| **💡 Correct Usage**<br/>`Schema-derived examples` | Shows the correct parameter structure | Copy-paste the fix, done |
-| **🔧 Auto-Fix**<br/>`--fix flag` | Repairs Switch v3 conditions, fallbackOutput, etc. | Let the tool do the boring work |
-| **🤖 JSON Output**<br/>`--json flag` | Structured output with all schema hints | Perfect for LLMs and CI pipelines |
+| **🤖 Agent-First `--json`**<br/>`Structured output everywhere` | Every command supports `--json` for machine parsing | Agents get clean JSON, not human-formatted tables |
+| **💡 Schema Hints**<br/>`Fix errors with examples` | Validation errors include the correct schema structure | Agent knows exactly how to fix the issue |
+| **📦 544 Nodes Bundled**<br/>`Offline node database` | Search and inspect nodes without API calls | No network latency for node lookups |
+| **🔧 Auto-Fix Mode**<br/>`--fix flag` | Repairs common mistakes (Switch v3, fallbackOutput, etc.) | Let the tool do the boring work |
+| **🎯 Schema Delta**<br/>`Missing/extra key detection` | Shows exactly which keys are wrong vs expected | Fix the right thing the first time |
+| **📍 Source Locations**<br/>`Line & column numbers` | Points to exact JSON location with code snippet | No hunting through 1000-line workflows |
+| **🔄 Full CRUD**<br/>`Complete workflow lifecycle` | Create, read, update, validate, deploy workflows | End-to-end automation support |
 
 </div>
 
@@ -145,207 +227,123 @@ No config. No setup. Just works.
 
 ## 🎮 CLI Usage
 
-### Basic Validation
+### Node Operations (Offline)
 
 ```bash
-npx n8n-workflow-validator workflow.json
+# Search nodes by keyword
+npx n8n-cli nodes search "slack" --limit 5 --json
+
+# Get node schema (for agent reference)
+npx n8n-cli nodes get slack --json
+
+# Validate node configuration
+npx n8n-cli nodes validate webhook --config '{"httpMethod":"POST"}' --json
 ```
 
-### Rich Error Output
+### Workflow Validation (The Star Feature)
 
+```bash
+# Validate a workflow file
+npx n8n-cli workflows validate workflow.json --json
+
+# Output includes:
+# - valid: boolean
+# - errors: array with schema hints
+# - warnings: array
+# - suggestions: array
+
+# Auto-fix and save
+npx n8n-cli workflows validate workflow.json --fix --save fixed.json
 ```
-❌ INVALID: workflow.json
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-🛑 ERRORS (1)
+### Workflow Management (Requires API)
 
-────────────────────────────────────────────────────────────────────────────────
-[1] N8N_PARAMETER_VALIDATION_ERROR
-    Path: nodes[12]
-    Location: Line 305, Column 5
-    Node: "route-by-format" (n8n-nodes-base.switch)
+```bash
+# List workflows
+npx n8n-cli workflows list --json
 
-    Message: Could not find property option
+# Get workflow by ID
+npx n8n-cli workflows get abc123 --json
 
-    Source:
-    ┌──────┬────────────────────────────────────────────────────────────
-    │ 302 │          "typeVersion": 2,
-    │ 303 │          "onError": "continueErrorOutput"
-    │ 304 │        },
-    │ 305 │>>>     {
-    │ 306 │          "parameters": {
-    └──────┴────────────────────────────────────────────────────────────
+# Create new workflow from file
+npx n8n-cli workflows create --file workflow.json
 
-    Root Cause Analysis:
-      • n8n Runtime Error: "Could not find property option"
+# Update existing workflow
+npx n8n-cli workflows update abc123 --file updated.json
 
-    Schema Delta:
-      • Missing keys: options
-      • Extra keys: fallbackOutput
+# Activate/deactivate
+npx n8n-cli workflows update abc123 --activate
+npx n8n-cli workflows update abc123 --deactivate
 
-    Correct Usage:
-    ┌──────────────────────────────────────────────────────────────────
-    │ {
-    │   "conditions": {
-    │     "options": {
-    │       "caseSensitive": true,
-    │       "leftValue": "",
-    │       "typeValidation": "strict"
-    │     },
-    │     "conditions": [...],
-    │     "combinator": "and"
-    │   }
-    │ }
-    └──────────────────────────────────────────────────────────────────
+# Trigger via webhook
+npx n8n-cli workflows trigger "https://n8n.example.com/webhook/xyz" --data '{"key":"value"}'
+```
+
+### Executions
+
+```bash
+# List recent executions
+npx n8n-cli executions list --limit 10 --json
+
+# Get execution details
+npx n8n-cli executions get exec123 --json
+```
+
+### Templates (Public n8n.io API)
+
+```bash
+# Search workflow templates
+npx n8n-cli templates search "slack notification" --json
+
+# Download template
+npx n8n-cli templates get 1234 --save template.json
 ```
 
 ---
 
-### JSON Output for LLMs & Automation
+## 💡 Schema Hints: The Killer Feature
 
-```bash
-npx n8n-workflow-validator workflow.json --json
-```
-
-Returns structured data with schema hints for programmatic consumption:
+When validation fails, you don't just get "invalid parameter". You get actionable guidance:
 
 ```json
 {
   "valid": false,
-  "issues": [{
-    "code": "N8N_PARAMETER_VALIDATION_ERROR",
-    "severity": "error",
-    "message": "Could not find property option",
-    "location": {
+  "errors": [
+    {
+      "code": "N8N_PARAMETER_VALIDATION_ERROR",
+      "message": "Could not find property option",
       "nodeName": "route-by-format",
       "nodeType": "n8n-nodes-base.switch",
-      "path": "nodes[12]"
-    },
-    "sourceLocation": { "line": 305, "column": 5 },
-    "context": {
-      "n8nError": "Could not find property option",
-      "fullObject": { "mode": "rules", "rules": {} },
-      "expectedSchema": { "mode": "rules", "rules": {}, "options": {} },
-      "schemaPath": "parameters"
+      "schemaDelta": {
+        "missing": ["options"],
+        "extra": ["fallbackOutput"]
+      },
+      "correctUsage": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [],
+          "combinator": "and"
+        }
+      }
     }
-  }]
+  ]
 }
 ```
 
-Perfect for feeding back into an LLM to auto-correct workflows.
+**Your agent sees:**
+- Exactly which keys are missing
+- Exactly which keys shouldn't be there
+- The correct structure to use
+
+**Result:** The agent can fix the issue in one shot, not guess-and-check for 10 iterations.
 
 ---
 
-### CLI Options
-
-<div align="center">
-
-| Option | Description |
-|:------:|:------------|
-| `--fix` | Auto-fix known issues (Switch v3, fallbackOutput, etc.) |
-| `--json` | JSON output for programmatic use |
-| `--out FILE` | Write fixed workflow to FILE |
-| `--repair` | Repair malformed JSON before validation |
-| `--no-sanitize` | Skip sanitization step |
-| `-h, --help` | Show help |
-
-</div>
-
----
-
-### Exit Codes
-
-| Code | Meaning |
-|:----:|:--------|
-| `0` | ✅ Valid workflow |
-| `1` | ❌ Invalid workflow |
-
----
-
-## 📦 API Usage
-
-Use as a library in your own tools:
-
-```typescript
-import { 
-  validateWorkflowStructure, 
-  validateNodeWithN8n,
-  nodeRegistry,
-  jsonParse 
-} from 'n8n-workflow-validator';
-
-const raw = fs.readFileSync('workflow.json', 'utf8');
-const workflow = jsonParse(raw);
-const result = validateWorkflowStructure(workflow, { rawSource: raw });
-
-for (const issue of result.issues) {
-  console.log(`[${issue.code}] ${issue.message}`);
-  
-  // Schema hints for LLMs
-  if (issue.context?.expectedSchema) {
-    console.log('Expected:', JSON.stringify(issue.context.expectedSchema, null, 2));
-  }
-  
-  // Delta detection
-  if (issue.context?.schemaDelta) {
-    console.log('Missing:', issue.context.schemaDelta.missingKeys);
-    console.log('Extra:', issue.context.schemaDelta.extraKeys);
-  }
-}
-```
-
----
-
-## 🎯 What Gets Validated
-
-<div align="center">
-
-| Layer | What's Checked | Source |
-|:-----:|:---------------|:-------|
-| **Structure** | `nodes` array, `connections` object, required fields | JSON schema |
-| **Parameters** | All node parameters against schema | `NodeHelpers.getNodeParameters` |
-| **Connections** | Valid node references, input/output types | n8n connection rules |
-| **Node Types** | Known types from `n8n-nodes-base` | Node registry |
-| **Auto-Fix Targets** | Switch v3 conditions, fallbackOutput location | Common LLM mistakes |
-
-</div>
-
----
-
-## 🔧 Installation Options
-
-```bash
-# Use directly with npx (no install needed)
-npx n8n-workflow-validator workflow.json
-
-# Or install globally
-npm install -g n8n-workflow-validator
-n8n-validate workflow.json
-
-# Or add to your project
-npm install n8n-workflow-validator
-```
-
----
-
-## 🎯 Use Cases
-
-<div align="center">
-
-| Scenario | How This Helps |
-|:---------|:---------------|
-| **🤖 MCP Servers** | Validate before sending to n8n API |
-| **🧠 LLM Agents** | Get schema hints to fix generated workflows |
-| **🔧 Workflow Generators** | Ensure output is valid before export |
-| **🧪 CI/CD Pipelines** | Block invalid workflows in PRs |
-| **📥 Import Tools** | Pre-validate user uploads |
-| **🔄 Migration Tools** | Validate during version upgrades |
-
-</div>
-
----
-
-## 🔥 Common Issues & Quick Fixes
+## 🔧 Common Issues & Quick Fixes
 
 <details>
 <summary><b>Expand for troubleshooting tips</b></summary>
@@ -355,10 +353,25 @@ npm install n8n-workflow-validator
 | **"Could not find property"** | Check Schema Delta in output—shows missing/extra keys |
 | **Switch node errors** | Use `--fix` flag—auto-fixes Switch v3 condition structure |
 | **Malformed JSON** | Use `--repair` flag to fix common JSON syntax errors |
-| **Too many errors** | Fix structure errors first (missing nodes/connections) |
-| **Node type not found** | Ensure node type exists in current `n8n-nodes-base` version |
+| **API connection failed** | Check `N8N_HOST` and `N8N_API_KEY` environment variables |
+| **Node type not found** | Node database has 544 nodes from n8n-nodes-base v1.120 |
 
 </details>
+
+---
+
+## 🆚 n8n-cli vs MCP Servers
+
+| Aspect | n8n-cli | Traditional MCP |
+|:-------|:--------|:----------------|
+| **Setup** | `npx n8n-cli` | Configure server, manage connections |
+| **Large Payloads** | Write to file, validate locally | Stream through tool calls, risk hallucinations |
+| **Error Handling** | Structured JSON with schema hints | Varies by implementation |
+| **Offline Capable** | Yes (544 nodes bundled) | Usually requires connection |
+| **Agent Complexity** | Execute shell commands | Implement MCP protocol |
+| **Iteration Speed** | Local validation loop | Network round-trips |
+
+**Bottom line:** If your agent is generating n8n workflows, CLI commands are simpler and more reliable than MCP tool calls. Use MCP for interactive exploration; use CLI for production automation.
 
 ---
 
@@ -366,8 +379,8 @@ npm install n8n-workflow-validator
 
 ```bash
 # Clone
-git clone https://github.com/yigitkonur/n8n-workflow-validator.git
-cd n8n-workflow-validator
+git clone https://github.com/yigitkonur/n8n-cli.git
+cd n8n-cli
 
 # Install
 npm install
@@ -375,15 +388,17 @@ npm install
 # Build
 npm run build
 
-# Test
-npm test
+# Run locally
+node dist/cli.js --help
 ```
 
 ---
 
 <div align="center">
 
-**Built with 🔥 because "Could not find property option" is not helpful.**
+**Built with 🔥 for AI agents that are tired of MCP complexity.**
+
+**This is what happens when you build infrastructure for agents, not just humans.**
 
 MIT © [Yiğit Konur](https://github.com/yigitkonur)
 
