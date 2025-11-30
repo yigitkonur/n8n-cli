@@ -4,6 +4,7 @@ import { Command } from 'commander';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { registerShutdownHandlers, shutdown } from './core/lifecycle.js';
 
 // Get package.json for version
 const __filename = fileURLToPath(import.meta.url);
@@ -142,8 +143,11 @@ workflowsCmd
   .command('update <id>')
   .description('Update workflow with partial changes')
   .option('-o, --operations <json>', 'Diff operations as JSON')
-  .option('-f, --file <path>', 'Path to operations JSON file')
-  .option('--dry-run', 'Preview without applying', true)
+  .option('-f, --file <path>', 'Path to workflow JSON file')
+  .option('--activate', 'Activate the workflow')
+  .option('--deactivate', 'Deactivate the workflow')
+  .option('--force, --yes', 'Skip confirmation prompts')
+  .option('--no-backup', 'Skip creating backup before changes')
   .option('--json', 'Output as JSON')
   .action(async (id, opts) => {
     const { workflowsUpdateCommand } = await import('./commands/workflows/update.js');
@@ -156,6 +160,9 @@ workflowsCmd
   .option('--dry-run', 'Preview fixes without applying', true)
   .option('--confidence <level>', 'Minimum confidence: high, medium, low', 'medium')
   .option('-s, --save <path>', 'Save fixed workflow locally')
+  .option('--apply', 'Apply fixes (to file or n8n server)')
+  .option('--force, --yes', 'Skip confirmation prompts')
+  .option('--no-backup', 'Skip creating backup before changes')
   .option('--json', 'Output as JSON')
   .action(async (id, opts) => {
     const { workflowsAutofixCommand } = await import('./commands/workflows/autofix.js');
@@ -249,5 +256,24 @@ program
     await workflowsValidateCommand(file, { ...opts, file: file || opts.file });
   });
 
-// Parse and execute
-program.parse();
+// Register shutdown handlers for graceful cleanup
+registerShutdownHandlers();
+
+// Handle unhandled rejections - set exitCode instead of exit() to allow cleanup
+process.on('unhandledRejection', (reason) => {
+  console.error('Unhandled rejection:', reason);
+  process.exitCode = 1;
+});
+
+// Parse and execute (async to properly await all command handlers)
+(async () => {
+  try {
+    await program.parseAsync(process.argv);
+  } catch (error) {
+    console.error(error);
+    process.exitCode = 1;
+  } finally {
+    // Ensure cleanup runs on normal completion
+    await shutdown();
+  }
+})();

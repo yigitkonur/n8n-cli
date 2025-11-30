@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { createRequire } from 'module';
 import type { INodeType, INodeTypeDescription, VersionedNodeType } from 'n8n-workflow';
+import { debug } from './debug.js';
 
 const require = createRequire(import.meta.url);
 // Load n8n-workflow via CommonJS entrypoint to avoid ESM logger-proxy resolution issues
@@ -10,9 +11,20 @@ const n8nWorkflowCjs = require('n8n-workflow') as any;
 // Use a differently named runtime class to avoid clashing with the type-only VersionedNodeType
 const { VersionedNodeType: CjsVersionedNodeType } = n8nWorkflowCjs;
 
+/**
+ * Failed load tracking for diagnostics
+ * Task 07: Debug Logging for Node Loader Errors
+ */
+interface FailedLoad {
+  path: string;
+  error: string;
+  type: 'require' | 'instantiate';
+}
+
 export class NodeRegistry {
   private nodeTypes: Map<string, any> = new Map();
   private initialized = false;
+  private failedLoads: FailedLoad[] = [];
 
   init() {
     if (this.initialized) return;
@@ -64,18 +76,39 @@ export class NodeRegistry {
               this.nodeTypes.set(`n8n-nodes-base.${name}`, instance);
             }
           } catch (e) {
-            // Ignore instantiation errors (some helpers might export classes that assume env)
+            // Task 07: Log instantiation errors in debug mode
+            const errorMsg = e instanceof Error ? e.message : String(e);
+            debug('loader', `Failed to instantiate ${key} from ${filePath}: ${errorMsg}`);
+            this.failedLoads.push({
+              path: filePath,
+              error: errorMsg,
+              type: 'instantiate',
+            });
           }
         }
       }
     } catch (e) {
-      // Ignore require errors
+      // Task 07: Log require errors in debug mode
+      const errorMsg = e instanceof Error ? e.message : String(e);
+      debug('loader', `Failed to require ${filePath}: ${errorMsg}`);
+      this.failedLoads.push({
+        path: filePath,
+        error: errorMsg,
+        type: 'require',
+      });
     }
   }
 
   getNodeType(nodeType: string, version?: number): INodeTypeDescription | null {
     const nodeInstance = this.nodeTypes.get(nodeType) as INodeType | VersionedNodeType | undefined;
-    if (!nodeInstance) return null;
+    if (!nodeInstance) {
+      // Task 07: Check if this node type failed to load
+      const failedEntry = this.failedLoads.find(f => f.path.includes(nodeType.replace('n8n-nodes-base.', '')));
+      if (failedEntry) {
+        debug('loader', `Node type ${nodeType} was requested but failed to load: ${failedEntry.error}`);
+      }
+      return null;
+    }
 
     if (nodeInstance instanceof CjsVersionedNodeType) {
       const vt = nodeInstance as VersionedNodeType;
@@ -86,6 +119,28 @@ export class NodeRegistry {
     }
 
     return (nodeInstance as INodeType).description;
+  }
+
+  /**
+   * Get list of load errors for diagnostics
+   * Task 07: Expose failed loads for debugging
+   */
+  getLoadErrors(): FailedLoad[] {
+    return [...this.failedLoads];
+  }
+  
+  /**
+   * Get count of successfully loaded node types
+   */
+  getLoadedCount(): number {
+    return this.nodeTypes.size;
+  }
+  
+  /**
+   * Get count of failed loads
+   */
+  getFailedCount(): number {
+    return this.failedLoads.length;
   }
 }
 

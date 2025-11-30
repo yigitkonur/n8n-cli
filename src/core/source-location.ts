@@ -28,26 +28,28 @@ export function createSourceMap(source: string): SourceMap {
 
 /**
  * Convert a character offset to line and column numbers (1-indexed).
+ * Handles both LF (\n) and CRLF (\r\n) line endings correctly.
  */
 export function offsetToLineColumn(source: string, offset: number): { line: number; column: number } {
-  const lines = source.split('\n');
-  let currentOffset = 0;
+  let line = 1;
+  let column = 1;
   
-  for (let i = 0; i < lines.length; i++) {
-    const lineLength = lines[i].length + 1; // +1 for newline
-    if (currentOffset + lineLength > offset) {
-      return {
-        line: i + 1,
-        column: offset - currentOffset + 1
-      };
+  for (let i = 0; i < offset && i < source.length; i++) {
+    if (source[i] === '\n') {
+      line++;
+      column = 1;
+    } else if (source[i] === '\r') {
+      // Skip \r - it will be followed by \n in CRLF, or standalone \r acts as newline
+      if (source[i + 1] !== '\n') {
+        line++;
+        column = 1;
+      }
+    } else {
+      column++;
     }
-    currentOffset += lineLength;
   }
   
-  return {
-    line: lines.length,
-    column: lines[lines.length - 1]?.length || 1
-  };
+  return { line, column };
 }
 
 /**

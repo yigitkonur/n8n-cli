@@ -4,8 +4,8 @@
  * Simplified for CLI use
  */
 
-import axios, { AxiosInstance, AxiosRequestConfig } from 'axios';
-import { getConfig } from '../config/loader.js';
+import axios, { AxiosInstance, AxiosRequestConfig, AxiosError } from 'axios';
+import { getConfig, maskApiKey } from '../config/loader.js';
 import { 
   handleN8nApiError, 
   N8nApiError,
@@ -21,6 +21,22 @@ import type {
   HealthCheckResponse,
   WebhookRequest,
 } from '../../types/n8n-api.js';
+
+/**
+ * Validate resource ID to prevent path injection attacks.
+ * Only allows alphanumeric, dash, and underscore characters.
+ */
+function validateResourceId(id: string, resourceType: string): string {
+  if (!id || typeof id !== 'string') {
+    throw new N8nApiError(`Invalid ${resourceType} ID: must be a non-empty string`);
+  }
+  if (!/^[a-zA-Z0-9_-]+$/.test(id)) {
+    throw new N8nApiError(
+      `Invalid ${resourceType} ID "${id}": must contain only alphanumeric characters, dashes, and underscores`
+    );
+  }
+  return id;
+}
 
 export interface N8nApiClientConfig {
   baseUrl: string;
@@ -50,14 +66,50 @@ export class N8nApiClient {
       },
     });
 
-    // Response interceptor for error handling
+    // Response interceptor for error handling and credential sanitization
+    // Task 06: Ensure API keys are never exposed in error messages
     this.client.interceptors.response.use(
       (response) => response,
       (error) => {
-        const n8nError = handleN8nApiError(error);
+        // Sanitize the error before handling
+        const sanitizedError = this.sanitizeAxiosError(error);
+        const n8nError = handleN8nApiError(sanitizedError);
         return Promise.reject(n8nError);
       }
     );
+  }
+  
+  /**
+   * Sanitize axios error to remove sensitive information
+   * Task 06: Consistent API Key Masking
+   */
+  private sanitizeAxiosError(error: AxiosError): AxiosError {
+    if (!error || typeof error !== 'object') {
+      return error;
+    }
+    
+    // Sanitize config headers
+    if (error.config?.headers) {
+      const headers = error.config.headers as Record<string, unknown>;
+      if (headers['X-N8N-API-KEY']) {
+        headers['X-N8N-API-KEY'] = maskApiKey(String(headers['X-N8N-API-KEY']));
+      }
+      if (headers['Authorization']) {
+        headers['Authorization'] = '[REDACTED]';
+      }
+    }
+    
+    // Sanitize request headers if present
+    if (error.request?.headers) {
+      const reqHeaders = error.request.headers as Record<string, unknown>;
+      for (const key of Object.keys(reqHeaders)) {
+        if (/api[-_]?key|auth|token|secret|password/i.test(key)) {
+          reqHeaders[key] = '[REDACTED]';
+        }
+      }
+    }
+    
+    return error;
   }
 
   // ===== Health Check =====
@@ -101,7 +153,8 @@ export class N8nApiClient {
 
   async getWorkflow(id: string): Promise<Workflow> {
     try {
-      const response = await this.client.get(`/workflows/${id}`);
+      const safeId = validateResourceId(id, 'workflow');
+      const response = await this.client.get(`/workflows/${safeId}`);
       return response.data;
     } catch (error) {
       throw handleN8nApiError(error);
@@ -120,14 +173,15 @@ export class N8nApiClient {
 
   async updateWorkflow(id: string, workflow: Partial<Workflow>): Promise<Workflow> {
     try {
+      const safeId = validateResourceId(id, 'workflow');
       const cleaned = this.cleanWorkflowForUpdate(workflow as Workflow);
       // Try PUT first, then PATCH
       try {
-        const response = await this.client.put(`/workflows/${id}`, cleaned);
+        const response = await this.client.put(`/workflows/${safeId}`, cleaned);
         return response.data;
       } catch (putError: any) {
         if (putError.statusCode === 405) {
-          const response = await this.client.patch(`/workflows/${id}`, cleaned);
+          const response = await this.client.patch(`/workflows/${safeId}`, cleaned);
           return response.data;
         }
         throw putError;
@@ -139,7 +193,8 @@ export class N8nApiClient {
 
   async deleteWorkflow(id: string): Promise<Workflow> {
     try {
-      const response = await this.client.delete(`/workflows/${id}`);
+      const safeId = validateResourceId(id, 'workflow');
+      const response = await this.client.delete(`/workflows/${safeId}`);
       return response.data;
     } catch (error) {
       throw handleN8nApiError(error);
@@ -148,7 +203,8 @@ export class N8nApiClient {
 
   async activateWorkflow(id: string): Promise<Workflow> {
     try {
-      const response = await this.client.post(`/workflows/${id}/activate`);
+      const safeId = validateResourceId(id, 'workflow');
+      const response = await this.client.post(`/workflows/${safeId}/activate`);
       return response.data;
     } catch (error) {
       throw handleN8nApiError(error);
@@ -157,7 +213,8 @@ export class N8nApiClient {
 
   async deactivateWorkflow(id: string): Promise<Workflow> {
     try {
-      const response = await this.client.post(`/workflows/${id}/deactivate`);
+      const safeId = validateResourceId(id, 'workflow');
+      const response = await this.client.post(`/workflows/${safeId}/deactivate`);
       return response.data;
     } catch (error) {
       throw handleN8nApiError(error);
@@ -177,7 +234,8 @@ export class N8nApiClient {
 
   async getExecution(id: string, includeData = false): Promise<Execution> {
     try {
-      const response = await this.client.get(`/executions/${id}`, {
+      const safeId = validateResourceId(id, 'execution');
+      const response = await this.client.get(`/executions/${safeId}`, {
         params: { includeData },
       });
       return response.data;
@@ -188,7 +246,8 @@ export class N8nApiClient {
 
   async deleteExecution(id: string): Promise<void> {
     try {
-      await this.client.delete(`/executions/${id}`);
+      const safeId = validateResourceId(id, 'execution');
+      await this.client.delete(`/executions/${safeId}`);
     } catch (error) {
       throw handleN8nApiError(error);
     }

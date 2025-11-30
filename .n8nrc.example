@@ -1,15 +1,25 @@
 # n8n CLI Configuration
 # Copy this file to .n8nrc in your project root or home directory
+#
+# SECURITY: This file contains sensitive credentials.
+# Recommended: chmod 600 .n8nrc (owner read/write only)
 
 # n8n Instance URL (required for API commands)
+# Must include protocol (http:// or https://)
 N8N_HOST=http://localhost:5678
 
 # n8n API Key (required for API commands)
 # Generate at: Settings → API
+# Must be 20+ alphanumeric characters
 N8N_API_KEY=your-api-key-here
 
 # Optional: API timeout in milliseconds
 # N8N_TIMEOUT=30000
 
 # Optional: Enable debug logging
+# Shows detailed information about node loading, API calls, etc.
 # N8N_DEBUG=true
+
+# Optional: Strict permission checking
+# When true, refuses to load config files with insecure permissions (e.g., 644)
+# N8N_STRICT_PERMISSIONS=false

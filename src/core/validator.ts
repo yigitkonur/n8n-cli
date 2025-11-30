@@ -315,6 +315,55 @@ export function validateWorkflowStructure(data: unknown, options?: ValidateOptio
     }
   }
 
+  // Validate connections reference existing nodes (CLI-003)
+  if (Array.isArray(wf.nodes) && wf.connections && typeof wf.connections === 'object' && !Array.isArray(wf.connections)) {
+    const nodeNames = new Set(wf.nodes.map(n => n?.name).filter(Boolean));
+    
+    for (const [sourceName, outputs] of Object.entries(wf.connections)) {
+      // Check source node exists
+      if (!nodeNames.has(sourceName)) {
+        const issue = enrichWithSourceInfo({
+          code: 'INVALID_CONNECTION_SOURCE',
+          severity: 'error',
+          message: `Connection references non-existent source node: "${sourceName}"`,
+          location: { path: `connections.${sourceName}` },
+          hint: `Available nodes: ${Array.from(nodeNames).slice(0, 5).join(', ')}${nodeNames.size > 5 ? '...' : ''}`
+        }, sourceMap, `connections.${sourceName}`);
+        issues.push(issue);
+        errors.push(issue.message);
+        continue;
+      }
+      
+      // Check target nodes in connection outputs
+      if (outputs && typeof outputs === 'object') {
+        for (const [outputType, branches] of Object.entries(outputs as Record<string, unknown>)) {
+          if (!Array.isArray(branches)) continue;
+          
+          for (let branchIdx = 0; branchIdx < branches.length; branchIdx++) {
+            const branch = branches[branchIdx];
+            if (!Array.isArray(branch)) continue;
+            
+            for (let connIdx = 0; connIdx < branch.length; connIdx++) {
+              const conn = branch[connIdx] as { node?: string } | undefined;
+              if (conn?.node && !nodeNames.has(conn.node)) {
+                const path = `connections.${sourceName}.${outputType}[${branchIdx}][${connIdx}]`;
+                const issue = enrichWithSourceInfo({
+                  code: 'INVALID_CONNECTION_TARGET',
+                  severity: 'error',
+                  message: `Connection from "${sourceName}" references non-existent target node: "${conn.node}"`,
+                  location: { path },
+                  hint: `Available nodes: ${Array.from(nodeNames).slice(0, 5).join(', ')}${nodeNames.size > 5 ? '...' : ''}`
+                }, sourceMap, path);
+                issues.push(issue);
+                errors.push(issue.message);
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
   return { 
     valid: errors.length === 0, 
     errors, 

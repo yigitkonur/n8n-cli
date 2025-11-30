@@ -147,6 +147,34 @@ export function getUserFriendlyErrorMessage(error: N8nApiError): string {
 }
 
 /**
+ * Sanitize object for logging - removes sensitive values
+ * Task 06: Consistent API Key Masking
+ */
+export function sanitizeForLogging(obj: unknown): unknown {
+  if (obj === null || obj === undefined) return obj;
+  if (typeof obj !== 'object') return obj;
+  
+  if (Array.isArray(obj)) {
+    return obj.map(sanitizeForLogging);
+  }
+  
+  const sanitized: Record<string, unknown> = {};
+  const sensitivePattern = /api[-_]?key|auth|token|secret|password|credential/i;
+  
+  for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
+    if (sensitivePattern.test(key)) {
+      sanitized[key] = '[REDACTED]';
+    } else if (typeof value === 'object' && value !== null) {
+      sanitized[key] = sanitizeForLogging(value);
+    } else {
+      sanitized[key] = value;
+    }
+  }
+  
+  return sanitized;
+}
+
+/**
  * Print error to console with formatting
  */
 export function printError(error: N8nApiError, verbose = false): void {
@@ -159,7 +187,9 @@ export function printError(error: N8nApiError, verbose = false): void {
       console.error(chalk.dim(`   Status: ${error.statusCode}`));
     }
     if (error.details) {
-      console.error(chalk.dim(`   Details: ${JSON.stringify(error.details, null, 2)}`));
+      // Task 06: Sanitize error details before logging
+      const sanitizedDetails = sanitizeForLogging(error.details);
+      console.error(chalk.dim(`   Details: ${JSON.stringify(sanitizedDetails, null, 2)}`));
     }
   }
 }

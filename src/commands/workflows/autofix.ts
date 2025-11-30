@@ -15,6 +15,8 @@ import { formatNextActions } from '../../core/formatters/next-actions.js';
 import { saveToJson, outputJson } from '../../core/formatters/json.js';
 import { theme, icons } from '../../core/formatters/theme.js';
 import { printError, N8nApiError } from '../../utils/errors.js';
+import { confirmAction, displayChangeSummary } from '../../utils/prompts.js';
+import { maybeBackupFile, maybeBackupWorkflow } from '../../utils/backup.js';
 
 interface AutofixOptions {
   file?: string;
@@ -22,6 +24,9 @@ interface AutofixOptions {
   experimental?: boolean;
   save?: string;
   json?: boolean;
+  force?: boolean;
+  yes?: boolean;
+  backup?: boolean;  // Commander inverts --no-backup to backup=false
 }
 
 export async function workflowsAutofixCommand(idOrFile: string, opts: AutofixOptions): Promise<void> {
@@ -40,7 +45,8 @@ export async function workflowsAutofixCommand(idOrFile: string, opts: AutofixOpt
       
       if (!workflow) {
         console.error(chalk.red(`\n${icons.error} Failed to parse workflow from ${filePath}`));
-        process.exit(1);
+        process.exitCode = 1;
+        return;
       }
     } else {
       source = `workflow:${idOrFile}`;
@@ -123,11 +129,30 @@ export async function workflowsAutofixCommand(idOrFile: string, opts: AutofixOpt
       console.log('');
     }
     
+    // Determine if --force or --yes was passed
+    const forceFlag = opts.force || opts.yes;
+    
     // Save if requested
     if (opts.save) {
       await saveToJson(workflow, { path: opts.save });
       console.log(chalk.green(`  ${icons.success} Saved to ${opts.save}`));
     } else if (isFile && opts.apply) {
+      // Task 02: Confirm before file mutation
+      displayChangeSummary({
+        action: 'About to overwrite local file',
+        target: source,
+        details: fixes.map(f => f.description),
+      });
+      
+      const confirmed = await confirmAction('Apply changes to file?', { force: forceFlag });
+      if (!confirmed) {
+        console.log(chalk.yellow('  Aborted.'));
+        return;
+      }
+      
+      // Task 03: Backup before mutation
+      await maybeBackupFile(source, { noBackup: opts.backup === false });
+      
       await writeFile(source, JSON.stringify(workflow, null, 2));
       console.log(chalk.green(`  ${icons.success} Updated ${source}`));
     }
@@ -135,6 +160,24 @@ export async function workflowsAutofixCommand(idOrFile: string, opts: AutofixOpt
     // Apply to API if requested
     if (opts.apply && !isFile) {
       const client = getApiClient();
+      
+      // Task 02: Confirm before API mutation
+      displayChangeSummary({
+        action: 'About to update workflow on n8n server',
+        target: `Workflow ID: ${idOrFile}`,
+        details: fixes.map(f => f.description),
+      });
+      
+      const confirmed = await confirmAction('Apply changes to n8n?', { force: forceFlag });
+      if (!confirmed) {
+        console.log(chalk.yellow('  Aborted.'));
+        return;
+      }
+      
+      // Task 03: Backup original workflow before mutation
+      const original = await client.getWorkflow(idOrFile);
+      await maybeBackupWorkflow(original, idOrFile, { noBackup: opts.backup === false });
+      
       await client.updateWorkflow(idOrFile, workflow);
       console.log(chalk.green(`  ${icons.success} Updated workflow on n8n`));
     }
@@ -149,9 +192,12 @@ export async function workflowsAutofixCommand(idOrFile: string, opts: AutofixOpt
   } catch (error) {
     if (error instanceof N8nApiError) {
       printError(error);
+    } else if ((error as Error).message?.includes('non-interactive')) {
+      // Task 02: Handle non-TTY error gracefully
+      console.error(chalk.red(`\n${icons.error} ${(error as Error).message}`));
     } else {
       console.error(chalk.red(`\n${icons.error} Error: ${(error as Error).message}`));
     }
-    process.exit(1);
+    process.exitCode = 1;
   }
 }

@@ -77,9 +77,13 @@ export interface Workflow {
 
 // Execution Types
 export enum ExecutionStatus {
+  NEW = 'new',
+  QUEUED = 'queued',
+  RUNNING = 'running',
+  WAITING = 'waiting',
   SUCCESS = 'success',
   ERROR = 'error',
-  WAITING = 'waiting',
+  CANCELED = 'canceled',
 }
 
 export interface ExecutionSummary {
