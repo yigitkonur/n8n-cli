@@ -1,0 +1,15 @@
+# n8n CLI Configuration
+# Copy this file to .n8nrc in your project root or home directory
+
+# n8n Instance URL (required for API commands)
+N8N_HOST=http://localhost:5678
+
+# n8n API Key (required for API commands)
+# Generate at: Settings → API
+N8N_API_KEY=your-api-key-here
+
+# Optional: API timeout in milliseconds
+# N8N_TIMEOUT=30000
+
+# Optional: Enable debug logging
+# N8N_DEBUG=true
