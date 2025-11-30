@@ -59,8 +59,7 @@
     "jsonrepair": "^3.8.0",
     "lodash": "^4.17.21",
     "n8n-nodes-base": "^1.120.1",
-    "n8n-workflow": "^1.119.1",
-    "ora": "^8.0.0"
+    "n8n-workflow": "^1.119.1"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.8",
