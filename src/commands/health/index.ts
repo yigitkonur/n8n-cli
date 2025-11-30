@@ -179,6 +179,6 @@ function outputResult(result: HealthResult, opts: HealthOptions): void {
     console.log(chalk.dim('   • Generate a new API key in n8n Settings → API'));
   }
   
-  // Exit with appropriate code
-  process.exit(result.status === 'ok' ? 0 : 1);
+  // Set exit code
+  process.exitCode = result.status === 'ok' ? 0 : 1;
 }

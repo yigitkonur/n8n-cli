@@ -73,7 +73,7 @@ export async function templatesSearchCommand(query: string, opts: SearchOptions)
       console.log(chalk.dim('\n  Tips:'));
       console.log(chalk.dim('  • Try broader search terms'));
       console.log(chalk.dim('  • Browse by category: --category marketing'));
-      process.exit(0);
+      process.exitCode = 0; return;
     }
     
     // Format as table
@@ -120,6 +120,6 @@ export async function templatesSearchCommand(query: string, opts: SearchOptions)
     } else {
       console.error(chalk.red(`\n${icons.error} Error: ${error.message}`));
     }
-    process.exit(1);
+    process.exitCode = 1; return;
   }
 }

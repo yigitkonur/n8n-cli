@@ -91,10 +91,3 @@ export function registerShutdownHandlers(): void {
 export async function shutdown(): Promise<void> {
   await performCleanup();
 }
-
-/**
- * Check if cleanup has been performed
- */
-export function isCleanupComplete(): boolean {
-  return cleanupComplete;
-}

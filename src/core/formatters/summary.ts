@@ -60,22 +60,3 @@ export function formatSummary(stats: SummaryStats): string {
   
   return chalk.blue('📊 Summary: ') + parts.join(' | ');
 }
-
-/**
- * Format a compact stats line
- */
-export function formatCompactStats(items: Array<{ label: string; value: string | number; color?: 'success' | 'error' | 'warning' | 'info' }>): string {
-  const colors = {
-    success: chalk.green,
-    error: chalk.red,
-    warning: chalk.yellow,
-    info: chalk.blue,
-  };
-  
-  const formatted = items.map(item => {
-    const colorFn = item.color ? colors[item.color] : chalk.white;
-    return `${chalk.dim(item.label + ':')} ${colorFn(String(item.value))}`;
-  });
-  
-  return formatted.join('  ');
-}

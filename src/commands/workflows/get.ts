@@ -57,7 +57,7 @@ export async function workflowsGetCommand(id: string, opts: GetOptions): Promise
     } else {
       console.error(chalk.red(`\n${icons.error} Error: ${(error as Error).message}`));
     }
-    process.exit(1);
+    process.exitCode = 1; return;
   }
 }
 

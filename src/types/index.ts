@@ -6,6 +6,3 @@ export * from './workflow-diff.js';
 
 // CLI Configuration Types
 export * from './config.js';
-
-// Output Formatting Types
-export * from './output.js';

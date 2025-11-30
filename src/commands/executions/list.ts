@@ -74,7 +74,7 @@ export async function executionsListCommand(opts: ListOptions): Promise<void> {
     
     if (executions.length === 0) {
       console.log(chalk.yellow('  No executions found.'));
-      process.exit(0);
+      process.exitCode = 0; return;
     }
     
     // Format as table
@@ -146,6 +146,6 @@ export async function executionsListCommand(opts: ListOptions): Promise<void> {
     } else {
       console.error(chalk.red(`\n${icons.error} Error: ${(error as Error).message}`));
     }
-    process.exit(1);
+    process.exitCode = 1; return;
   }
 }

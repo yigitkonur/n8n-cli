@@ -46,11 +46,9 @@ export interface N8nApiClientConfig {
 
 export class N8nApiClient {
   private client: AxiosInstance;
-  private debug: boolean;
 
   constructor(config: N8nApiClientConfig) {
     const { baseUrl, apiKey, timeout = 30000 } = config;
-    this.debug = process.env.N8N_DEBUG === 'true';
 
     // Ensure baseUrl ends with /api/v1
     const apiUrl = baseUrl.endsWith('/api/v1') 

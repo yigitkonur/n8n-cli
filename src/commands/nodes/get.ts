@@ -49,7 +49,7 @@ export async function nodesGetCommand(nodeType: string, opts: GetOptions): Promi
       console.log(chalk.dim('\n  Tips:'));
       console.log(chalk.dim('  • Use full node type: nodes-base.webhook'));
       console.log(chalk.dim(`  • Search for it: n8n nodes search "${nodeType}"`));
-      process.exit(1);
+      process.exitCode = 1; return;
     }
     
     // JSON output mode
@@ -77,7 +77,7 @@ export async function nodesGetCommand(nodeType: string, opts: GetOptions): Promi
     
   } catch (error: any) {
     console.error(chalk.red(`\n${icons.error} Error: ${error.message}`));
-    process.exit(1);
+    process.exitCode = 1; return;
   }
 }
 

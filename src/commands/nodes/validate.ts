@@ -9,7 +9,7 @@ import { NodeTypeNormalizer } from '../../utils/node-type-normalizer.js';
 import { formatHeader, formatDivider } from '../../core/formatters/header.js';
 import { formatNextActions } from '../../core/formatters/next-actions.js';
 import { outputJson } from '../../core/formatters/json.js';
-import { theme, icons } from '../../core/formatters/theme.js';
+import { icons } from '../../core/formatters/theme.js';
 
 interface ValidateOptions {
   config?: string;
@@ -33,7 +33,7 @@ export async function nodesValidateCommand(nodeType: string, opts: ValidateOptio
     if (!node) {
       console.error(chalk.red(`\n${icons.error} Node not found: ${nodeType}`));
       console.log(chalk.dim(`\n  Search for it: n8n nodes search "${nodeType}"`));
-      process.exit(1);
+      process.exitCode = 1; return;
     }
     
     // Parse config if provided
@@ -43,7 +43,7 @@ export async function nodesValidateCommand(nodeType: string, opts: ValidateOptio
         config = JSON.parse(opts.config);
       } catch {
         console.error(chalk.red(`\n${icons.error} Invalid JSON config`));
-        process.exit(1);
+        process.exitCode = 1; return;
       }
     }
     
@@ -97,7 +97,8 @@ export async function nodesValidateCommand(nodeType: string, opts: ValidateOptio
         suggestions,
         requiredProperties: node.properties?.filter((p: any) => p.required).map((p: any) => p.name) || [],
       });
-      process.exit(isValid ? 0 : 1);
+      process.exitCode = isValid ? 0 : 1;
+      return;
     }
     
     // Human-friendly output
@@ -162,10 +163,10 @@ export async function nodesValidateCommand(nodeType: string, opts: ValidateOptio
       { command: `n8n nodes validate ${node.nodeType} --config '{"key":"value"}'`, description: 'Validate with config' },
     ]));
     
-    process.exit(isValid ? 0 : 1);
+    process.exitCode = isValid ? 0 : 1;
     
   } catch (error: any) {
     console.error(chalk.red(`\n${icons.error} Error: ${error.message}`));
-    process.exit(1);
+    process.exitCode = 1; return;
   }
 }

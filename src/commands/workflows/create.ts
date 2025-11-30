@@ -24,7 +24,7 @@ export async function workflowsCreateCommand(opts: CreateOptions): Promise<void>
   try {
     if (!opts.file) {
       console.error(chalk.red(`\n${icons.error} Please provide --file with workflow JSON`));
-      process.exit(1);
+      process.exitCode = 1; return;
     }
     
     const content = await readFile(opts.file, 'utf8');
@@ -32,7 +32,7 @@ export async function workflowsCreateCommand(opts: CreateOptions): Promise<void>
     
     if (!workflow) {
       console.error(chalk.red(`\n${icons.error} Failed to parse workflow from ${opts.file}`));
-      process.exit(1);
+      process.exitCode = 1; return;
     }
     
     // Override name if provided
@@ -86,6 +86,6 @@ export async function workflowsCreateCommand(opts: CreateOptions): Promise<void>
     } else {
       console.error(chalk.red(`\n${icons.error} Error: ${(error as Error).message}`));
     }
-    process.exit(1);
+    process.exitCode = 1; return;
   }
 }

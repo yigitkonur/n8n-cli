@@ -13,7 +13,7 @@ import { jsonParse } from '../../core/json-parser.js';
 import { formatHeader, formatDivider } from '../../core/formatters/header.js';
 import { formatNextActions } from '../../core/formatters/next-actions.js';
 import { saveToJson, outputJson } from '../../core/formatters/json.js';
-import { theme, icons } from '../../core/formatters/theme.js';
+import { icons } from '../../core/formatters/theme.js';
 import { printError, N8nApiError } from '../../utils/errors.js';
 
 interface ValidateOptions {
@@ -46,7 +46,8 @@ export async function workflowsValidateCommand(idOrFile: string | undefined, opt
       
       if (!workflow) {
         console.error(chalk.red(`\n${icons.error} Failed to parse workflow JSON from ${filePath}`));
-        process.exit(1);
+        process.exitCode = 1;
+        return;
       }
     } else if (idOrFile) {
       // Load from API
@@ -55,7 +56,8 @@ export async function workflowsValidateCommand(idOrFile: string | undefined, opt
       workflow = await client.getWorkflow(idOrFile);
     } else {
       console.error(chalk.red(`\n${icons.error} Please provide a workflow ID or --file path`));
-      process.exit(1);
+      process.exitCode = 1;
+      return;
     }
     
     // Apply fixes if requested
@@ -86,7 +88,8 @@ export async function workflowsValidateCommand(idOrFile: string | undefined, opt
         fixed: fixedCount,
         issues: result.issues || [],
       });
-      process.exit(result.valid && errors.length === 0 ? 0 : 1);
+      process.exitCode = result.valid && errors.length === 0 ? 0 : 1;
+      return;
     }
     
     // Human-friendly output
@@ -165,7 +168,7 @@ export async function workflowsValidateCommand(idOrFile: string | undefined, opt
       ]));
     }
     
-    process.exit(isValid ? 0 : 1);
+    process.exitCode = isValid ? 0 : 1;
     
   } catch (error) {
     if (error instanceof N8nApiError) {
@@ -173,6 +176,6 @@ export async function workflowsValidateCommand(idOrFile: string | undefined, opt
     } else {
       console.error(chalk.red(`\n${icons.error} Error: ${(error as Error).message}`));
     }
-    process.exit(1);
+    process.exitCode = 1;
   }
 }

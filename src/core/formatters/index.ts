@@ -10,7 +10,7 @@ export { formatTable, columnFormatters } from './table.js';
 export type { TableColumn, TableOptions } from './table.js';
 
 // Summary statistics
-export { formatSummary, formatCompactStats } from './summary.js';
+export { formatSummary } from './summary.js';
 export type { SummaryStats } from './summary.js';
 
 // Next actions

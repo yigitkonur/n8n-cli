@@ -28,7 +28,7 @@ export async function templatesGetCommand(id: string, opts: GetOptions): Promise
     
     if (!template) {
       console.error(chalk.red(`\n${icons.error} Template ${id} not found`));
-      process.exit(1);
+      process.exitCode = 1; return;
     }
     
     // JSON output mode (returns the workflow ready to import)
@@ -119,6 +119,6 @@ export async function templatesGetCommand(id: string, opts: GetOptions): Promise
     } else {
       console.error(chalk.red(`\n${icons.error} Error: ${error.message}`));
     }
-    process.exit(1);
+    process.exitCode = 1; return;
   }
 }

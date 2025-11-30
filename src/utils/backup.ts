@@ -82,8 +82,6 @@ export function logBackupCreated(backupPath: string): void {
 export interface BackupOptions {
   /** Skip creating backup */
   noBackup?: boolean;
-  /** Custom backup directory */
-  backupDir?: string;
 }
 
 /**

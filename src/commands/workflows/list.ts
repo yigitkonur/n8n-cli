@@ -10,7 +10,7 @@ import { formatTable, columnFormatters } from '../../core/formatters/table.js';
 import { formatSummary } from '../../core/formatters/summary.js';
 import { formatNextActions } from '../../core/formatters/next-actions.js';
 import { saveToJson, outputJson } from '../../core/formatters/json.js';
-import { theme, icons } from '../../core/formatters/theme.js';
+import { icons } from '../../core/formatters/theme.js';
 import { printError, N8nApiError } from '../../utils/errors.js';
 
 interface ListOptions {
@@ -76,7 +76,7 @@ export async function workflowsListCommand(opts: ListOptions): Promise<void> {
       console.log(chalk.dim('\n  Tips:'));
       console.log(chalk.dim('  • Check your n8n instance has workflows'));
       console.log(chalk.dim('  • Verify N8N_HOST and N8N_API_KEY are correct'));
-      process.exit(0);
+      process.exitCode = 0; return;
     }
     
     // Format as table
@@ -147,6 +147,6 @@ export async function workflowsListCommand(opts: ListOptions): Promise<void> {
     } else {
       console.error(chalk.red(`\n${icons.error} Error: ${(error as Error).message}`));
     }
-    process.exit(1);
+    process.exitCode = 1; return;
   }
 }

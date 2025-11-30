@@ -75,7 +75,7 @@ export async function workflowsTriggerCommand(webhookUrl: string, opts: TriggerO
       }
     }
     
-    process.exit(result.status >= 200 && result.status < 300 ? 0 : 1);
+    process.exitCode = result.status >= 200 && result.status < 300 ? 0 : 1;
     
   } catch (error) {
     if (error instanceof N8nApiError) {
@@ -83,6 +83,6 @@ export async function workflowsTriggerCommand(webhookUrl: string, opts: TriggerO
     } else {
       console.error(chalk.red(`\n${icons.error} Error: ${(error as Error).message}`));
     }
-    process.exit(1);
+    process.exitCode = 1; return;
   }
 }

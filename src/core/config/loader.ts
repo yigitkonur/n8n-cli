@@ -208,13 +208,6 @@ export function validateConfig(config: CliConfig): { valid: boolean; errors: str
 }
 
 /**
- * Normalize host URL (remove trailing slash)
- */
-export function normalizeHost(host: string): string {
-  return host.replace(/\/+$/, '');
-}
-
-/**
  * Mask API key for display
  */
 export function maskApiKey(key: string): string {

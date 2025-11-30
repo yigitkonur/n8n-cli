@@ -66,7 +66,7 @@ export async function nodesSearchCommand(query: string, opts: SearchOptions): Pr
       console.log(chalk.dim('  • Try --mode FUZZY for broader matches'));
       console.log(chalk.dim('  • Use simpler search terms'));
       console.log(chalk.dim('  • Check spelling'));
-      process.exit(0);
+      process.exitCode = 0; return;
     }
     
     // Format as table (cast to generic record for formatTable)
@@ -131,6 +131,6 @@ export async function nodesSearchCommand(query: string, opts: SearchOptions): Pr
       console.log(chalk.dim('\n  The nodes database is missing.'));
       console.log(chalk.dim('  Ensure you are running from the package root directory.'));
     }
-    process.exit(1);
+    process.exitCode = 1; return;
   }
 }

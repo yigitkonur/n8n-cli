@@ -14,8 +14,3 @@ export interface CliConfig {
   /** Enable debug logging */
   debug: boolean;
 }
-
-export interface ConfigValidationResult {
-  valid: boolean;
-  errors: string[];
-}

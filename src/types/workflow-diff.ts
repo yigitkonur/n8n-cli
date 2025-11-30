@@ -194,20 +194,3 @@ export interface NodeReference {
   id?: string;
   name?: string;
 }
-
-// Type guards
-export function isNodeOperation(op: WorkflowDiffOperation): op is 
-  AddNodeOperation | RemoveNodeOperation | UpdateNodeOperation | 
-  MoveNodeOperation | EnableNodeOperation | DisableNodeOperation {
-  return ['addNode', 'removeNode', 'updateNode', 'moveNode', 'enableNode', 'disableNode'].includes(op.type);
-}
-
-export function isConnectionOperation(op: WorkflowDiffOperation): op is
-  AddConnectionOperation | RemoveConnectionOperation | RewireConnectionOperation | CleanStaleConnectionsOperation | ReplaceConnectionsOperation {
-  return ['addConnection', 'removeConnection', 'rewireConnection', 'cleanStaleConnections', 'replaceConnections'].includes(op.type);
-}
-
-export function isMetadataOperation(op: WorkflowDiffOperation): op is 
-  UpdateSettingsOperation | UpdateNameOperation | AddTagOperation | RemoveTagOperation {
-  return ['updateSettings', 'updateName', 'addTag', 'removeTag'].includes(op.type);
-}
