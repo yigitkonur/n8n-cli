@@ -56,6 +56,9 @@ export const icons = {
   node: '📦',
   execution: '▶️',
   template: '📋',
+  auth: '🔐',
+  user: '👤',
+  logout: '🚪',
 };
 
 /**

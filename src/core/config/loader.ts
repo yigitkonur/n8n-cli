@@ -1,4 +1,5 @@
-import { existsSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, statSync, writeFileSync, chmodSync, mkdirSync } from 'node:fs';
+import { dirname } from 'node:path';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import chalk from 'chalk';
@@ -10,7 +11,7 @@ export type { CliConfig } from '../../types/config.js';
 /**
  * Partial config from file or env
  */
-interface PartialConfig {
+export interface PartialConfig {
   host?: string;
   apiKey?: string;
   timeout?: number;
@@ -213,6 +214,130 @@ export function validateConfig(config: CliConfig): { valid: boolean; errors: str
 export function maskApiKey(key: string): string {
   if (!key || key.length < 8) return '***';
   return key.slice(0, 4) + '...' + key.slice(-4);
+}
+
+/**
+ * Normalize a URL to its base form (protocol + host + port)
+ * Handles dirty URLs like 'https://example.com/settings/profile?tab=api'
+ * Returns: 'https://example.com'
+ */
+export function normalizeUrl(input: string): string {
+  // Handle common mistakes: host:port without protocol
+  let urlStr = input.trim();
+  if (/^[a-zA-Z0-9.-]+:\d+$/.test(urlStr)) {
+    urlStr = `http://${urlStr}`;
+  } else if (!urlStr.startsWith('http://') && !urlStr.startsWith('https://')) {
+    urlStr = `https://${urlStr}`;
+  }
+  
+  try {
+    const url = new URL(urlStr);
+    if (!['http:', 'https:'].includes(url.protocol)) {
+      throw new Error('URL must use http:// or https:// protocol');
+    }
+    // Return origin (protocol + host + port if non-standard)
+    return url.origin;
+  } catch (error) {
+    throw new Error(`Invalid URL: ${input}. Expected format: https://your-n8n-instance.com`);
+  }
+}
+
+/**
+ * Get the default config file path for writing
+ * Prefers ~/.n8nrc.json for user-level config
+ */
+export function getConfigFilePath(): string {
+  // Check if any config file exists (use that for updates)
+  for (const configPath of configPaths) {
+    if (existsSync(configPath)) {
+      return configPath;
+    }
+  }
+  // Default to ~/.n8nrc.json for new configs
+  return join(homedir(), '.n8nrc.json');
+}
+
+/**
+ * Save configuration to file
+ * Merges with existing config and sets secure permissions (600 on Unix)
+ * @returns The path where config was saved
+ */
+export function saveConfig(partial: PartialConfig): string {
+  const configPath = getConfigFilePath();
+  
+  // Ensure directory exists
+  const configDir = dirname(configPath);
+  if (!existsSync(configDir)) {
+    mkdirSync(configDir, { recursive: true, mode: 0o700 });
+  }
+  
+  // Load existing config (if any) and merge
+  let existing: PartialConfig = {};
+  if (existsSync(configPath)) {
+    try {
+      existing = JSON.parse(readFileSync(configPath, 'utf8'));
+    } catch {
+      // Start fresh if file is corrupted
+    }
+  }
+  
+  // Merge new values with existing (new values take precedence)
+  const merged = {
+    ...existing,
+    ...Object.fromEntries(
+      Object.entries(partial).filter(([_, v]) => v !== undefined)
+    ),
+  };
+  
+  // Write config
+  writeFileSync(configPath, JSON.stringify(merged, null, 2), 'utf8');
+  
+  // Set secure permissions on Unix (owner read/write only)
+  if (process.platform !== 'win32') {
+    try {
+      chmodSync(configPath, 0o600);
+    } catch {
+      // Ignore permission errors (e.g., on some filesystems)
+    }
+  }
+  
+  // Invalidate cached config
+  resetConfig();
+  
+  return configPath;
+}
+
+/**
+ * Clear authentication credentials from config
+ * Removes apiKey while preserving other settings
+ */
+export function clearAuthConfig(): void {
+  const configPath = getConfigFilePath();
+  
+  if (!existsSync(configPath)) {
+    return; // Nothing to clear
+  }
+  
+  try {
+    const existing = JSON.parse(readFileSync(configPath, 'utf8'));
+    // Remove auth-related fields
+    delete existing.apiKey;
+    delete existing.N8N_API_KEY;
+    delete existing.n8n_api_key;
+    
+    writeFileSync(configPath, JSON.stringify(existing, null, 2), 'utf8');
+    resetConfig();
+  } catch {
+    // Ignore errors
+  }
+}
+
+/**
+ * Check if CLI is configured with required auth credentials
+ */
+export function isConfigured(): boolean {
+  const config = getConfig();
+  return Boolean(config.host && config.apiKey);
 }
 
 // Singleton config instance

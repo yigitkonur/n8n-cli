@@ -28,6 +28,50 @@ program
   .helpOption('-h, --help', 'Display help');
 
 // ============================================================================
+// AUTH COMMAND
+// ============================================================================
+const authCmd = program
+  .command('auth')
+  .description('Manage n8n CLI authentication');
+
+authCmd
+  .command('login')
+  .description('Configure n8n credentials')
+  .option('-H, --host <url>', 'n8n instance URL (e.g., https://your-n8n.com)')
+  .option('-k, --api-key <key>', 'n8n API key')
+  .option('-i, --interactive', 'Use interactive mode with prompts')
+  .option('--json', 'Output as JSON')
+  .action(async (opts) => {
+    const { authLoginCommand } = await import('./commands/auth/index.js');
+    await authLoginCommand(opts);
+  });
+
+authCmd
+  .command('status')
+  .alias('whoami')
+  .description('Show current authentication status')
+  .option('--json', 'Output as JSON')
+  .action(async (opts) => {
+    const { authStatusCommand } = await import('./commands/auth/index.js');
+    await authStatusCommand(opts);
+  });
+
+authCmd
+  .command('logout')
+  .description('Clear stored credentials')
+  .option('--json', 'Output as JSON')
+  .action(async (opts) => {
+    const { authLogoutCommand } = await import('./commands/auth/index.js');
+    await authLogoutCommand(opts);
+  });
+
+// Default action for 'n8n auth' without subcommand - show help
+authCmd.action(async () => {
+  const { showAuthHelp } = await import('./commands/auth/index.js');
+  showAuthHelp();
+});
+
+// ============================================================================
 // HEALTH COMMAND
 // ============================================================================
 program

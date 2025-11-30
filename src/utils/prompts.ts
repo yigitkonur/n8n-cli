@@ -4,6 +4,7 @@
  */
 
 import * as readline from 'node:readline';
+import { spawn } from 'node:child_process';
 import chalk from 'chalk';
 
 /**
@@ -21,6 +22,164 @@ export interface ConfirmOptions {
  */
 export function isInteractive(): boolean {
   return Boolean(process.stdin.isTTY);
+}
+
+/**
+ * Check if running in non-interactive mode (CI, agents, piped input)
+ * More comprehensive than just !isInteractive()
+ */
+export function isNonInteractive(): boolean {
+  // Check for common CI environment variables
+  const ciEnvVars = [
+    'CI',
+    'GITHUB_ACTIONS',
+    'GITLAB_CI',
+    'JENKINS_URL',
+    'TRAVIS',
+    'CIRCLECI',
+    'BUILDKITE',
+    'DRONE',
+    'TF_BUILD', // Azure DevOps
+  ];
+  
+  const isCI = ciEnvVars.some(envVar => process.env[envVar]);
+  const noTTY = !process.stdin.isTTY;
+  const dumbTerminal = process.env.TERM === 'dumb';
+  
+  return isCI || noTTY || dumbTerminal;
+}
+
+/**
+ * Open a URL in the default browser
+ * Cross-platform: macOS (open), Windows (start), Linux (xdg-open)
+ */
+export function openBrowser(url: string): boolean {
+  try {
+    let command: string;
+    let args: string[];
+    
+    switch (process.platform) {
+      case 'darwin':
+        command = 'open';
+        args = [url];
+        break;
+      case 'win32':
+        command = 'cmd';
+        args = ['/c', 'start', '', url];
+        break;
+      default: // Linux and others
+        command = 'xdg-open';
+        args = [url];
+        break;
+    }
+    
+    const child = spawn(command, args, {
+      stdio: 'ignore',
+      detached: true,
+    });
+    
+    child.unref();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Prompt for a single line of input
+ * @param message - Prompt message
+ * @param defaultValue - Optional default value shown in brackets
+ */
+export async function promptInput(
+  message: string,
+  defaultValue?: string
+): Promise<string> {
+  if (isNonInteractive()) {
+    throw new Error(
+      'Cannot prompt for input in non-interactive mode.\n' +
+      'Provide required values via command-line flags or environment variables.'
+    );
+  }
+  
+  const defaultHint = defaultValue ? ` [${defaultValue}]` : '';
+  const prompt = `${message}${defaultHint}: `;
+  
+  return new Promise((resolve) => {
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout,
+    });
+    
+    rl.on('SIGINT', () => {
+      rl.close();
+      console.log(chalk.yellow('\nAborted.'));
+      process.exit(1);
+    });
+    
+    rl.question(chalk.cyan(prompt), (answer) => {
+      rl.close();
+      const value = answer.trim() || defaultValue || '';
+      resolve(value);
+    });
+  });
+}
+
+/**
+ * Prompt for sensitive input (like API keys)
+ * Input is hidden from the terminal
+ * @param message - Prompt message
+ */
+export async function promptSecret(message: string): Promise<string> {
+  if (isNonInteractive()) {
+    throw new Error(
+      'Cannot prompt for secret input in non-interactive mode.\n' +
+      'Provide required values via command-line flags or environment variables.'
+    );
+  }
+  
+  const prompt = `${message}: `;
+  
+  return new Promise((resolve) => {
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout,
+    });
+    
+    // Hide input by not echoing
+    if (process.stdin.isTTY) {
+      process.stdin.setRawMode?.(true);
+    }
+    
+    process.stdout.write(chalk.cyan(prompt));
+    
+    let input = '';
+    
+    const onData = (char: Buffer) => {
+      const c = char.toString();
+      
+      if (c === '\n' || c === '\r') {
+        process.stdin.setRawMode?.(false);
+        process.stdin.removeListener('data', onData);
+        process.stdout.write('\n');
+        rl.close();
+        resolve(input);
+      } else if (c === '\u0003') { // Ctrl+C
+        process.stdin.setRawMode?.(false);
+        process.stdin.removeListener('data', onData);
+        console.log(chalk.yellow('\nAborted.'));
+        rl.close();
+        process.exit(1);
+      } else if (c === '\u007F' || c === '\b') { // Backspace
+        if (input.length > 0) {
+          input = input.slice(0, -1);
+        }
+      } else {
+        input += c;
+      }
+    };
+    
+    process.stdin.on('data', onData);
+  });
 }
 
 /**
