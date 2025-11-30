@@ -1,8 +1,6 @@
 name: Publish to npm
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
     inputs:
       bump:
@@ -36,7 +34,9 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
       
       - name: Install dependencies
-        run: npm install
+        run: |
+          rm -rf node_modules package-lock.json
+          npm install
       
       - name: Build
         run: npm run build
@@ -47,7 +47,7 @@ jobs:
       - name: Bump version
         id: bump
         run: |
-          BUMP_TYPE="${{ github.event.inputs.bump || 'patch' }}"
+          BUMP_TYPE="${{ github.event.inputs.bump }}"
           npm version $BUMP_TYPE -m "chore: bump version to %s"
           echo "version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
       
