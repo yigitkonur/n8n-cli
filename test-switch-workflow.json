@@ -1,0 +1,35 @@
+{
+  "name": "Test Switch Workflow",
+  "nodes": [
+    {
+      "id": "switch-1",
+      "name": "My Switch",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [100, 100],
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.value }}",
+                    "rightValue": "test",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "outputKey": "Rule 1"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "connections": {}
+}

@@ -28,7 +28,8 @@ import { getLatestRegistryVersion } from '../../core/versioning/breaking-changes
 
 interface ValidateOptions {
   file?: string;
-  profile?: string;
+  profile?: 'minimal' | 'runtime' | 'ai-friendly' | 'strict';
+  mode?: 'minimal' | 'operation' | 'full';
   repair?: boolean;
   fix?: boolean;
   validateExpressions?: boolean;
@@ -119,9 +120,8 @@ export async function workflowsValidateCommand(idOrFile: string | undefined, opt
       // Similarity service unavailable - continue without suggestions
     }
     
-    // Validate
-    // TODO: Profile parameter not yet fully implemented - all profiles currently run the same validation
-    // Future: differentiate between minimal (structure only), runtime (+ node params), and strict (+ best practices)
+    // Validate with enhanced validation when profile or mode is specified
+    const useEnhanced = opts.profile !== undefined || opts.mode !== undefined;
     const result = validateWorkflowStructure(workflow, {
       rawSource,
       nodeSuggestions,
@@ -129,6 +129,10 @@ export async function workflowsValidateCommand(idOrFile: string | undefined, opt
       checkVersions: opts.checkVersions,
       versionSeverity: opts.versionSeverity,
       skipCommunityNodes: opts.skipCommunityNodes,
+      // Enhanced validation options
+      enhanced: useEnhanced,
+      mode: opts.mode || 'operation',
+      profile: opts.profile || 'runtime',
     });
     
     // Profile-specific messaging
@@ -167,6 +171,14 @@ export async function workflowsValidateCommand(idOrFile: string | undefined, opt
         issues: result.issues || [],
         ...(upgradeAnalysis && { upgradeAnalysis }),
         ...(result.versionIssues && { versionIssues: result.versionIssues }),
+        // Enhanced validation metadata
+        ...(useEnhanced && {
+          validation: {
+            mode: opts.mode || 'operation',
+            profile: opts.profile || 'runtime',
+            enhanced: true,
+          },
+        }),
       });
       process.exitCode = result.valid && errors.length === 0 ? 0 : 1;
       return;

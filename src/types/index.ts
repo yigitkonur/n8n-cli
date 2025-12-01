@@ -12,3 +12,6 @@ export * from './global-options.js';
 
 // Template Types
 export * from './templates.js';
+
+// Node Detail Mode Types
+export * from './node-detail.js';

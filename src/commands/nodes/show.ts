@@ -15,6 +15,7 @@ import { formatExportFooter } from '../../core/formatters/jq-recipes.js';
 import { saveToJson, outputJson } from '../../core/formatters/json.js';
 import { theme, icons, formatBoolean } from '../../core/formatters/theme.js';
 import { PropertyFilter, type SimplifiedProperty } from '../../core/services/property-filter.js';
+import { BreakingChangeDetector, type DetectedChange, getTrackedVersionsForNode, getLatestRegistryVersion } from '../../core/versioning/index.js';
 import type { 
   ShowOptions, 
   DetailLevel, 
@@ -93,16 +94,11 @@ export async function nodesShowCommand(nodeType: string, opts: ShowOptions): Pro
           process.exitCode = 1;
           return;
         }
-        outputVersionStub(node, 'compare', opts.from, opts.to);
+        // Use breaking changes for comparison (same underlying data)
+        outputBreaking(node, opts.from, opts.to);
         break;
       case 'breaking':
-        if (!opts.from) {
-          console.error(chalk.red(`\n${icons.error} --from required for breaking mode`));
-          console.log(chalk.dim('  Example: n8n nodes show httpRequest --mode breaking --from 3'));
-          process.exitCode = 1;
-          return;
-        }
-        outputVersionStub(node, 'breaking', opts.from, opts.to);
+        outputBreaking(node, opts.from, opts.to);
         break;
       case 'migrations':
         if (!opts.from || !opts.to) {

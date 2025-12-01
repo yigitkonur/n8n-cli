@@ -253,10 +253,27 @@ n8n workflows validate [idOrFile] [options]
 | `--profile <profile>` | Validation profile: `minimal`, `runtime`, `ai-friendly`, `strict` | `runtime` |
 | `--repair` | Attempt to repair malformed JSON | - |
 | `--fix` | Auto-fix known issues | - |
+| `--check-upgrades` | Check for node version upgrades and breaking changes | - |
+| `--upgrade-severity <level>` | Minimum severity for upgrade warnings: `LOW`, `MEDIUM`, `HIGH` | - |
 | `--validate-expressions` | Enable expression format validation | `true` |
 | `--no-validate-expressions` | Skip expression format validation | - |
 | `-s, --save <path>` | Save fixed workflow | - |
 | `--json` | Output as JSON | - |
+
+**Version Upgrade Checking:**
+
+Use `--check-upgrades` to analyze nodes in the workflow for available version upgrades:
+
+```bash
+# Check for upgrade recommendations
+n8n workflows validate workflow.json --check-upgrades
+
+# Get JSON output with upgrade analysis
+n8n workflows validate workflow.json --check-upgrades --json
+
+# Only show high severity breaking changes
+n8n workflows validate workflow.json --check-upgrades --upgrade-severity HIGH
+```
 
 **Expression Format Validation:**
 
@@ -798,8 +815,10 @@ n8n nodes show <nodeType> [options]
 | `--schema` | Show full property schema | - |
 | `--minimal` | Show operations only | - |
 | `--examples` | Show usage examples | - |
-| `-m, --mode <mode>` | Output mode: `info`, `docs`, `versions` | `info` |
+| `-m, --mode <mode>` | Output mode: `info`, `docs`, `versions`, `breaking` | `info` |
 | `-d, --detail <level>` | Detail level: `minimal`, `standard`, `full` | `standard` |
+| `--from <version>` | Source version (for `--mode breaking`) | `1.0` |
+| `--to <version>` | Target version (for `--mode breaking`) | Latest |
 | `-s, --save <path>` | Save to JSON file | - |
 | `--json` | Output as JSON | - |
 
@@ -819,6 +838,42 @@ n8n nodes get <nodeType> [options]
 | `--json` | Output as JSON | - |
 
 > **Note:** For full schema output with `--schema`, `--minimal`, or `--examples`, use `nodes show` instead.
+
+#### `nodes breaking-changes`
+
+Analyze breaking changes between node versions. Uses bundled registry (offline).
+
+```bash
+n8n nodes breaking-changes <nodeType> [options]
+```
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--from <version>` | Source version | `1.0` |
+| `--to <version>` | Target version | Latest known |
+| `--severity <level>` | Filter by severity: `LOW`, `MEDIUM`, `HIGH` | - |
+| `--auto-only` | Show only auto-migratable changes | - |
+| `-s, --save <path>` | Save analysis to JSON file | - |
+| `--json` | Output as JSON | - |
+
+**Examples:**
+```bash
+# Show all breaking changes between webhook v1.0 and v2.0
+n8n nodes breaking-changes webhook --from 1.0 --to 2.0
+
+# Get only high severity changes in JSON
+n8n nodes breaking-changes executeWorkflow --from 1.0 --severity HIGH --json
+
+# Show only auto-migratable changes for Switch node
+n8n nodes breaking-changes switch --from 2.0 --auto-only
+```
+
+**Severity Levels:**
+- `HIGH` - Breaking changes that will cause errors
+- `MEDIUM` - Changes that may affect behavior  
+- `LOW` - Minor changes, usually safe
+
+**Exit Code:** Returns `65` (DATAERR) if breaking changes are found.
 
 #### `nodes categories`
 

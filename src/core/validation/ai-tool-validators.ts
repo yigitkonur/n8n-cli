@@ -9,7 +9,7 @@
  */
 
 import { NodeTypeNormalizer } from '../../utils/node-type-normalizer.js';
-import type { Workflow, WorkflowNode, ReverseConnection, ValidationIssue } from '../types.js';
+import type { Workflow, WorkflowNode, ReverseConnection } from '../types.js';
 
 // Validation constants
 const MIN_DESCRIPTION_LENGTH_MEDIUM = 15;

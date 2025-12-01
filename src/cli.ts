@@ -212,36 +212,51 @@ jq Examples (after --save):
 
 nodesCmd
   .command('show <nodeType>')
-  .description('Show node details, schema, and examples')
-  .option('--schema', 'Show full property schema')
-  .option('--minimal', 'Show operations only')
-  .option('--examples', 'Show usage examples')
-  .option('-m, --mode <mode>', 'Output mode: info, docs, versions, breaking', 'info')
-  .option('-d, --detail <level>', 'Detail level: minimal, standard, full', 'standard')
-  .option('--from <version>', 'Source version (for --mode breaking)')
-  .option('--to <version>', 'Target version (for --mode breaking)')
-  .option('--json', 'Output as JSON')
+  .description('Show node details with configurable detail level and specialized modes')
+  .option('-d, --detail <level>', 'Detail level: minimal (~200 tokens), standard (~1-2K), full (~3-8K)', 'standard')
+  .option('-m, --mode <mode>', 'Operation mode: info, docs, search-properties, versions, compare, breaking, migrations', 'info')
+  .option('--query <term>', 'Property search term (for search-properties mode)')
+  .option('--from <version>', 'Source version (for compare, breaking, migrations)')
+  .option('--to <version>', 'Target version (for compare, migrations)')
+  .option('--max-results <n>', 'Max property search results', '20')
+  .option('--include-type-info', 'Include type structure metadata')
+  .option('--include-examples', 'Include real-world configuration examples')
+  .option('--schema', 'Legacy: equivalent to --detail full')
+  .option('--minimal', 'Legacy: equivalent to --detail minimal')
+  .option('--examples', 'Legacy: equivalent to --include-examples')
   .option('-s, --save <path>', 'Save to JSON file')
+  .option('--json', 'Output as JSON')
   .addHelpText('after', `
 Node Type Naming:
   Use the internal node type name, NOT the display name:
   ✓ n8n-nodes-base.httpRequest     (correct)
-  ✓ @n8n/n8n-nodes-langchain.agent  (community nodes)
-  ✗ "HTTP Request"                  (display name - won't work)
+  ✓ @n8n/n8n-nodes-langchain.agent (community nodes)
+  ✗ "HTTP Request"                 (display name - won't work)
 
 💡 Find node types with: n8n nodes search "http"
 
-Output Modes:
-  info      Default: operations, properties, credentials
-  docs      Documentation and descriptions
-  versions  Version history and changes
-  breaking  Breaking changes between versions (use --from/--to)
+Detail Levels:
+  minimal   Basic metadata only (~200 tokens)
+  standard  Essential properties + operations (~1-2K tokens, default)
+  full      Complete schema with all properties (~3-8K tokens)
+
+Operation Modes:
+  info              Node configuration schema (default)
+  docs              Markdown documentation
+  search-properties Find properties by query (requires --query)
+  versions          Version history with breaking changes
+  compare           Property diff between versions (requires --from)
+  breaking          Breaking changes between versions
+  migrations        Auto-migratable changes (requires --from, --to)
 
 Examples:
-  n8n nodes show n8n-nodes-base.slack --schema
-  n8n nodes show n8n-nodes-base.httpRequest --mode docs
-  n8n nodes show n8n-nodes-base.webhook --save webhook-schema.json
-  n8n nodes show n8n-nodes-base.webhook --mode breaking --from 1.0 --to 2.0
+  n8n nodes show httpRequest                              # Standard detail
+  n8n nodes show httpRequest --detail minimal --json      # Quick lookup
+  n8n nodes show httpRequest --detail full                # Full schema
+  n8n nodes show httpRequest --mode docs                  # Documentation
+  n8n nodes show httpRequest --mode search-properties --query "auth"
+  n8n nodes show httpRequest --mode versions              # Version history
+  n8n nodes show httpRequest --mode breaking --from 3     # Breaking changes
 `)
   .action(async (nodeType, opts) => {
     const { nodesShowCommand } = await import('./commands/nodes/show.js');
@@ -455,6 +470,9 @@ workflowsCmd
   .option('--fix', 'Auto-fix known issues')
   .option('--check-upgrades', 'Check for node version upgrades and breaking changes')
   .option('--upgrade-severity <level>', 'Minimum severity for upgrade warnings: LOW, MEDIUM, HIGH')
+  .option('--check-versions', 'Check for outdated node typeVersions')
+  .option('--version-severity <level>', 'Version issue severity: info, warning, error', 'warning')
+  .option('--skip-community-nodes', 'Skip version checks for community nodes')
   .option('--validate-expressions', 'Enable expression format validation (default: true)')
   .option('--no-validate-expressions', 'Skip expression format validation')
   .option('-s, --save <path>', 'Save fixed workflow to file')
@@ -469,6 +487,11 @@ Validation Profiles:
 Upgrade Checking:
   --check-upgrades       Analyze nodes for available version upgrades
   --upgrade-severity     Filter by severity (LOW, MEDIUM, HIGH)
+
+Version Checking:
+  --check-versions       Check for outdated node typeVersions
+  --version-severity     Set severity level (info, warning, error)
+  --skip-community-nodes Skip checking non n8n-nodes-base nodes
 
 💡 Tip: Use --fix --save to clean exported workflows:
    n8n workflows validate workflow.json --fix --save clean.json
