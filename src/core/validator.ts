@@ -427,6 +427,89 @@ export function validateWorkflowStructure(data: unknown, options?: ValidateOptio
             }
           }
         }
+
+        // Enhanced validation (opt-in)
+        if (options?.enhanced) {
+          try {
+            // Get node schema from registry
+            nodeRegistry.init();
+            const nodeTypeDescription = nodeRegistry.getNodeType(nodeType, node.typeVersion);
+            
+            if (nodeTypeDescription && nodeTypeDescription.properties) {
+              const mode = options.mode || 'operation';
+              const profile = options.profile || 'runtime';
+              
+              const enhancedResult = EnhancedConfigValidator.validateWithMode(
+                nodeType,
+                node.parameters,
+                nodeTypeDescription.properties,
+                mode,
+                profile
+              );
+
+              // Convert enhanced errors to ValidationIssues
+              for (const enhancedError of enhancedResult.errors) {
+                // Check for duplicates (same property and similar message)
+                const isDuplicate = issues.some(
+                  existing =>
+                    existing.location?.path?.includes(enhancedError.property) &&
+                    existing.message.toLowerCase().includes(enhancedError.property.toLowerCase())
+                );
+
+                if (!isDuplicate) {
+                  const fullPath = `${nodePath}.parameters.${enhancedError.property}`;
+                  const enriched = enrichWithSourceInfo(
+                    {
+                      code: `ENHANCED_${enhancedError.type.toUpperCase()}`,
+                      severity: 'error',
+                      message: enhancedError.message,
+                      location: { ...baseLocation, path: fullPath },
+                      hint: enhancedError.fix,
+                    },
+                    sourceMap,
+                    fullPath
+                  );
+                  issues.push(enriched);
+                  errors.push(enriched.message);
+                }
+              }
+
+              // Convert enhanced warnings to ValidationIssues
+              for (const enhancedWarning of enhancedResult.warnings) {
+                const isDuplicate = issues.some(
+                  existing =>
+                    existing.location?.path?.includes(enhancedWarning.property || '') &&
+                    existing.severity === 'warning'
+                );
+
+                if (!isDuplicate) {
+                  const fullPath = enhancedWarning.property
+                    ? `${nodePath}.parameters.${enhancedWarning.property}`
+                    : nodePath;
+                  const enriched = enrichWithSourceInfo(
+                    {
+                      code: `ENHANCED_${enhancedWarning.type.toUpperCase()}`,
+                      severity: 'warning',
+                      message: enhancedWarning.message,
+                      location: { ...baseLocation, path: fullPath },
+                      hint: enhancedWarning.suggestion,
+                    },
+                    sourceMap,
+                    fullPath
+                  );
+                  issues.push(enriched);
+                  warnings.push(enriched.message);
+                }
+              }
+            }
+          } catch (enhancedError) {
+            // Enhanced validation is optional - don't fail the whole validation
+            // Just log if in debug mode
+            if (process.env.DEBUG) {
+              console.error(`Enhanced validation failed for ${nodeName}:`, enhancedError);
+            }
+          }
+        }
       }
     }
   }

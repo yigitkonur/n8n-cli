@@ -500,6 +500,7 @@ n8n workflows autofix <idOrFile> [options]
 | `-s, --save <path>` | Save fixed workflow locally | - |
 | `--force, --yes` | Skip confirmation prompts | - |
 | `--no-backup` | Skip creating backup before changes | - |
+| `--no-guidance` | Suppress post-update guidance display | - |
 | `--json` | Output as JSON | - |
 
 **Fix Types and Confidence Levels:**
@@ -514,6 +515,36 @@ n8n workflows autofix <idOrFile> [options]
 | `error-output-config` | MEDIUM | Remove invalid onError settings |
 | `typeversion-upgrade` | MEDIUM | Suggest version upgrades |
 | `version-migration` | LOW | Breaking change migration hints |
+
+**Post-Update Guidance:**
+
+After applying fixes, the autofix command displays actionable migration guidance for each affected node:
+
+- **Confidence Scores**: Each upgrade is rated HIGH, MEDIUM, or LOW based on remaining manual work
+- **Required Actions**: Step-by-step list of manual tasks needed after the fix
+- **Behavior Changes**: Documents how node behavior changed between versions
+- **Estimated Time**: Expected time to complete manual verification
+
+The guidance is included in JSON output (`--json`) as a `postUpdateGuidance` array. Use `--no-guidance` to suppress the guidance display.
+
+**Example Guidance Output:**
+```
+╔══════════════════════════════════════════════════════════════════════╗
+║ ℹ Post-Update Guidance                                               ║
+╠══════════════════════════════════════════════════════════════════════╣
+║ Node: My Switch (abc12345...)                                        ║
+║ Type: n8n-nodes-base.switch                                          ║
+║ Version: v3 → v3                                                     ║
+╟──────────────────────────────────────────────────────────────────────╢
+║ Status: ◐ Partial                                                    ║
+║ Confidence: MEDIUM                                                   ║
+║ Est. Time: 2-5 minutes                                               ║
+╟──────────────────────────────────────────────────────────────────────╢
+║ ℹ Behavior Changes (1):                                              ║
+║   • Rule evaluation                                                  ║
+║     Review rule conditions and ensure type matching is correct.      ║
+╚══════════════════════════════════════════════════════════════════════╝
+```
 
 **Examples:**
 ```bash
