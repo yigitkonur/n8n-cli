@@ -96,11 +96,15 @@ export async function nodesValidateCommand(nodeType: string, opts: ValidateOptio
       outputJson({
         nodeType: node.nodeType,
         profile,
+        mode,
         valid: isValid,
         errors,
         warnings,
         suggestions,
         requiredProperties: node.properties?.filter((p: any) => p.required).map((p: any) => p.name) || [],
+        ...(result.operation && { operation: result.operation }),
+        ...(result.autofix && Object.keys(result.autofix).length > 0 && { autofix: result.autofix }),
+        ...(result.nextSteps && result.nextSteps.length > 0 && { nextSteps: result.nextSteps }),
       });
       process.exitCode = isValid ? 0 : 1;
       return;
@@ -113,6 +117,7 @@ export async function nodesValidateCommand(nodeType: string, opts: ValidateOptio
       context: {
         'Node Type': node.nodeType,
         'Profile': profile,
+        'Mode': mode,
         'Status': isValid ? chalk.green('Valid') : chalk.red('Invalid'),
       },
     }));
