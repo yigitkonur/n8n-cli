@@ -9,3 +9,6 @@ export * from './config.js';
 
 // Global CLI Options
 export * from './global-options.js';
+
+// Template Types
+export * from './templates.js';

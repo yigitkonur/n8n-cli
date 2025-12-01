@@ -22,6 +22,28 @@ export interface Workflow {
   [key: string]: unknown;
 }
 
+/**
+ * Reverse Connection for AI Validation
+ * 
+ * AI connections flow TO the consumer node (reversed from standard n8n pattern).
+ * This type represents an incoming connection to a node.
+ * 
+ * @example
+ * Standard n8n: [Source] --main--> [Target]
+ * AI pattern: [Language Model] --ai_languageModel--> [AI Agent]
+ * Reverse map: reverseMap.get("AI Agent") = [{sourceName: "Language Model", type: "ai_languageModel", ...}]
+ */
+export interface ReverseConnection {
+  /** Name of the source node that connects to this node */
+  sourceName: string;
+  /** Output type from the source node (main, ai_tool, ai_languageModel, etc.) */
+  sourceType: string;
+  /** Connection type (same as sourceType for clarity) */
+  type: string;
+  /** Output index from the source node */
+  index: number;
+}
+
 export type IssueSeverity = 'error' | 'warning' | 'info';
 
 export interface SourceLocation {
@@ -80,6 +102,33 @@ export interface ValidationIssue {
   
   // Additional context hint
   hint?: string;
+  
+  // Suggestions for similar valid values (e.g., node type suggestions)
+  suggestions?: Array<{
+    /** The suggested value (e.g., correct node type) */
+    value: string;
+    /** Confidence score from 0.0 to 1.0 */
+    confidence: number;
+    /** Reason for the suggestion (e.g., 'Likely typo') */
+    reason: string;
+    /** Whether this can be auto-fixed (confidence >= 0.9) */
+    autoFixable: boolean;
+  }>;
+}
+
+/**
+ * Version issue for a node (used by --check-versions)
+ */
+export interface VersionIssue {
+  code: 'OUTDATED_TYPE_VERSION';
+  severity: 'info' | 'warning' | 'error';
+  nodeName: string;
+  nodeType: string;
+  currentVersion: string;
+  latestVersion: string;
+  hasBreakingChanges: boolean;
+  autoMigratable: boolean;
+  hint: string;
 }
 
 export interface ValidationResult {
@@ -88,6 +137,7 @@ export interface ValidationResult {
   warnings: string[]; // Legacy
   issues: ValidationIssue[]; // New rich issues
   nodeTypeIssues?: string[];
+  versionIssues?: VersionIssue[]; // Version checking results
 }
 
 export interface ValidationSummary {
@@ -100,3 +150,25 @@ export interface ValidationSummary {
   sanitized: boolean;
   fixed?: number;
 }
+
+// Re-export expression validation types for convenience
+export type {
+  ExpressionFormatIssue,
+  ResourceLocatorField,
+  ExpressionValidationContext,
+} from './validation/index.js';
+
+// Re-export enhanced validation types
+export type {
+  ValidationMode,
+  ValidationProfile,
+  ValidationError as EnhancedValidationError,
+  ValidationWarning as EnhancedValidationWarning,
+  EnhancedValidationResult,
+  NodeValidationContext,
+  OperationContext,
+  NodeProperty,
+} from './validation/index.js';
+
+// Re-export enhanced validator
+export { EnhancedConfigValidator } from './validation/index.js';

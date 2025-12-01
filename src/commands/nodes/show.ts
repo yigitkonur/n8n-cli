@@ -14,6 +14,7 @@ import { formatNextActions } from '../../core/formatters/next-actions.js';
 import { formatExportFooter } from '../../core/formatters/jq-recipes.js';
 import { saveToJson, outputJson } from '../../core/formatters/json.js';
 import { theme, icons, formatBoolean } from '../../core/formatters/theme.js';
+import { BreakingChangeDetector, type DetectedChange, type Severity, getTrackedVersionsForNode, getLatestRegistryVersion } from '../../core/versioning/index.js';
 
 interface ShowOptions {
   schema?: boolean;
@@ -21,6 +22,8 @@ interface ShowOptions {
   examples?: boolean;
   mode?: string;
   detail?: string;
+  from?: string;
+  to?: string;
   save?: string;
   json?: boolean;
 }
@@ -82,6 +85,9 @@ export async function nodesShowCommand(nodeType: string, opts: ShowOptions): Pro
           break;
         case 'versions':
           outputVersions(node);
+          break;
+        case 'breaking':
+          outputBreaking(node, opts.from, opts.to);
           break;
         default:
           outputInfo(node, opts.detail || 'standard');
@@ -419,21 +425,69 @@ function outputDocs(node: NodeInfo): void {
 }
 
 /**
- * Output version info
+ * Output version info with registry data
  */
 function outputVersions(node: NodeInfo): void {
+  const fullType = NodeRepository.formatNodeType(node.nodeType);
+  const detector = new BreakingChangeDetector();
+  
+  // Get tracked versions from registry
+  const trackedVersions = getTrackedVersionsForNode(fullType);
+  const latestVersion = getLatestRegistryVersion(fullType);
+  
   console.log(formatHeader({
     title: `${node.displayName} - Version Info`,
     icon: '📦',
     context: {
-      'Current Version': node.version || 'Unknown',
-      'Versioned': node.isVersioned ? 'Yes' : 'No',
+      'Type': fullType,
+      'DB Version': node.version || 'Unknown',
+      'Latest Tracked': latestVersion || 'Not tracked',
+      'Tracked Versions': trackedVersions.length > 0 ? trackedVersions.join(', ') : 'None',
     },
   }));
   
   console.log('');
-  console.log(chalk.dim('  Note: Detailed version history requires API access.'));
-  console.log(chalk.dim('  Use n8n workflows validate to check version compatibility.'));
+  
+  if (trackedVersions.length === 0) {
+    console.log(chalk.dim('  This node is not tracked in the breaking changes registry.'));
+    console.log(chalk.dim('  It may be a community node or have no known breaking changes.'));
+    console.log('');
+    return;
+  }
+  
+  // Show version history with breaking changes
+  console.log(formatDivider('Version History'));
+  
+  for (let i = 0; i < trackedVersions.length; i++) {
+    const version = trackedVersions[i];
+    const isLatest = version === latestVersion;
+    const nextVersion = trackedVersions[i + 1];
+    
+    // Check for breaking changes TO this version
+    let breakingChanges = 0;
+    if (i > 0) {
+      const prevVersion = trackedVersions[i - 1];
+      const analysis = detector.analyzeVersionUpgrade(fullType, prevVersion, version);
+      breakingChanges = analysis.changes.filter(c => c.isBreaking).length;
+    }
+    
+    const marker = isLatest ? chalk.green('●') : chalk.dim('○');
+    const versionLabel = isLatest ? chalk.green.bold(`v${version} (latest)`) : `v${version}`;
+    const breakingBadge = breakingChanges > 0 
+      ? chalk.red(` ⚠️ ${breakingChanges} breaking change${breakingChanges > 1 ? 's' : ''}`)
+      : '';
+    
+    console.log(`  ${marker} ${versionLabel}${breakingBadge}`);
+  }
+  
+  console.log('');
+  
+  // Next actions
+  console.log(formatNextActions([
+    { command: `n8n nodes show ${node.nodeType} --mode breaking`, description: 'View breaking changes' },
+    { command: `n8n nodes show ${node.nodeType} --mode breaking --from 1.0 --to ${latestVersion || '2.0'}`, description: 'Compare specific versions' },
+    { command: `n8n workflows validate <file> --check-versions`, description: 'Check workflow version issues' },
+  ]));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -533,4 +587,88 @@ function outputPropertyDetail(prop: any): void {
 function capitalizeFirst(str: string): string {
   if (!str) return str;
   return str.charAt(0).toUpperCase() + str.slice(1);
+}
+
+/**
+ * Output breaking changes between versions (--mode breaking)
+ */
+function outputBreaking(node: NodeInfo, fromVersion?: string, toVersion?: string): void {
+  const fullType = NodeRepository.formatNodeType(node.nodeType);
+  const detector = new BreakingChangeDetector();
+  
+  // Determine versions
+  const from = fromVersion || '1.0';
+  const to = toVersion || getLatestRegistryVersion(fullType) || node.version || '2.0';
+  
+  // Analyze upgrade
+  const analysis = detector.analyzeVersionUpgrade(fullType, from, to);
+  
+  console.log(formatHeader({
+    title: `${node.displayName} - Breaking Changes`,
+    icon: analysis.hasBreakingChanges ? '⚠️' : '✅',
+    context: {
+      'Type': fullType,
+      'Version Range': `${from} → ${to}`,
+      'Breaking Changes': String(analysis.changes.filter(c => c.isBreaking).length),
+      'Severity': analysis.overallSeverity,
+    },
+  }));
+  
+  console.log('');
+  
+  if (analysis.changes.length === 0) {
+    console.log(chalk.green('  ✓ No breaking changes detected for this version range.'));
+    console.log(chalk.dim('  This node can likely be upgraded without issues.'));
+    console.log('');
+    return;
+  }
+  
+  // Group changes by severity
+  const bySeverity = {
+    HIGH: analysis.changes.filter(c => c.severity === 'HIGH'),
+    MEDIUM: analysis.changes.filter(c => c.severity === 'MEDIUM'),
+    LOW: analysis.changes.filter(c => c.severity === 'LOW'),
+  };
+  
+  for (const [severity, changes] of Object.entries(bySeverity)) {
+    if (changes.length === 0) continue;
+    
+    const color = severity === 'HIGH' ? chalk.red : severity === 'MEDIUM' ? chalk.yellow : chalk.blue;
+    console.log(formatDivider(`${severity} Severity (${changes.length})`));
+    
+    changes.forEach((change: DetectedChange, index: number) => {
+      console.log(color(`  ${index + 1}. ${change.propertyName}`));
+      console.log(chalk.dim(`     Type: ${change.changeType}`));
+      console.log(chalk.dim(`     Auto-migratable: ${change.autoMigratable ? '✓ Yes' : '✗ No'}`));
+      
+      // Wrap hint
+      const hintLines = change.migrationHint.match(/.{1,65}/g) || [change.migrationHint];
+      console.log(chalk.cyan(`     Hint: ${hintLines[0]}`));
+      hintLines.slice(1).forEach((line: string) => {
+        console.log(chalk.cyan(`           ${line}`));
+      });
+      console.log('');
+    });
+  }
+  
+  // Summary
+  console.log(formatDivider('Summary'));
+  console.log(`  Total changes: ${analysis.changes.length}`);
+  console.log(`  Auto-migratable: ${chalk.green(String(analysis.autoMigratableCount))}`);
+  console.log(`  Manual required: ${chalk.yellow(String(analysis.manualRequiredCount))}`);
+  console.log('');
+  
+  // Recommendations
+  console.log(formatDivider('Recommendations'));
+  analysis.recommendations.forEach(rec => {
+    console.log(`  ${rec}`);
+  });
+  console.log('');
+  
+  // Next actions
+  console.log(formatNextActions([
+    { command: `n8n nodes breaking-changes ${node.nodeType} --from ${from} --to ${to} --json`, description: 'Get JSON output' },
+    { command: `n8n workflows autofix <file> --upgrade-versions`, description: 'Apply auto-migrations' },
+    { command: `n8n nodes show ${node.nodeType} --schema`, description: 'View full schema' },
+  ]));
 }

@@ -19,6 +19,8 @@ export interface DatabaseAdapter {
   readonly inTransaction: boolean;
   transaction<T>(fn: () => T): T;
   checkFTS5Support(): boolean;
+  /** Whether nodes_fts table exists for FTS5 search */
+  readonly hasFTS5Tables: boolean;
 }
 
 export interface PreparedStatement {
@@ -107,6 +109,8 @@ export async function createDatabaseAdapter(dbPath?: string): Promise<DatabaseAd
  * Adapter for better-sqlite3
  */
 class BetterSQLiteAdapter implements DatabaseAdapter {
+  private _hasFTS5Tables: boolean | null = null;  // null = not yet detected
+
   constructor(private db: any) {}
   
   prepare(sql: string): PreparedStatement {
@@ -133,12 +137,36 @@ class BetterSQLiteAdapter implements DatabaseAdapter {
   transaction<T>(fn: () => T): T {
     return this.db.transaction(fn)();
   }
-  
+
+  get hasFTS5Tables(): boolean {
+    // Lazy detection on first access
+    if (this._hasFTS5Tables === null) {
+      this._hasFTS5Tables = this.detectFTS5Tables();
+    }
+    return this._hasFTS5Tables;
+  }
+
   checkFTS5Support(): boolean {
     try {
       this.exec("CREATE VIRTUAL TABLE IF NOT EXISTS _fts5_test USING fts5(content);");
       this.exec("DROP TABLE IF EXISTS _fts5_test;");
       return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Detect if nodes_fts table exists in the database
+   * Pattern from: n8n-mcp/src/mcp/server.ts:1382-1385
+   */
+  private detectFTS5Tables(): boolean {
+    try {
+      const result = this.prepare(`
+        SELECT name FROM sqlite_master 
+        WHERE type='table' AND name='nodes_fts'
+      `).get();
+      return !!result;
     } catch {
       return false;
     }

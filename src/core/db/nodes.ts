@@ -76,10 +76,88 @@ export class NodeRepository {
   }
   
   /**
-   * Search nodes with LIKE-based matching
-   * Modes: OR (any word), AND (all words), FUZZY (Levenshtein distance)
+   * Search nodes with automatic FTS5/LIKE selection
+   * FTS5 provides faster search with BM25 relevance ranking
+   * Pattern from: n8n-mcp/src/mcp/server.ts:1357-1396
    */
   searchNodes(query: string, mode: 'OR' | 'AND' | 'FUZZY' = 'OR', limit: number = 20): NodeSearchResult[] {
+    // Use FTS5 if available (except for FUZZY which needs Levenshtein)
+    if (this.db.hasFTS5Tables && mode !== 'FUZZY') {
+      return this.searchNodesFTS(query, mode, limit);
+    }
+    
+    // Fallback to LIKE-based search
+    return this.searchNodesLIKE(query, mode, limit);
+  }
+
+  /**
+   * FTS5 full-text search with BM25 ranking
+   * Pattern from: n8n-mcp/src/mcp/server.ts:1398-1565
+   */
+  private searchNodesFTS(query: string, mode: 'OR' | 'AND', limit: number): NodeSearchResult[] {
+    const cleanedQuery = query.trim();
+    if (!cleanedQuery) return [];
+    
+    // Build FTS5 query based on mode
+    let ftsQuery: string;
+    
+    // Handle exact phrase searches with quotes
+    if (cleanedQuery.startsWith('"') && cleanedQuery.endsWith('"')) {
+      ftsQuery = cleanedQuery;
+    } else {
+      const words = cleanedQuery.split(/\s+/).filter(w => w.length > 0);
+      if (words.length === 0) return [];
+      
+      // Escape FTS5 special characters
+      const escapedWords = words.map(w => 
+        w.replace(/['"(){}[\]*+\-:^~]/g, '')
+      ).filter(w => w.length > 0);
+      
+      if (escapedWords.length === 0) return [];
+      
+      ftsQuery = mode === 'AND' 
+        ? escapedWords.join(' AND ')
+        : escapedWords.join(' OR ');
+    }
+    
+    try {
+      // FTS5 query with ranking - pattern from MCP server.ts:1443-1460
+      const rows = this.db.prepare(`
+        SELECT
+          n.node_type, n.display_name, n.description, n.category,
+          n.package_name, n.is_ai_tool, n.is_trigger, n.is_webhook,
+          -nodes_fts.rank as relevance_score
+        FROM nodes_fts
+        JOIN nodes n ON nodes_fts.rowid = n.rowid
+        WHERE nodes_fts MATCH ?
+        ORDER BY
+          CASE
+            WHEN LOWER(n.display_name) = LOWER(?) THEN 0
+            WHEN LOWER(n.display_name) LIKE LOWER(?) THEN 1
+            WHEN LOWER(n.node_type) LIKE LOWER(?) THEN 2
+            ELSE 3
+          END,
+          relevance_score DESC,
+          n.display_name
+        LIMIT ?
+      `).all(ftsQuery, cleanedQuery, `%${cleanedQuery}%`, `%${cleanedQuery}%`, limit) as any[];
+      
+      return rows.map(row => this.parseSearchRow(row, query));
+    } catch (error: any) {
+      // FTS5 syntax error - fallback to LIKE
+      // Pattern from: n8n-mcp/src/mcp/server.ts:1543-1564
+      if (error.message?.includes('fts5') || error.message?.includes('syntax')) {
+        return this.searchNodesLIKE(query, mode, limit);
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * LIKE-based search fallback (original implementation)
+   * Used when FTS5 unavailable or for FUZZY mode
+   */
+  private searchNodesLIKE(query: string, mode: 'OR' | 'AND' | 'FUZZY' = 'OR', limit: number = 20): NodeSearchResult[] {
     let sql = '';
     const params: any[] = [];
 

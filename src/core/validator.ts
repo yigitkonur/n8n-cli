@@ -1,6 +1,10 @@
-import type { Workflow, ValidationResult, ValidationIssue, IssueSeverity } from './types.js';
+import type { Workflow, ValidationResult, ValidationIssue, IssueSeverity, VersionIssue, ValidationMode, ValidationProfile } from './types.js';
 import { createSourceMap, findSourceLocation, extractSnippet, type SourceMap } from './source-location.js';
 import { validateNodeWithN8n } from './n8n-native-validator.js';
+import { NodeVersionService, type VersionComparison } from './versioning/index.js';
+import { hasAINodes, validateAISpecificNodes } from './validation/ai-nodes.js';
+import { ExpressionFormatValidator, EnhancedConfigValidator, type EnhancedValidationResult } from './validation/index.js';
+import { nodeRegistry } from './n8n-loader.js';
 
 interface IssueBuilder {
   code: string;
@@ -10,6 +14,7 @@ interface IssueBuilder {
   context?: ValidationIssue['context'];
   validAlternatives?: string[];
   hint?: string;
+  suggestions?: ValidationIssue['suggestions'];
 }
 
 function enrichWithSourceInfo(
@@ -25,6 +30,7 @@ function enrichWithSourceInfo(
     context: issue.context,
     validAlternatives: issue.validAlternatives,
     hint: issue.hint,
+    suggestions: issue.suggestions,
   };
 
   if (sourceMap && path) {
@@ -40,6 +46,12 @@ function enrichWithSourceInfo(
 
 export interface ValidateOptions {
   rawSource?: string;  // Original JSON source for line number extraction
+  checkVersions?: boolean;  // Check for outdated node typeVersions
+  versionSeverity?: 'info' | 'warning' | 'error';  // Minimum severity for version issues
+  skipCommunityNodes?: boolean;  // Skip version checks for non n8n-nodes-base nodes
+  validateExpressions?: boolean;  // Enable expression format validation (default: true)
+  /** Pre-computed node type suggestions (Map: invalidType -> suggestions) */
+  nodeSuggestions?: Map<string, ValidationIssue['suggestions']>;
 }
 
 export function validateWorkflowStructure(data: unknown, options?: ValidateOptions): ValidationResult {
@@ -179,23 +191,54 @@ export function validateWorkflowStructure(data: unknown, options?: ValidateOptio
         issues.push(issue);
         errors.push(issue.message);
       } else {
+        // Get pre-computed suggestions for this node type if available
+        const suggestions = options?.nodeSuggestions?.get(node.type);
+        const topSuggestion = suggestions?.[0];
+        const hintText = topSuggestion 
+          ? `Did you mean: ${topSuggestion.value}? (${Math.round(topSuggestion.confidence * 100)}% match)`
+          : undefined;
+
         if (!node.type.includes('.')) {
           const issue = enrichWithSourceInfo({
             code: 'INVALID_NODE_TYPE_FORMAT',
             severity: 'warning',
             message: `Node "${nodeName}" has invalid type "${node.type}" - must include package prefix (e.g., "n8n-nodes-base.webhook")`,
             location: { ...baseLocation, path: `${nodePath}.type` },
-            context: { value: node.type, expected: 'Format: "package-name.nodeName"', fullObject: node }
+            context: { value: node.type, expected: 'Format: "package-name.nodeName"', fullObject: node },
+            suggestions,
+            hint: hintText,
           }, sourceMap, `${nodePath}.type`);
           issues.push(issue);
           nodeTypeIssues.push(issue.message);
         } else if (node.type.startsWith('nodes-base.')) {
+          // Short form detected - suggest the correct full form
+          const correctType = `n8n-${node.type}`;
           const issue = enrichWithSourceInfo({
             code: 'DEPRECATED_NODE_TYPE_PREFIX',
             severity: 'warning',
-            message: `Node "${nodeName}" has invalid type "${node.type}" - should be "n8n-${node.type}"`,
+            message: `Node "${nodeName}" has invalid type "${node.type}" - should be "${correctType}"`,
             location: { ...baseLocation, path: `${nodePath}.type` },
-            context: { value: node.type, expected: `n8n-${node.type}`, fullObject: node }
+            context: { value: node.type, expected: correctType, fullObject: node },
+            suggestions: suggestions || [{
+              value: correctType,
+              confidence: 0.95,
+              reason: 'Short form used - API requires full form',
+              autoFixable: true,
+            }],
+            hint: `Use "${correctType}" instead`,
+          }, sourceMap, `${nodePath}.type`);
+          issues.push(issue);
+          nodeTypeIssues.push(issue.message);
+        } else if (suggestions && suggestions.length > 0) {
+          // Unknown node type with suggestions available
+          const issue = enrichWithSourceInfo({
+            code: 'UNKNOWN_NODE_TYPE',
+            severity: 'warning',
+            message: `Node "${nodeName}" has unknown type "${node.type}"`,
+            location: { ...baseLocation, path: `${nodePath}.type` },
+            context: { value: node.type, fullObject: node },
+            suggestions,
+            hint: hintText,
           }, sourceMap, `${nodePath}.type`);
           issues.push(issue);
           nodeTypeIssues.push(issue.message);
@@ -311,6 +354,61 @@ export function validateWorkflowStructure(data: unknown, options?: ValidateOptio
             warnings.push(enriched.message);
           }
         }
+
+        // Expression format validation (enabled by default)
+        if (options?.validateExpressions !== false) {
+          const exprContext = {
+            nodeType: nodeType,
+            nodeName: nodeName,
+            nodeId: node.id,
+          };
+
+          const exprIssues = ExpressionFormatValidator.validateNodeParameters(
+            node.parameters,
+            exprContext
+          );
+
+          for (const exprIssue of exprIssues) {
+            const issueCode = exprIssue.issueType === 'missing-prefix'
+              ? 'EXPRESSION_MISSING_PREFIX'
+              : exprIssue.issueType === 'needs-resource-locator'
+              ? 'EXPRESSION_NEEDS_RESOURCE_LOCATOR'
+              : exprIssue.issueType === 'invalid-rl-structure'
+              ? 'EXPRESSION_INVALID_STRUCTURE'
+              : 'EXPRESSION_FORMAT_ERROR';
+
+            const fullPath = `${nodePath}.parameters.${exprIssue.fieldPath}`;
+            const enriched = enrichWithSourceInfo(
+              {
+                code: issueCode,
+                severity: exprIssue.severity,
+                message: exprIssue.explanation,
+                location: {
+                  ...baseLocation,
+                  path: fullPath,
+                },
+                context: {
+                  value: exprIssue.currentValue,
+                  expected: typeof exprIssue.correctedValue === 'string'
+                    ? exprIssue.correctedValue
+                    : JSON.stringify(exprIssue.correctedValue),
+                },
+                hint: exprIssue.confidence
+                  ? `Confidence: ${Math.round(exprIssue.confidence * 100)}%`
+                  : undefined,
+              },
+              sourceMap,
+              fullPath,
+            );
+
+            issues.push(enriched);
+            if (exprIssue.severity === 'error') {
+              errors.push(enriched.message);
+            } else if (exprIssue.severity === 'warning') {
+              warnings.push(enriched.message);
+            }
+          }
+        }
       }
     }
   }
@@ -364,12 +462,94 @@ export function validateWorkflowStructure(data: unknown, options?: ValidateOptio
     }
   }
 
+  // Version checking for outdated node typeVersions
+  const versionIssues: VersionIssue[] = [];
+  if (options?.checkVersions && Array.isArray(wf.nodes)) {
+    const versionService = new NodeVersionService();
+    const severity = options.versionSeverity || 'warning';
+    
+    for (const node of wf.nodes) {
+      if (!node || typeof node !== 'object') continue;
+      if (!node.type || typeof node.type !== 'string') continue;
+      
+      // Skip community nodes if requested
+      if (options.skipCommunityNodes && !node.type.startsWith('n8n-nodes-base.')) continue;
+      
+      // Skip nodes without typeVersion
+      if (node.typeVersion === undefined) continue;
+      
+      const currentVersion = String(node.typeVersion);
+      
+      // Check if node is tracked in registry
+      if (!versionService.isNodeTracked(node.type)) continue;
+      
+      // Analyze version
+      const analysis = versionService.analyzeVersion(node.type, currentVersion);
+      
+      if (analysis.isOutdated) {
+        const versionIssue: VersionIssue = {
+          code: 'OUTDATED_TYPE_VERSION',
+          severity,
+          nodeName: node.name || 'unnamed',
+          nodeType: node.type,
+          currentVersion: analysis.currentVersion,
+          latestVersion: analysis.latestVersion,
+          hasBreakingChanges: analysis.hasBreakingChanges,
+          autoMigratable: !analysis.hasBreakingChanges,
+          hint: analysis.reason,
+        };
+        versionIssues.push(versionIssue);
+        
+        // Add to general warnings/errors based on severity
+        const message = `Node "${node.name}": typeVersion ${currentVersion} is outdated (latest: ${analysis.latestVersion})${analysis.hasBreakingChanges ? ' ⚠️ breaking changes' : ''}`;
+        if (severity === 'error') {
+          errors.push(message);
+        } else {
+          warnings.push(message);
+        }
+      }
+    }
+  }
+
+  // AI-specific validation (AI Agent, Chat Trigger, Basic LLM Chain, AI Tools)
+  if (Array.isArray(wf.nodes) && hasAINodes(wf)) {
+    const aiIssues = validateAISpecificNodes(wf);
+    
+    for (const aiIssue of aiIssues) {
+      // Find the node index for source location enrichment
+      let nodePath = '';
+      if (aiIssue.nodeName) {
+        const nodeIndex = wf.nodes.findIndex(n => n?.name === aiIssue.nodeName);
+        nodePath = nodeIndex >= 0 ? `nodes[${nodeIndex}]` : '';
+      }
+
+      const enriched = enrichWithSourceInfo({
+        code: aiIssue.code || 'AI_VALIDATION_ERROR',
+        severity: aiIssue.severity,
+        message: aiIssue.message,
+        location: {
+          nodeName: aiIssue.nodeName,
+          nodeId: aiIssue.nodeId,
+          path: nodePath,
+        },
+      }, sourceMap, nodePath);
+
+      issues.push(enriched);
+      if (aiIssue.severity === 'error') {
+        errors.push(aiIssue.message);
+      } else if (aiIssue.severity === 'warning') {
+        warnings.push(aiIssue.message);
+      }
+    }
+  }
+
   return { 
     valid: errors.length === 0, 
     errors, 
     warnings, 
     issues,
-    nodeTypeIssues: nodeTypeIssues.length > 0 ? nodeTypeIssues : undefined 
+    nodeTypeIssues: nodeTypeIssues.length > 0 ? nodeTypeIssues : undefined,
+    versionIssues: versionIssues.length > 0 ? versionIssues : undefined,
   };
 }
 
