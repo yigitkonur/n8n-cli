@@ -1,0 +1,18 @@
+# Command: npx n8n nodes get n8n-nodes-base.httpRequest --mode versions
+# Flags: --mode versions
+# Exit Code: 0
+# Duration: 1291ms
+# Timestamp: 2025-11-30T21:41:28.936Z
+# Success: true
+=== STDOUT ===
+╭─ 📦 HTTP Request - Version Info
+│  Fetched: 2025-11-30 21:41:28 UTC
+│  Current Version: 4.3
+│  Versioned: Yes
+╰─
+
+  Note: Detailed version history requires API access.
+  Use n8n workflows validate to check version compatibility.
+
+=== STDERR ===
+(empty)

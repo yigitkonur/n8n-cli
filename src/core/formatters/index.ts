@@ -10,11 +10,11 @@ export { formatTable, columnFormatters } from './table.js';
 export type { TableColumn, TableOptions } from './table.js';
 
 // Summary statistics
-export { formatSummary } from './summary.js';
+export { formatSummary, formatHealthIndicator } from './summary.js';
 export type { SummaryStats } from './summary.js';
 
 // Next actions
-export { formatNextActions, generateNextActions } from './next-actions.js';
+export { formatNextActions, generateNextActions, formatJqSuggestion } from './next-actions.js';
 export type { NextAction } from './next-actions.js';
 
 // jq recipes

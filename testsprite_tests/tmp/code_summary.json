@@ -1,0 +1,319 @@
+{
+  "tech_stack": [
+    "TypeScript",
+    "Node.js",
+    "Commander.js",
+    "Axios",
+    "SQLite (better-sqlite3)",
+    "Chalk",
+    "Vitest (testing)"
+  ],
+  "features": [
+    {
+      "name": "auth login",
+      "description": "Configure CLI credentials with n8n instance host URL and API key. Supports interactive prompts, environment variables, and direct flag input.",
+      "files": ["src/commands/auth/login.ts"],
+      "api_doc": {
+        "command": "n8n auth login",
+        "flags": [
+          {"name": "--host", "type": "string", "description": "n8n instance URL"},
+          {"name": "--api-key", "type": "string", "description": "n8n API key"},
+          {"name": "--interactive", "type": "boolean", "description": "Use interactive prompts"},
+          {"name": "--json", "type": "boolean", "description": "Output as JSON"}
+        ],
+        "exit_codes": {"0": "success", "1": "error"}
+      }
+    },
+    {
+      "name": "auth status",
+      "description": "Show current authentication status including connection state and API key validity.",
+      "files": ["src/commands/auth/status.ts"],
+      "api_doc": {
+        "command": "n8n auth status",
+        "aliases": ["whoami"],
+        "flags": [
+          {"name": "--json", "type": "boolean", "description": "Output as JSON"}
+        ],
+        "exit_codes": {"0": "configured and valid", "1": "not configured or invalid"}
+      }
+    },
+    {
+      "name": "auth logout",
+      "description": "Clear stored CLI credentials.",
+      "files": ["src/commands/auth/logout.ts"],
+      "api_doc": {
+        "command": "n8n auth logout",
+        "flags": [
+          {"name": "--json", "type": "boolean", "description": "Output as JSON"}
+        ],
+        "exit_codes": {"0": "success"}
+      }
+    },
+    {
+      "name": "health",
+      "description": "Check n8n instance connectivity and API key validity.",
+      "files": ["src/commands/health/index.ts"],
+      "api_doc": {
+        "command": "n8n health",
+        "flags": [
+          {"name": "--json", "type": "boolean", "description": "Output as JSON"}
+        ],
+        "exit_codes": {"0": "healthy", "1": "unhealthy or unreachable"}
+      }
+    },
+    {
+      "name": "nodes search",
+      "description": "Search local SQLite node database for n8n nodes by query.",
+      "files": ["src/commands/nodes/search.ts"],
+      "api_doc": {
+        "command": "n8n nodes search <query>",
+        "flags": [
+          {"name": "--mode", "type": "string", "values": ["OR", "AND", "FUZZY"], "description": "Search mode"},
+          {"name": "--limit", "type": "number", "description": "Limit results"},
+          {"name": "--save", "type": "string", "description": "Save results to JSON file"},
+          {"name": "--json", "type": "boolean", "description": "Output as JSON"}
+        ],
+        "exit_codes": {"0": "success"}
+      }
+    },
+    {
+      "name": "nodes get",
+      "description": "Get detailed information about a specific node type from local database.",
+      "files": ["src/commands/nodes/get.ts"],
+      "api_doc": {
+        "command": "n8n nodes get <nodeType>",
+        "flags": [
+          {"name": "--mode", "type": "string", "values": ["info", "docs", "versions"], "description": "Output mode"},
+          {"name": "--detail", "type": "string", "values": ["minimal", "standard", "full"], "description": "Detail level"},
+          {"name": "--save", "type": "string", "description": "Save to JSON file"},
+          {"name": "--json", "type": "boolean", "description": "Output as JSON"}
+        ],
+        "exit_codes": {"0": "found", "1": "not found"}
+      }
+    },
+    {
+      "name": "nodes validate",
+      "description": "Validate a node configuration against its schema.",
+      "files": ["src/commands/nodes/validate.ts"],
+      "api_doc": {
+        "command": "n8n nodes validate <nodeType>",
+        "flags": [
+          {"name": "--config", "type": "string", "description": "Node config as JSON string"},
+          {"name": "--profile", "type": "string", "values": ["minimal", "runtime", "strict"], "description": "Validation profile"},
+          {"name": "--json", "type": "boolean", "description": "Output as JSON"}
+        ],
+        "exit_codes": {"0": "valid", "1": "invalid"}
+      }
+    },
+    {
+      "name": "workflows list",
+      "description": "List workflows from n8n instance with optional filtering.",
+      "files": ["src/commands/workflows/list.ts"],
+      "api_doc": {
+        "command": "n8n workflows list",
+        "flags": [
+          {"name": "--active", "type": "boolean", "description": "Filter active workflows only"},
+          {"name": "--tags", "type": "string", "description": "Filter by tags (comma-separated)"},
+          {"name": "--limit", "type": "number", "description": "Limit results"},
+          {"name": "--cursor", "type": "string", "description": "Pagination cursor"},
+          {"name": "--save", "type": "string", "description": "Save to JSON file"},
+          {"name": "--json", "type": "boolean", "description": "Output as JSON"}
+        ],
+        "exit_codes": {"0": "success"}
+      }
+    },
+    {
+      "name": "workflows get",
+      "description": "Get workflow details by ID from n8n instance.",
+      "files": ["src/commands/workflows/get.ts"],
+      "api_doc": {
+        "command": "n8n workflows get <id>",
+        "flags": [
+          {"name": "--mode", "type": "string", "values": ["full", "details", "structure", "minimal"], "description": "Output mode"},
+          {"name": "--save", "type": "string", "description": "Save to JSON file"},
+          {"name": "--json", "type": "boolean", "description": "Output as JSON"}
+        ],
+        "exit_codes": {"0": "found", "1": "not found"}
+      }
+    },
+    {
+      "name": "workflows validate",
+      "description": "Validate workflow structure from ID or local JSON file.",
+      "files": ["src/commands/workflows/validate.ts"],
+      "api_doc": {
+        "command": "n8n workflows validate [idOrFile]",
+        "flags": [
+          {"name": "--file", "type": "string", "description": "Path to workflow JSON file"},
+          {"name": "--profile", "type": "string", "values": ["minimal", "runtime", "ai-friendly", "strict"], "description": "Validation profile"},
+          {"name": "--repair", "type": "boolean", "description": "Attempt to repair malformed JSON"},
+          {"name": "--fix", "type": "boolean", "description": "Auto-fix known issues"},
+          {"name": "--save", "type": "string", "description": "Save fixed workflow to file"},
+          {"name": "--json", "type": "boolean", "description": "Output as JSON"}
+        ],
+        "exit_codes": {"0": "valid", "1": "invalid or error"}
+      }
+    },
+    {
+      "name": "workflows create",
+      "description": "Create a new workflow on n8n instance from JSON file.",
+      "files": ["src/commands/workflows/create.ts"],
+      "api_doc": {
+        "command": "n8n workflows create",
+        "flags": [
+          {"name": "--file", "type": "string", "required": true, "description": "Path to workflow JSON file"},
+          {"name": "--name", "type": "string", "description": "Workflow name (overrides file)"},
+          {"name": "--dry-run", "type": "boolean", "default": true, "description": "Preview without creating"},
+          {"name": "--json", "type": "boolean", "description": "Output as JSON"}
+        ],
+        "exit_codes": {"0": "success", "1": "error"}
+      }
+    },
+    {
+      "name": "workflows update",
+      "description": "Update existing workflow on n8n instance.",
+      "files": ["src/commands/workflows/update.ts"],
+      "api_doc": {
+        "command": "n8n workflows update <id>",
+        "flags": [
+          {"name": "--file", "type": "string", "description": "Path to workflow JSON file"},
+          {"name": "--activate", "type": "boolean", "description": "Activate the workflow"},
+          {"name": "--deactivate", "type": "boolean", "description": "Deactivate the workflow"},
+          {"name": "--force", "type": "boolean", "description": "Skip confirmation prompts"},
+          {"name": "--yes", "type": "boolean", "description": "Skip confirmation prompts"},
+          {"name": "--no-backup", "type": "boolean", "description": "Skip creating backup"},
+          {"name": "--json", "type": "boolean", "description": "Output as JSON"}
+        ],
+        "exit_codes": {"0": "success", "1": "error"}
+      }
+    },
+    {
+      "name": "workflows autofix",
+      "description": "Automatically fix known issues in workflow.",
+      "files": ["src/commands/workflows/autofix.ts"],
+      "api_doc": {
+        "command": "n8n workflows autofix <id>",
+        "flags": [
+          {"name": "--dry-run", "type": "boolean", "default": true, "description": "Preview fixes without applying"},
+          {"name": "--confidence", "type": "string", "values": ["high", "medium", "low"], "description": "Minimum confidence level"},
+          {"name": "--save", "type": "string", "description": "Save fixed workflow locally"},
+          {"name": "--apply", "type": "boolean", "description": "Apply fixes to server"},
+          {"name": "--force", "type": "boolean", "description": "Skip confirmation prompts"},
+          {"name": "--no-backup", "type": "boolean", "description": "Skip creating backup"},
+          {"name": "--json", "type": "boolean", "description": "Output as JSON"}
+        ],
+        "exit_codes": {"0": "success"}
+      }
+    },
+    {
+      "name": "workflows trigger",
+      "description": "Trigger a workflow via webhook URL.",
+      "files": ["src/commands/workflows/trigger.ts"],
+      "api_doc": {
+        "command": "n8n workflows trigger <webhookUrl>",
+        "flags": [
+          {"name": "--data", "type": "string", "description": "Request body as JSON"},
+          {"name": "--method", "type": "string", "values": ["GET", "POST", "PUT", "DELETE"], "description": "HTTP method"},
+          {"name": "--json", "type": "boolean", "description": "Output as JSON"}
+        ],
+        "exit_codes": {"0": "2xx response", "1": "non-2xx response"}
+      }
+    },
+    {
+      "name": "executions list",
+      "description": "List workflow executions from n8n instance.",
+      "files": ["src/commands/executions/list.ts"],
+      "api_doc": {
+        "command": "n8n executions list",
+        "flags": [
+          {"name": "--workflow-id", "type": "string", "description": "Filter by workflow ID"},
+          {"name": "--status", "type": "string", "values": ["success", "error", "waiting"], "description": "Filter by status"},
+          {"name": "--limit", "type": "number", "description": "Limit results"},
+          {"name": "--cursor", "type": "string", "description": "Pagination cursor"},
+          {"name": "--save", "type": "string", "description": "Save to JSON file"},
+          {"name": "--json", "type": "boolean", "description": "Output as JSON"}
+        ],
+        "exit_codes": {"0": "success"}
+      }
+    },
+    {
+      "name": "executions get",
+      "description": "Get execution details by ID.",
+      "files": ["src/commands/executions/get.ts"],
+      "api_doc": {
+        "command": "n8n executions get <id>",
+        "flags": [
+          {"name": "--mode", "type": "string", "values": ["preview", "summary", "filtered", "full"], "description": "Output mode"},
+          {"name": "--save", "type": "string", "description": "Save to JSON file"},
+          {"name": "--json", "type": "boolean", "description": "Output as JSON"}
+        ],
+        "exit_codes": {"0": "found", "1": "not found"}
+      }
+    },
+    {
+      "name": "templates search",
+      "description": "Search public n8n.io templates by query.",
+      "files": ["src/commands/templates/search.ts"],
+      "api_doc": {
+        "command": "n8n templates search <query>",
+        "flags": [
+          {"name": "--limit", "type": "number", "description": "Limit results"},
+          {"name": "--save", "type": "string", "description": "Save to JSON file"},
+          {"name": "--json", "type": "boolean", "description": "Output as JSON"}
+        ],
+        "exit_codes": {"0": "success"},
+        "notes": "Uses public n8n.io API - requires internet"
+      }
+    },
+    {
+      "name": "templates get",
+      "description": "Get template details and workflow from n8n.io.",
+      "files": ["src/commands/templates/get.ts"],
+      "api_doc": {
+        "command": "n8n templates get <id>",
+        "flags": [
+          {"name": "--save", "type": "string", "description": "Save workflow to JSON file"},
+          {"name": "--json", "type": "boolean", "description": "Output as JSON"}
+        ],
+        "exit_codes": {"0": "found", "1": "not found"},
+        "notes": "Uses public n8n.io API - requires internet"
+      }
+    }
+  ],
+  "core_modules": [
+    {
+      "name": "API Client",
+      "description": "HTTP client for n8n REST API communication",
+      "files": ["src/core/api/client.ts"]
+    },
+    {
+      "name": "Config Loader",
+      "description": "Configuration management from env vars, config files",
+      "files": ["src/core/config/loader.ts"]
+    },
+    {
+      "name": "Validator",
+      "description": "Workflow and node validation logic",
+      "files": ["src/core/validator.ts"]
+    },
+    {
+      "name": "Fixer",
+      "description": "Auto-fix logic for workflow issues",
+      "files": ["src/core/fixer.ts"]
+    },
+    {
+      "name": "Database",
+      "description": "SQLite database for local node storage",
+      "files": ["src/core/db/"]
+    },
+    {
+      "name": "Error Handling",
+      "description": "Custom error classes for API, auth, validation errors",
+      "files": ["src/utils/errors.ts"]
+    },
+    {
+      "name": "Prompts",
+      "description": "Interactive prompts with TTY/CI detection",
+      "files": ["src/utils/prompts.ts"]
+    }
+  ]
+}

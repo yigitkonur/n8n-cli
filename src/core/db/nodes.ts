@@ -77,24 +77,56 @@ export class NodeRepository {
   
   /**
    * Search nodes with LIKE-based matching
-   * Modes: OR (any word), AND (all words), FUZZY (simple contains)
+   * Modes: OR (any word), AND (all words), FUZZY (Levenshtein distance)
    */
   searchNodes(query: string, mode: 'OR' | 'AND' | 'FUZZY' = 'OR', limit: number = 20): NodeSearchResult[] {
     let sql = '';
     const params: any[] = [];
 
     if (mode === 'FUZZY') {
-      // Simple fuzzy search
+      // Fuzzy search: get all nodes and filter by Levenshtein distance
       sql = `
         SELECT node_type, display_name, description, category, package_name,
                is_ai_tool, is_trigger, is_webhook
-        FROM nodes 
-        WHERE node_type LIKE ? OR display_name LIKE ? OR description LIKE ?
-        ORDER BY display_name
-        LIMIT ?
+        FROM nodes
       `;
-      const fuzzyQuery = `%${query}%`;
-      params.push(fuzzyQuery, fuzzyQuery, fuzzyQuery, limit);
+      const allRows = this.db.prepare(sql).all() as any[];
+      
+      // Calculate fuzzy match score for each node
+      const queryLower = query.toLowerCase();
+      const scored = allRows.map(row => {
+        const nodeType = (row.node_type || '').toLowerCase();
+        const displayName = (row.display_name || '').toLowerCase();
+        const description = (row.description || '').toLowerCase();
+        
+        // Calculate best Levenshtein distance across fields
+        const distances = [
+          this.levenshteinDistance(queryLower, nodeType),
+          this.levenshteinDistance(queryLower, displayName),
+          // For description, check if any word is close
+          ...displayName.split(/\s+/).map((w: string) => this.levenshteinDistance(queryLower, w)),
+        ];
+        const minDistance = Math.min(...distances);
+        
+        // Also check substring containment with typo tolerance
+        const containsMatch = nodeType.includes(queryLower) || 
+                              displayName.includes(queryLower) ||
+                              description.includes(queryLower);
+        
+        // Score: lower distance = better match, containment is bonus
+        const score = containsMatch ? 0 : minDistance;
+        
+        return { row, score, minDistance };
+      });
+      
+      // Filter by reasonable distance (max 3 edits for short queries, scale with length)
+      const maxDistance = Math.max(2, Math.floor(query.length * 0.4));
+      const matches = scored
+        .filter(s => s.minDistance <= maxDistance || s.score === 0)
+        .sort((a, b) => a.score - b.score)
+        .slice(0, limit);
+      
+      return matches.map(m => this.parseSearchRow(m.row, query));
     } else {
       // OR/AND mode
       const words = query.split(/\s+/).filter(w => w.length > 0);
@@ -333,6 +365,39 @@ export class NodeRepository {
     return result;
   }
   
+  /**
+   * Calculate Levenshtein distance between two strings
+   */
+  private levenshteinDistance(a: string, b: string): number {
+    if (a.length === 0) return b.length;
+    if (b.length === 0) return a.length;
+    
+    const matrix: number[][] = [];
+    
+    for (let i = 0; i <= b.length; i++) {
+      matrix[i] = [i];
+    }
+    for (let j = 0; j <= a.length; j++) {
+      matrix[0][j] = j;
+    }
+    
+    for (let i = 1; i <= b.length; i++) {
+      for (let j = 1; j <= a.length; j++) {
+        if (b.charAt(i - 1) === a.charAt(j - 1)) {
+          matrix[i][j] = matrix[i - 1][j - 1];
+        } else {
+          matrix[i][j] = Math.min(
+            matrix[i - 1][j - 1] + 1, // substitution
+            matrix[i][j - 1] + 1,     // insertion
+            matrix[i - 1][j] + 1      // deletion
+          );
+        }
+      }
+    }
+    
+    return matrix[b.length][a.length];
+  }
+
   private calculateRelevance(result: NodeSearchResult, query: string): number {
     const queryLower = query.toLowerCase();
     let score = 0;

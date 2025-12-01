@@ -282,3 +282,73 @@ export interface FilteredNodeData {
     };
   };
 }
+
+// Variable List Types
+export interface VariableListParams {
+  limit?: number;
+  cursor?: string;
+}
+
+export interface VariableListResponse {
+  data: Variable[];
+  nextCursor?: string | null;
+}
+
+// Credential Schema Types
+export interface CredentialSchema {
+  additionalProperties?: boolean;
+  type: string;
+  properties: Record<string, {
+    type: string;
+    description?: string;
+    default?: unknown;
+  }>;
+  required?: string[];
+}
+
+// Audit Types
+export type AuditCategory = 'credentials' | 'database' | 'nodes' | 'filesystem' | 'instance';
+
+export interface AuditParams {
+  additionalOptions?: {
+    daysAbandonedWorkflow?: number;
+    categories?: AuditCategory[];
+  };
+}
+
+export interface AuditLocation {
+  kind: string;
+  id?: string;
+  name?: string;
+  workflowId?: string;
+  workflowName?: string;
+  nodeId?: string;
+  nodeName?: string;
+  nodeType?: string;
+  packageUrl?: string;
+}
+
+export interface AuditSection {
+  title: string;
+  description: string;
+  recommendation: string;
+  location: AuditLocation[];
+}
+
+export interface AuditRiskReport {
+  risk: string;
+  sections: AuditSection[];
+}
+
+export interface AuditReport {
+  'Credentials Risk Report'?: AuditRiskReport;
+  'Database Risk Report'?: AuditRiskReport;
+  'Nodes Risk Report'?: AuditRiskReport;
+  'Filesystem Risk Report'?: AuditRiskReport;
+  'Instance Risk Report'?: AuditRiskReport;
+}
+
+// Execution Retry Types
+export interface ExecutionRetryParams {
+  loadWorkflow?: boolean;
+}

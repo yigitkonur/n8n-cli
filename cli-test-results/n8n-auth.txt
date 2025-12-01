@@ -1,0 +1,54 @@
+# Command: npx n8n auth
+# Flags: (none)
+# Exit Code: 0
+# Duration: 1246ms
+# Timestamp: 2025-11-30T21:40:55.982Z
+# Success: true
+=== STDOUT ===
+╭─ 🔐 n8n Authentication
+│  Fetched: 2025-11-30 21:40:55 UTC
+╰─
+
+Commands:
+
+  n8n auth login     Configure n8n credentials
+  n8n auth status    Show current authentication status
+  n8n auth logout    Clear stored credentials
+
+Non-Interactive Login (Recommended for CI/Agents):
+
+  Using command-line flags:
+    n8n auth login --host https://your-n8n.com --api-key YOUR_API_KEY
+
+  Using environment variables:
+    export N8N_HOST=https://your-n8n.com
+    export N8N_API_KEY=your-api-key
+    n8n auth login
+
+  JSON output for automation:
+    n8n auth login --host https://n8n.com --api-key KEY --json
+
+Interactive Login:
+
+  For manual setup with prompts (opens browser for API key):
+    n8n auth login --interactive
+
+Configuration Storage:
+
+  Credentials are stored in ~/.n8nrc.json with secure permissions (600).
+  You can also use environment variables which take precedence.
+
+Supported n8n Instances:
+
+  • n8n Cloud: https://app.n8n.cloud
+  • Self-hosted: https://your-domain.com or http://localhost:5678
+
+Getting an API Key:
+
+  1. Open your n8n instance
+  2. Navigate to Settings → API
+  3. Create a new API key with appropriate permissions
+
+
+=== STDERR ===
+(empty)

@@ -59,6 +59,12 @@ export const icons = {
   auth: '🔐',
   user: '👤',
   logout: '🚪',
+  credential: '🔑',
+  variable: '📝',
+  tag: '🏷️',
+  audit: '🛡️',
+  retry: '🔄',
+  delete: '🗑️',
 };
 
 /**

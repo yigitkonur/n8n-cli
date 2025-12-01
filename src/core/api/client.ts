@@ -20,6 +20,19 @@ import type {
   ExecutionListResponse,
   HealthCheckResponse,
   WebhookRequest,
+  Credential,
+  CredentialListParams,
+  CredentialListResponse,
+  CredentialSchema,
+  Variable,
+  VariableListParams,
+  VariableListResponse,
+  Tag,
+  TagListParams,
+  TagListResponse,
+  AuditParams,
+  AuditReport,
+  ExecutionRetryParams,
 } from '../../types/n8n-api.js';
 
 /**
@@ -242,10 +255,186 @@ export class N8nApiClient {
     }
   }
 
-  async deleteExecution(id: string): Promise<void> {
+  async deleteExecution(id: string): Promise<Execution> {
     try {
       const safeId = validateResourceId(id, 'execution');
-      await this.client.delete(`/executions/${safeId}`);
+      const response = await this.client.delete(`/executions/${safeId}`);
+      return response.data;
+    } catch (error) {
+      throw handleN8nApiError(error);
+    }
+  }
+
+  async retryExecution(id: string, options: ExecutionRetryParams = {}): Promise<Execution> {
+    try {
+      const safeId = validateResourceId(id, 'execution');
+      const response = await this.client.post(`/executions/${safeId}/retry`, {
+        loadWorkflow: options.loadWorkflow || false,
+      });
+      return response.data;
+    } catch (error) {
+      throw handleN8nApiError(error);
+    }
+  }
+
+  // ===== Credential Management =====
+
+  async listCredentials(params: CredentialListParams = {}): Promise<CredentialListResponse> {
+    try {
+      const response = await this.client.get('/credentials', { params });
+      return this.normalizeListResponse<Credential>(response.data);
+    } catch (error) {
+      throw handleN8nApiError(error);
+    }
+  }
+
+  async getCredentialSchema(typeName: string): Promise<CredentialSchema> {
+    try {
+      const safeType = validateResourceId(typeName, 'credential type');
+      const response = await this.client.get(`/credentials/schema/${safeType}`);
+      return response.data;
+    } catch (error) {
+      throw handleN8nApiError(error);
+    }
+  }
+
+  async createCredential(credential: Omit<Credential, 'id' | 'createdAt' | 'updatedAt'>): Promise<Credential> {
+    try {
+      const response = await this.client.post('/credentials', credential);
+      return response.data;
+    } catch (error) {
+      throw handleN8nApiError(error);
+    }
+  }
+
+  async deleteCredential(id: string): Promise<Credential> {
+    try {
+      const safeId = validateResourceId(id, 'credential');
+      const response = await this.client.delete(`/credentials/${safeId}`);
+      return response.data;
+    } catch (error) {
+      throw handleN8nApiError(error);
+    }
+  }
+
+  // ===== Variable Management =====
+
+  async listVariables(params: VariableListParams = {}): Promise<VariableListResponse> {
+    try {
+      const response = await this.client.get('/variables', { params });
+      return this.normalizeListResponse<Variable>(response.data);
+    } catch (error) {
+      throw handleN8nApiError(error);
+    }
+  }
+
+  async createVariable(variable: Omit<Variable, 'id'>): Promise<Variable> {
+    try {
+      const response = await this.client.post('/variables', variable);
+      return response.data;
+    } catch (error) {
+      throw handleN8nApiError(error);
+    }
+  }
+
+  async updateVariable(id: string, variable: Omit<Variable, 'id'>): Promise<void> {
+    try {
+      const safeId = validateResourceId(id, 'variable');
+      await this.client.put(`/variables/${safeId}`, variable);
+    } catch (error) {
+      throw handleN8nApiError(error);
+    }
+  }
+
+  async deleteVariable(id: string): Promise<void> {
+    try {
+      const safeId = validateResourceId(id, 'variable');
+      await this.client.delete(`/variables/${safeId}`);
+    } catch (error) {
+      throw handleN8nApiError(error);
+    }
+  }
+
+  // ===== Tag Management =====
+
+  async listTags(params: TagListParams = {}): Promise<TagListResponse> {
+    try {
+      const response = await this.client.get('/tags', { params });
+      return this.normalizeListResponse<Tag>(response.data);
+    } catch (error) {
+      throw handleN8nApiError(error);
+    }
+  }
+
+  async getTag(id: string): Promise<Tag> {
+    try {
+      const safeId = validateResourceId(id, 'tag');
+      const response = await this.client.get(`/tags/${safeId}`);
+      return response.data;
+    } catch (error) {
+      throw handleN8nApiError(error);
+    }
+  }
+
+  async createTag(tag: { name: string }): Promise<Tag> {
+    try {
+      const response = await this.client.post('/tags', tag);
+      return response.data;
+    } catch (error) {
+      throw handleN8nApiError(error);
+    }
+  }
+
+  async updateTag(id: string, tag: { name: string }): Promise<Tag> {
+    try {
+      const safeId = validateResourceId(id, 'tag');
+      const response = await this.client.put(`/tags/${safeId}`, tag);
+      return response.data;
+    } catch (error) {
+      throw handleN8nApiError(error);
+    }
+  }
+
+  async deleteTag(id: string): Promise<Tag> {
+    try {
+      const safeId = validateResourceId(id, 'tag');
+      const response = await this.client.delete(`/tags/${safeId}`);
+      return response.data;
+    } catch (error) {
+      throw handleN8nApiError(error);
+    }
+  }
+
+  // ===== Workflow Tags =====
+
+  async getWorkflowTags(workflowId: string): Promise<Tag[]> {
+    try {
+      const safeId = validateResourceId(workflowId, 'workflow');
+      const response = await this.client.get(`/workflows/${safeId}/tags`);
+      return response.data;
+    } catch (error) {
+      throw handleN8nApiError(error);
+    }
+  }
+
+  async updateWorkflowTags(workflowId: string, tagIds: string[]): Promise<Tag[]> {
+    try {
+      const safeId = validateResourceId(workflowId, 'workflow');
+      const response = await this.client.put(`/workflows/${safeId}/tags`, 
+        tagIds.map(id => ({ id }))
+      );
+      return response.data;
+    } catch (error) {
+      throw handleN8nApiError(error);
+    }
+  }
+
+  // ===== Audit =====
+
+  async generateAudit(params: AuditParams = {}): Promise<AuditReport> {
+    try {
+      const response = await this.client.post('/audit', params);
+      return response.data;
     } catch (error) {
       throw handleN8nApiError(error);
     }

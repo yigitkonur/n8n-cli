@@ -86,3 +86,15 @@ export function generateNextActions(
   
   return actions;
 }
+
+/**
+ * @deprecated Use formatExportFooter from jq-recipes.ts instead
+ * Format proactive jq suggestion when data could benefit from filtering
+ */
+export function formatJqSuggestion(commandName: string, dataType: string): string {
+  const filename = `${dataType}.json`;
+  let output = chalk.dim('\n💡 Pro tip: Save + filter with jq:\n');
+  output += chalk.dim(`   n8n ${commandName} --save ${filename}\n`);
+  output += chalk.dim(`   jq '.[] | select(...)' ${filename}\n`);
+  return output;
+}

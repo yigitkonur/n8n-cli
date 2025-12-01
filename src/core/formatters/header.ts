@@ -10,6 +10,10 @@ export interface HeaderOptions {
   icon?: string;
   /** Key-value context lines */
   context?: Record<string, string>;
+  /** Show timestamp (default: true) */
+  showTimestamp?: boolean;
+  /** Optional host/source context */
+  host?: string;
 }
 
 /**
@@ -22,10 +26,21 @@ export interface HeaderOptions {
  * ╰─
  */
 export function formatHeader(options: HeaderOptions): string {
-  const { title, icon, context = {} } = options;
+  const { title, icon, context = {}, showTimestamp = true, host } = options;
   
-  const titleLine = icon ? `${icon} ${title}` : title;
+  // Build title with optional host context
+  let titleLine = icon ? `${icon} ${title}` : title;
+  if (host) {
+    titleLine += chalk.dim(` @ ${host}`);
+  }
+  
   let output = chalk.cyan(`╭─ ${titleLine}\n`);
+  
+  // Add timestamp if enabled
+  if (showTimestamp) {
+    const timestamp = new Date().toISOString().replace('T', ' ').slice(0, 19) + ' UTC';
+    output += chalk.cyan('│  ') + chalk.dim(`Fetched: ${timestamp}`) + '\n';
+  }
   
   const contextEntries = Object.entries(context);
   if (contextEntries.length > 0) {

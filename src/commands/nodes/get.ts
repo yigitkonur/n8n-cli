@@ -9,6 +9,7 @@ import { NodeTypeNormalizer } from '../../utils/node-type-normalizer.js';
 import { formatHeader, formatDivider } from '../../core/formatters/header.js';
 import { formatTable } from '../../core/formatters/table.js';
 import { formatNextActions } from '../../core/formatters/next-actions.js';
+import { formatExportFooter } from '../../core/formatters/jq-recipes.js';
 import { saveToJson, outputJson } from '../../core/formatters/json.js';
 import { theme, icons, formatBoolean } from '../../core/formatters/theme.js';
 
@@ -169,6 +170,9 @@ function outputInfo(node: NodeInfo, detail: string): void {
     { command: `n8n nodes get ${node.nodeType} --detail full`, description: 'View all properties' },
     { command: `n8n nodes search "${node.displayName}"`, description: 'Find similar nodes' },
   ]));
+  
+  // Export & jq filter hints
+  console.log(formatExportFooter('nodes-get', `nodes get ${node.nodeType}`));
 }
 
 function outputDocs(node: NodeInfo): void {

@@ -1,0 +1,24 @@
+# Command: npx n8n auth --help
+# Flags: --help
+# Exit Code: 0
+# Duration: 937ms
+# Timestamp: 2025-11-30T21:40:56.919Z
+# Success: true
+=== STDOUT ===
+
+n8n v1.6.0
+
+Usage: n8n auth [options] [command]
+
+Manage n8n CLI authentication
+
+Options:
+  -h, --help               Display help
+
+Commands:
+  login [options]          Configure n8n credentials
+  status|whoami [options]  Show current authentication status
+  logout [options]         Clear stored credentials
+
+=== STDERR ===
+(empty)

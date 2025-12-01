@@ -1,0 +1,16 @@
+
+n8n v1.6.0
+
+Usage: n8n workflows validate [options] [idOrFile]
+
+Validate a workflow (by ID or local file)
+
+Options:
+  -f, --file <path>    Path to workflow JSON file
+  --profile <profile>  Validation profile: minimal, runtime, ai-friendly,
+                       strict (default: "runtime")
+  --repair             Attempt to repair malformed JSON
+  --fix                Auto-fix known issues
+  -s, --save <path>    Save fixed workflow to file
+  --json               Output as JSON
+  -h, --help           Display help

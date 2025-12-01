@@ -1,0 +1,11 @@
+# Command: npx n8n validate --json
+# Flags: --json
+# Exit Code: 1
+# Duration: 1335ms
+# Timestamp: 2025-11-30T21:43:18.414Z
+# Success: false
+=== STDOUT ===
+(empty)
+=== STDERR ===
+
+❌ Please provide a workflow ID or --file path

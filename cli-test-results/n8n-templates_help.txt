@@ -1,0 +1,24 @@
+# Command: npx n8n templates --help
+# Flags: --help
+# Exit Code: 0
+# Duration: 956ms
+# Timestamp: 2025-11-30T21:43:03.341Z
+# Success: true
+=== STDOUT ===
+
+n8n v1.6.0
+
+Usage: n8n templates [options] [command]
+
+Search and get workflow templates
+
+Options:
+  -h, --help                Display help
+
+Commands:
+  search [options] <query>  Search templates by keyword
+  get [options] <id>        Get template by ID
+  help [command]            display help for command
+
+=== STDERR ===
+(empty)

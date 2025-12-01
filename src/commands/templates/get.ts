@@ -8,6 +8,7 @@ import axios from 'axios';
 import { formatHeader, formatDivider } from '../../core/formatters/header.js';
 import { formatTable, columnFormatters } from '../../core/formatters/table.js';
 import { formatNextActions } from '../../core/formatters/next-actions.js';
+import { formatExportFooter } from '../../core/formatters/jq-recipes.js';
 import { saveToJson, outputJson } from '../../core/formatters/json.js';
 import { theme, icons } from '../../core/formatters/theme.js';
 
@@ -110,6 +111,9 @@ export async function templatesGetCommand(id: string, opts: GetOptions): Promise
       { command: `n8n workflows validate workflow.json`, description: 'Validate after download' },
       { command: `open https://n8n.io/workflows/${id}`, description: 'View on n8n.io' },
     ]));
+    
+    // Export & jq filter hints
+    console.log(formatExportFooter('templates-get', `templates get ${id}`));
     
   } catch (error: any) {
     if (error.response?.status === 404) {

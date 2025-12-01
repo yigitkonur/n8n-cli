@@ -7,6 +7,7 @@ import chalk from 'chalk';
 import { getApiClient } from '../../core/api/client.js';
 import { formatHeader, formatDivider } from '../../core/formatters/header.js';
 import { formatNextActions } from '../../core/formatters/next-actions.js';
+import { formatExportFooter } from '../../core/formatters/jq-recipes.js';
 import { saveToJson, outputJson } from '../../core/formatters/json.js';
 import { icons } from '../../core/formatters/theme.js';
 import { printError, N8nApiError } from '../../utils/errors.js';
@@ -144,4 +145,7 @@ function outputExecution(execution: any, mode: string): void {
     { command: `n8n executions get ${execution.id} --mode full`, description: 'View full data' },
     { command: `n8n executions get ${execution.id} --json --save execution.json`, description: 'Export' },
   ]));
+  
+  // Export & jq filter hints
+  console.log(formatExportFooter('executions-get', `executions get ${execution.id}`));
 }

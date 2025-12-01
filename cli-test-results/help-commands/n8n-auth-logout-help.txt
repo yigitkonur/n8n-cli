@@ -1,0 +1,10 @@
+
+n8n v1.6.0
+
+Usage: n8n auth logout [options]
+
+Clear stored credentials
+
+Options:
+  --json      Output as JSON
+  -h, --help  Display help

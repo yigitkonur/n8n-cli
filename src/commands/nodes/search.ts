@@ -9,7 +9,7 @@ import { formatHeader } from '../../core/formatters/header.js';
 import { formatTable, columnFormatters } from '../../core/formatters/table.js';
 import { formatSummary } from '../../core/formatters/summary.js';
 import { formatNextActions } from '../../core/formatters/next-actions.js';
-import { formatJqRecipes, getStandardRecipes } from '../../core/formatters/jq-recipes.js';
+import { formatExportFooter } from '../../core/formatters/jq-recipes.js';
 import { saveToJson, outputJson } from '../../core/formatters/json.js';
 import { icons } from '../../core/formatters/theme.js';
 
@@ -120,9 +120,9 @@ export async function nodesSearchCommand(query: string, opts: SearchOptions): Pr
       ]));
     }
     
-    // jq recipes if saved
-    if (opts.save) {
-      console.log(formatJqRecipes(getStandardRecipes('nodes', opts.save), opts.save));
+    // Export & jq filter hints (always show for discoverability)
+    if (results.length > 0) {
+      console.log(formatExportFooter('nodes-search', `nodes search "${query}"`, opts.save));
     }
     
   } catch (error: any) {

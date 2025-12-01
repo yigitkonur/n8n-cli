@@ -1,0 +1,19 @@
+# Command: npx n8n auth status --json
+# Flags: --json
+# Exit Code: 0
+# Duration: 1969ms
+# Timestamp: 2025-11-30T21:41:00.388Z
+# Success: true
+=== STDOUT ===
+{
+  "configured": true,
+  "configPath": "/Users/yigitkonur/.n8nrc.json",
+  "host": "https://aura.zeogen.com",
+  "apiKeyMasked": "eyJh...vGv8",
+  "connected": true,
+  "apiKeyValid": true,
+  "latencyMs": 630
+}
+
+=== STDERR ===
+(empty)

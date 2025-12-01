@@ -9,6 +9,7 @@ import { formatHeader } from '../../core/formatters/header.js';
 import { formatTable, columnFormatters } from '../../core/formatters/table.js';
 import { formatSummary } from '../../core/formatters/summary.js';
 import { formatNextActions } from '../../core/formatters/next-actions.js';
+import { formatExportFooter } from '../../core/formatters/jq-recipes.js';
 import { saveToJson, outputJson } from '../../core/formatters/json.js';
 import { icons } from '../../core/formatters/theme.js';
 
@@ -111,6 +112,11 @@ export async function templatesSearchCommand(query: string, opts: SearchOptions)
         { command: `n8n templates get ${templates[0].id}`, description: 'View template details' },
         { command: `n8n templates get ${templates[0].id} --save workflow.json`, description: 'Download template' },
       ]));
+    }
+    
+    // Export & jq filter hints
+    if (templates.length > 0) {
+      console.log(formatExportFooter('templates-search', `templates search "${query}"`, opts.save));
     }
     
   } catch (error: any) {

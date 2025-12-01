@@ -5,10 +5,12 @@
 
 import chalk from 'chalk';
 import { getApiClient } from '../../core/api/client.js';
+import { getConfig } from '../../core/config/loader.js';
 import { formatHeader } from '../../core/formatters/header.js';
 import { formatTable, columnFormatters } from '../../core/formatters/table.js';
 import { formatSummary } from '../../core/formatters/summary.js';
 import { formatNextActions } from '../../core/formatters/next-actions.js';
+import { formatExportFooter } from '../../core/formatters/jq-recipes.js';
 import { saveToJson, outputJson } from '../../core/formatters/json.js';
 import { icons } from '../../core/formatters/theme.js';
 import { printError, N8nApiError } from '../../utils/errors.js';
@@ -24,6 +26,7 @@ interface ListOptions {
 
 export async function workflowsListCommand(opts: ListOptions): Promise<void> {
   const limit = parseInt(opts.limit || '10', 10);
+  const startTime = Date.now();
   
   try {
     const client = getApiClient();
@@ -59,10 +62,12 @@ export async function workflowsListCommand(opts: ListOptions): Promise<void> {
       await saveToJson(workflows, { path: opts.save });
     }
     
-    // Human-friendly output
+    // Human-friendly output with host context
+    const config = getConfig();
     console.log(formatHeader({
       title: 'Workflows',
       icon: icons.workflow,
+      host: config.host ? new URL(config.host).host : undefined,
       context: {
         'Found': `${workflows.length} workflows`,
         ...(opts.active !== undefined && { 'Filter': opts.active ? 'Active only' : 'Inactive only' }),
@@ -128,8 +133,17 @@ export async function workflowsListCommand(opts: ListOptions): Promise<void> {
       console.log(chalk.dim(`\n  More workflows available. Use --cursor ${response.nextCursor} to see more.`));
     }
     
-    // Summary
-    console.log('\n' + formatSummary({ total: workflows.length }));
+    // Summary with stats
+    const activeCount = workflows.filter((w: any) => w.active).length;
+    const inactiveCount = workflows.length - activeCount;
+    const durationMs = Date.now() - startTime;
+    
+    console.log('\n' + formatSummary({ 
+      total: workflows.length,
+      active: activeCount,
+      inactive: inactiveCount,
+      durationMs,
+    }));
     
     // Next actions
     if (workflows.length > 0) {
@@ -141,9 +155,14 @@ export async function workflowsListCommand(opts: ListOptions): Promise<void> {
       ]));
     }
     
+    // Export & jq filter hints (always show for discoverability)
+    if (workflows.length > 0) {
+      console.log(formatExportFooter('workflows-list', 'workflows list', opts.save));
+    }
+    
   } catch (error) {
     if (error instanceof N8nApiError) {
-      printError(error);
+      printError(error, false, 'workflows list');
     } else {
       console.error(chalk.red(`\n${icons.error} Error: ${(error as Error).message}`));
     }

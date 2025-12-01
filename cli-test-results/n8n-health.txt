@@ -1,0 +1,20 @@
+# Command: npx n8n health
+# Flags: (none)
+# Exit Code: 0
+# Duration: 1880ms
+# Timestamp: 2025-11-30T21:41:06.394Z
+# Success: true
+=== STDOUT ===
+╭─ 🏥 n8n Health Check
+│  Fetched: 2025-11-30 21:41:06 UTC
+│  Host: https://aura.zeogen.com
+│  API Key: eyJh...vGv8
+╰─
+
+✅ Connection: OK
+✅ API Key: Valid
+ℹ️ Latency: 630ms
+
+
+=== STDERR ===
+(empty)

@@ -1,0 +1,23 @@
+# Command: npx n8n workflows get 1 --mode minimal
+# Flags: --mode minimal
+# Exit Code: 1
+# Duration: 1510ms
+# Timestamp: 2025-11-30T21:42:12.397Z
+# Success: false
+=== STDOUT ===
+(empty)
+=== STDERR ===
+
+❌ Resource with ID Not Found not found
+   [NOT_FOUND] (HTTP 404)
+
+   This usually means:
+   • The resource was recently deleted
+   • You're looking in the wrong context/instance
+   • The ID was mistyped or uses wrong format
+   • The resource exists but you lack read permissions
+
+   Try:
+   n8n --help                      # See all commands
+
+   Docs: https://github.com/yigitkonur/n8n-cli#troubleshooting-not-found

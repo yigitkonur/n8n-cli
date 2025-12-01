@@ -45,6 +45,16 @@ export async function workflowsCreateCommand(opts: CreateOptions): Promise<void>
       workflow.name = `Imported Workflow ${new Date().toISOString().split('T')[0]}`;
     }
     
+    // Ensure workflow has required settings (n8n API requires this)
+    if (!workflow.settings) {
+      workflow.settings = { executionOrder: 'v1' };
+    }
+    
+    // Ensure workflow has connections object
+    if (!workflow.connections) {
+      workflow.connections = {};
+    }
+    
     const client = getApiClient();
     const created = await client.createWorkflow(workflow);
     

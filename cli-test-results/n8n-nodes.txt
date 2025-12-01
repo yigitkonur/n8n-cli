@@ -1,0 +1,24 @@
+# Command: npx n8n nodes
+# Flags: (none)
+# Exit Code: 1
+# Duration: 1270ms
+# Timestamp: 2025-11-30T21:41:09.591Z
+# Success: false
+=== STDOUT ===
+(empty)
+=== STDERR ===
+
+n8n v1.6.0
+
+Usage: n8n nodes [options] [command]
+
+Search and inspect n8n nodes
+
+Options:
+  -h, --help                     Display help
+
+Commands:
+  search [options] <query>       Search for nodes by keyword
+  get [options] <nodeType>       Get node schema and documentation
+  validate [options] <nodeType>  Validate node configuration
+  help [command]                 display help for command

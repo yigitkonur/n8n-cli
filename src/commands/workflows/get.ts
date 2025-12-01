@@ -8,6 +8,7 @@ import { getApiClient } from '../../core/api/client.js';
 import { formatHeader, formatDivider } from '../../core/formatters/header.js';
 import { formatTable, columnFormatters } from '../../core/formatters/table.js';
 import { formatNextActions } from '../../core/formatters/next-actions.js';
+import { formatExportFooter } from '../../core/formatters/jq-recipes.js';
 import { saveToJson, outputJson } from '../../core/formatters/json.js';
 import { theme, icons, formatBoolean } from '../../core/formatters/theme.js';
 import { printError, N8nApiError } from '../../utils/errors.js';
@@ -206,4 +207,7 @@ function outputFull(workflow: any): void {
     { command: `n8n executions list --workflow-id ${workflow.id}`, description: 'View executions' },
     { command: `n8n workflows get ${workflow.id} --json --save workflow.json`, description: 'Export to JSON' },
   ]));
+  
+  // Export & jq filter hints
+  console.log(formatExportFooter('workflows-get', `workflows get ${workflow.id}`));
 }

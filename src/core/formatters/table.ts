@@ -93,10 +93,12 @@ export function formatTable<T extends Record<string, unknown>>(
   
   let output = table.toString();
   
-  // Add truncation notice
+  // Add truncation notice with guidance
   if (truncated) {
     const remaining = data.length - displayLimit;
     output += chalk.dim(`\n... and ${remaining} more (showing ${displayLimit} of ${data.length})`);
+    output += chalk.dim('\n   • Use --limit 0 for all results');
+    output += chalk.dim('\n   • Use --save <file>.json for complete dataset + jq filtering');
   }
   
   return output;

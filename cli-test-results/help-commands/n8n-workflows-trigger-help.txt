@@ -1,0 +1,12 @@
+
+n8n v1.6.0
+
+Usage: n8n workflows trigger [options] <webhookUrl>
+
+Trigger workflow via webhook
+
+Options:
+  -d, --data <json>      Request body as JSON (default: "{}")
+  -m, --method <method>  HTTP method: GET, POST, PUT, DELETE (default: "POST")
+  --json                 Output as JSON
+  -h, --help             Display help

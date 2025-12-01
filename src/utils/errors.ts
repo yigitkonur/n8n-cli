@@ -147,6 +147,117 @@ export function getUserFriendlyErrorMessage(error: N8nApiError): string {
 }
 
 /**
+ * Get common causes for an error - helps LLMs understand root issues
+ */
+export function getErrorCauses(code: string | undefined): string[] {
+  const causes: Record<string, string[]> = {
+    AUTHENTICATION_ERROR: [
+      'Your API key may be expired or revoked',
+      'The API key lacks required permissions',
+      'N8N_API_KEY environment variable is not set',
+      'You\'re connecting to the wrong n8n instance',
+    ],
+    NOT_FOUND: [
+      'The resource was recently deleted',
+      'You\'re looking in the wrong context/instance',
+      'The ID was mistyped or uses wrong format',
+      'The resource exists but you lack read permissions',
+    ],
+    VALIDATION_ERROR: [
+      'Required fields are missing in the request',
+      'Field values don\'t match expected format',
+      'Referenced resources (nodes, credentials) don\'t exist',
+      'Workflow JSON structure is malformed',
+    ],
+    RATE_LIMIT_ERROR: [
+      'Too many API requests in short period',
+      'Batch operations exceeded quota',
+      'Concurrent requests from multiple clients',
+    ],
+    CONNECTION_ERROR: [
+      'n8n instance is not running',
+      'Network connectivity issues',
+      'Firewall blocking the connection',
+      'N8N_HOST URL is incorrect',
+    ],
+    NO_RESPONSE: [
+      'n8n instance is overloaded',
+      'Network timeout occurred',
+      'Request was too large to process',
+    ],
+    SERVER_ERROR: [
+      'n8n internal error occurred',
+      'Database connectivity issues on server',
+      'Resource exhaustion on n8n instance',
+    ],
+  };
+  
+  return causes[code || ''] || [];
+}
+
+/**
+ * Get suggested commands for error recovery
+ */
+export function getErrorSuggestions(code: string | undefined, commandContext?: string): string[] {
+  const suggestions: Record<string, string[]> = {
+    AUTHENTICATION_ERROR: [
+      'n8n auth login                  # Configure credentials',
+      'n8n auth status                 # Check current auth',
+      'n8n health                      # Verify connection',
+    ],
+    NOT_FOUND: [
+      ...(commandContext?.includes('workflow') ? [
+        'n8n workflows list             # List available workflows',
+        'n8n workflows list --limit 0   # List ALL workflows',
+      ] : []),
+      ...(commandContext?.includes('execution') ? [
+        'n8n executions list            # List recent executions',
+        'n8n executions list --status error  # Find failed ones',
+      ] : []),
+      ...(commandContext?.includes('node') ? [
+        'n8n nodes search <query>       # Search for nodes',
+        'n8n nodes search --mode FUZZY  # Fuzzy search for typos',
+      ] : []),
+      'n8n --help                      # See all commands',
+    ],
+    VALIDATION_ERROR: [
+      'n8n workflows validate <id> --fix         # Auto-fix issues',
+      'n8n workflows validate <id> --repair      # Repair malformed JSON',
+      'n8n nodes search <node-name>              # Find correct node types',
+    ],
+    RATE_LIMIT_ERROR: [
+      '# Wait 60 seconds and retry',
+      '# Use --limit to reduce batch size',
+    ],
+    CONNECTION_ERROR: [
+      'n8n health                      # Check connectivity',
+      'n8n auth status                 # Verify configuration',
+      'curl $N8N_HOST/healthz          # Direct health check',
+    ],
+    NO_RESPONSE: [
+      'n8n health                      # Check connectivity',
+      '# Verify n8n instance is running',
+      '# Check n8n server resource usage',
+    ],
+    SERVER_ERROR: [
+      'n8n health                      # Check instance status',
+      '# Check n8n server logs for details',
+      '# Retry in a few minutes',
+    ],
+  };
+  
+  return suggestions[code || ''] || [];
+}
+
+/**
+ * Get documentation URL for error code
+ */
+export function getErrorDocsUrl(code: string | undefined): string {
+  const baseUrl = 'https://github.com/yigitkonur/n8n-cli#troubleshooting';
+  return code ? `${baseUrl}-${code.toLowerCase().replace(/_/g, '-')}` : baseUrl;
+}
+
+/**
  * Sanitize object for logging - removes sensitive values
  * Task 06: Consistent API Key Masking
  */
@@ -175,19 +286,47 @@ export function sanitizeForLogging(obj: unknown): unknown {
 }
 
 /**
- * Print error to console with formatting
+ * Print error to console with formatting and actionable guidance
+ * Follows LLM-first CLI design: descriptive, actionable, with causes and suggestions
  */
-export function printError(error: N8nApiError, verbose = false): void {
+export function printError(error: N8nApiError, verbose = false, commandContext?: string): void {
   const friendlyMessage = getUserFriendlyErrorMessage(error);
-  console.error(chalk.red(`\n❌ ${friendlyMessage}`));
   
+  // Error header with code
+  console.error(chalk.red(`\n❌ ${friendlyMessage}`));
+  if (error.code) {
+    console.error(chalk.dim(`   [${error.code}]${error.statusCode ? ` (HTTP ${error.statusCode})` : ''}`));
+  }
+  
+  // "This usually means:" section - helps LLMs understand root causes
+  const causes = getErrorCauses(error.code);
+  if (causes.length > 0) {
+    console.error(chalk.yellow('\n   This usually means:'));
+    for (const cause of causes.slice(0, 4)) {
+      console.error(chalk.dim(`   • ${cause}`));
+    }
+  }
+  
+  // "Try:" section with actionable commands
+  const suggestions = getErrorSuggestions(error.code, commandContext);
+  if (suggestions.length > 0) {
+    console.error(chalk.cyan('\n   Try:'));
+    for (const suggestion of suggestions) {
+      console.error(chalk.white(`   ${suggestion}`));
+    }
+  }
+  
+  // Documentation link
+  console.error(chalk.dim(`\n   Docs: ${getErrorDocsUrl(error.code)}`));
+  
+  // Verbose mode: additional technical details
   if (verbose) {
-    console.error(chalk.dim(`\n   Code: ${error.code || 'unknown'}`));
+    console.error(chalk.dim('\n   Debug info:'));
+    console.error(chalk.dim(`   Code: ${error.code || 'UNKNOWN'}`));
     if (error.statusCode) {
       console.error(chalk.dim(`   Status: ${error.statusCode}`));
     }
     if (error.details) {
-      // Task 06: Sanitize error details before logging
       const sanitizedDetails = sanitizeForLogging(error.details);
       console.error(chalk.dim(`   Details: ${JSON.stringify(sanitizedDetails, null, 2)}`));
     }

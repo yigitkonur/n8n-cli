@@ -1,0 +1,18 @@
+{
+  "status": "commited",
+  "type": "backend",
+  "scope": "codebase",
+  "localEndpoint": "http://localhost:5173",
+  "backendAuthType": "API key",
+  "backendApiKey": "base_url to use: https://aura.zeogen.com",
+  "backendApiValue": "api-key to use: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZDk2ZmQzMS0xODU2LTQzY2UtODg5Ny0wOThlY2VhYjk4OTAiLCJpc3MiOiJuOG4iLCJhdWQiOiJwdWJsaWMtYXBpIiwiaWF0IjoxNzY0NTMzNDY1fQ.eNVaGYpcGJXhncDO6Zbn1a609y9K3F-QoNgfTJsvGv8",
+  "executionArgs": {
+    "projectName": "cli",
+    "projectPath": "/Users/yigitkonur/n8n-workspace/cli",
+    "testIds": [],
+    "additionalInstruction": "This is a CLI tool (not a web server). Focus on unit tests for command handlers, config loading, API client mocking, and validation logic. Use Vitest as the test framework. Mock external API calls and SQLite database interactions.",
+    "envs": {
+      "API_KEY": "sk-user-UD62za08OJnq-USlkE-BuV8dd3UL_NaAjSuR5NdRbZk6e3jRA-sK0GW4YFjsO9uIxltE_aPkb1aFjnLONJm42CNA8U8OzKmksprvZaGO2VC36pDyqKz58VXNPGgwDrKsNs8"
+    }
+  }
+}

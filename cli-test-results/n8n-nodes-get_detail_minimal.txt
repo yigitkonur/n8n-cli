@@ -1,0 +1,67 @@
+# Command: npx n8n nodes get n8n-nodes-base.httpRequest --detail minimal
+# Flags: --detail minimal
+# Exit Code: 0
+# Duration: 1259ms
+# Timestamp: 2025-11-30T21:41:30.195Z
+# Success: true
+=== STDOUT ===
+╭─ 📦 HTTP Request
+│  Fetched: 2025-11-30 21:41:30 UTC
+│  Type: nodes-base.httpRequest
+│  Category: output
+│  Package: n8n-nodes-base
+╰─
+
+  Makes an HTTP request and returns the response data
+
+  Flags:
+    ✗ Trigger   ✗ Webhook   ✗ AI Tool
+
+
+─── Properties ────────────────────────────────────────
+
+┌─────────────────────────┬────────────┬──────────┬────────────────────┐
+│ Property                │ Type       │ Required │ Default            │
+├─────────────────────────┼────────────┼──────────┼────────────────────┤
+│ preBuiltAgentsCalloutH… │ callout    │ No       │                    │
+├─────────────────────────┼────────────┼──────────┼────────────────────┤
+│ curlImport              │ curlImport │ No       │                    │
+├─────────────────────────┼────────────┼──────────┼────────────────────┤
+│ method                  │ options    │ No       │ GET                │
+├─────────────────────────┼────────────┼──────────┼────────────────────┤
+│ url                     │ string     │ Yes      │                    │
+├─────────────────────────┼────────────┼──────────┼────────────────────┤
+│ authentication          │ options    │ No       │ none               │
+└─────────────────────────┴────────────┴──────────┴────────────────────┘
+  ... and 38 more properties
+
+─── Credentials ───────────────────────────────────────
+
+  🔑 httpSslAuth
+
+
+⚡ Next steps:
+   n8n nodes get nodes-base.httpRequest --mode docs # View documentation
+   n8n nodes get nodes-base.httpRequest --detail full # View all properties
+   n8n nodes search "HTTP Request" # Find similar nodes
+
+
+💡 Export & filter with jq:
+
+   # Pipe to jq (quick analysis):
+   n8n nodes get nodes-base.httpRequest --json | jq '.properties | map(.name)'
+      # List property names
+   n8n nodes get nodes-base.httpRequest --json | jq '.properties | map(select(.required == true))'
+      # Required properties only
+
+   # Save then filter (for larger datasets):
+   n8n nodes get nodes-base.httpRequest --save nodes.json
+   jq '.properties | map(.name)' nodes.json
+   jq '.properties | map(select(.required == true))' nodes.json
+   jq '.operations | map(.value)' nodes.json
+
+   # Export as TSV/CSV:
+
+
+=== STDERR ===
+(empty)

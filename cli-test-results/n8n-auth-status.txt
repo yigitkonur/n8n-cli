@@ -1,0 +1,30 @@
+# Command: npx n8n auth status
+# Flags: (none)
+# Exit Code: 0
+# Duration: 1497ms
+# Timestamp: 2025-11-30T21:40:58.416Z
+# Success: true
+=== STDOUT ===
+╭─ 👤 n8n Authentication Status
+│  Fetched: 2025-11-30 21:40:58 UTC
+╰─
+
+Configuration
+  Host:       https://aura.zeogen.com
+  API Key:    eyJh...vGv8
+  Config:     /Users/yigitkonur/.n8nrc.json
+
+Connection Status
+  ✅ Connected
+  ✅ API Key valid
+  ℹ️ Latency: 506ms
+
+✅ Ready to use n8n CLI
+
+Try:
+  n8n workflows list
+  n8n health
+
+
+=== STDERR ===
+(empty)

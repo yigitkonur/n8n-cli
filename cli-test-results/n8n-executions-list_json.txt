@@ -1,0 +1,137 @@
+# Command: npx n8n executions list --json
+# Flags: --json
+# Exit Code: 0
+# Duration: 1486ms
+# Timestamp: 2025-11-30T21:42:35.877Z
+# Success: true
+=== STDOUT ===
+{
+  "data": [
+    {
+      "id": "9360",
+      "finished": true,
+      "mode": "manual",
+      "retryOf": null,
+      "retrySuccessId": null,
+      "status": "success",
+      "startedAt": "2025-11-29T18:14:56.268Z",
+      "stoppedAt": "2025-11-29T18:14:56.710Z",
+      "workflowId": "XoavLhoExyQKyAj0",
+      "waitTill": null
+    },
+    {
+      "id": "9359",
+      "finished": true,
+      "mode": "manual",
+      "retryOf": null,
+      "retrySuccessId": null,
+      "status": "success",
+      "startedAt": "2025-11-29T18:14:50.333Z",
+      "stoppedAt": "2025-11-29T18:14:50.959Z",
+      "workflowId": "XoavLhoExyQKyAj0",
+      "waitTill": null
+    },
+    {
+      "id": "9358",
+      "finished": true,
+      "mode": "manual",
+      "retryOf": null,
+      "retrySuccessId": null,
+      "status": "success",
+      "startedAt": "2025-11-29T18:14:38.157Z",
+      "stoppedAt": "2025-11-29T18:14:38.914Z",
+      "workflowId": "XoavLhoExyQKyAj0",
+      "waitTill": null
+    },
+    {
+      "id": "9357",
+      "finished": true,
+      "mode": "manual",
+      "retryOf": null,
+      "retrySuccessId": null,
+      "status": "success",
+      "startedAt": "2025-11-29T18:14:22.978Z",
+      "stoppedAt": "2025-11-29T18:14:23.829Z",
+      "workflowId": "XoavLhoExyQKyAj0",
+      "waitTill": null
+    },
+    {
+      "id": "9356",
+      "finished": true,
+      "mode": "manual",
+      "retryOf": null,
+      "retrySuccessId": null,
+      "status": "success",
+      "startedAt": "2025-11-29T18:13:48.253Z",
+      "stoppedAt": "2025-11-29T18:13:49.263Z",
+      "workflowId": "XoavLhoExyQKyAj0",
+      "waitTill": null
+    },
+    {
+      "id": "9355",
+      "finished": true,
+      "mode": "manual",
+      "retryOf": null,
+      "retrySuccessId": null,
+      "status": "success",
+      "startedAt": "2025-11-29T18:12:48.782Z",
+      "stoppedAt": "2025-11-29T18:13:09.181Z",
+      "workflowId": "XoavLhoExyQKyAj0",
+      "waitTill": null
+    },
+    {
+      "id": "9354",
+      "finished": true,
+      "mode": "manual",
+      "retryOf": null,
+      "retrySuccessId": null,
+      "status": "success",
+      "startedAt": "2025-11-29T18:12:34.709Z",
+      "stoppedAt": "2025-11-29T18:12:35.964Z",
+      "workflowId": "XoavLhoExyQKyAj0",
+      "waitTill": null
+    },
+    {
+      "id": "9353",
+      "finished": true,
+      "mode": "manual",
+      "retryOf": null,
+      "retrySuccessId": null,
+      "status": "success",
+      "startedAt": "2025-11-29T18:12:02.802Z",
+      "stoppedAt": "2025-11-29T18:12:04.075Z",
+      "workflowId": "XoavLhoExyQKyAj0",
+      "waitTill": null
+    },
+    {
+      "id": "9352",
+      "finished": true,
+      "mode": "manual",
+      "retryOf": null,
+      "retrySuccessId": null,
+      "status": "success",
+      "startedAt": "2025-11-29T18:11:52.860Z",
+      "stoppedAt": "2025-11-29T18:11:53.849Z",
+      "workflowId": "XoavLhoExyQKyAj0",
+      "waitTill": null
+    },
+    {
+      "id": "9351",
+      "finished": false,
+      "mode": "manual",
+      "retryOf": null,
+      "retrySuccessId": null,
+      "status": "error",
+      "startedAt": "2025-11-29T18:06:34.450Z",
+      "stoppedAt": "2025-11-29T18:06:34.460Z",
+      "workflowId": "XoavLhoExyQKyAj0",
+      "waitTill": null
+    }
+  ],
+  "total": 10,
+  "hasMore": true,
+  "nextCursor": "eyJsYXN0SWQiOiI5MzUxIiwibGltaXQiOjEwfQ=="
+}
+
+=== STDERR ===
+(empty)

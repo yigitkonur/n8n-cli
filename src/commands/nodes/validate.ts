@@ -13,6 +13,7 @@ import { icons } from '../../core/formatters/theme.js';
 
 interface ValidateOptions {
   config?: string;
+  profile?: 'minimal' | 'runtime' | 'strict';
   json?: boolean;
 }
 
@@ -47,7 +48,8 @@ export async function nodesValidateCommand(nodeType: string, opts: ValidateOptio
       }
     }
     
-    // Validate configuration
+    // Validate configuration based on profile
+    const profile = opts.profile || 'runtime';
     const errors: string[] = [];
     const warnings: string[] = [];
     const suggestions: string[] = [];
@@ -55,12 +57,20 @@ export async function nodesValidateCommand(nodeType: string, opts: ValidateOptio
     // Check required properties
     if (node.properties) {
       for (const prop of node.properties) {
-        if (prop.required && config[prop.name] === undefined) {
+        // minimal: only check if explicitly marked required
+        // runtime: check required + basic type validation (default)
+        // strict: check everything including optional properties
+        
+        const isRequired = prop.required;
+        const hasValue = config[prop.name] !== undefined;
+        
+        // Required property check (all profiles)
+        if (isRequired && !hasValue) {
           errors.push(`Missing required property: ${prop.name}`);
         }
         
-        // Type validation
-        if (config[prop.name] !== undefined) {
+        // Type validation (runtime and strict only)
+        if (hasValue && profile !== 'minimal') {
           const value = config[prop.name];
           const expectedType = prop.type;
           
@@ -77,6 +87,11 @@ export async function nodesValidateCommand(nodeType: string, opts: ValidateOptio
             }
           }
         }
+        
+        // Strict mode: warn about missing optional properties
+        if (profile === 'strict' && !isRequired && !hasValue && prop.default === undefined) {
+          warnings.push(`Optional property '${prop.name}' not set (no default)`);
+        }
       }
     }
     
@@ -85,12 +100,20 @@ export async function nodesValidateCommand(nodeType: string, opts: ValidateOptio
       suggestions.push(`This node requires credentials: ${node.credentials.map((c: any) => c.name || c).join(', ')}`);
     }
     
+    // Strict mode: additional checks
+    if (profile === 'strict') {
+      if (!node.description) {
+        warnings.push('Node has no description');
+      }
+    }
+    
     const isValid = errors.length === 0;
     
     // JSON output
     if (opts.json) {
       outputJson({
         nodeType: node.nodeType,
+        profile,
         valid: isValid,
         errors,
         warnings,
@@ -107,6 +130,7 @@ export async function nodesValidateCommand(nodeType: string, opts: ValidateOptio
       icon: isValid ? icons.success : icons.error,
       context: {
         'Node Type': node.nodeType,
+        'Profile': profile,
         'Status': isValid ? chalk.green('Valid') : chalk.red('Invalid'),
       },
     }));

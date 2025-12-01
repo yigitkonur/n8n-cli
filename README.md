@@ -220,6 +220,10 @@ N8N_API_KEY=your-api-key
 | **🎯 Schema Delta**<br/>`Missing/extra key detection` | Shows exactly which keys are wrong vs expected | Fix the right thing the first time |
 | **📍 Source Locations**<br/>`Line & column numbers` | Points to exact JSON location with code snippet | No hunting through 1000-line workflows |
 | **🔄 Full CRUD**<br/>`Complete workflow lifecycle` | Create, read, update, validate, deploy workflows | End-to-end automation support |
+| **🔑 Credentials**<br/>`Secure credential management` | List, create, delete credentials with masked output | Automate credential provisioning |
+| **📝 Variables**<br/>`Environment config` | Manage n8n environment variables via CLI | Infrastructure-as-code support |
+| **🏷️ Tags**<br/>`Workflow organization` | CRUD for tags + assign tags to workflows | Organize and filter workflows |
+| **🛡️ Security Audit**<br/>`Built-in security checks` | Generate security audit reports for n8n instance | Catch vulnerabilities early |
 
 </div>
 
@@ -287,6 +291,91 @@ npx n8n-cli executions list --limit 10 --json
 
 # Get execution details
 npx n8n-cli executions get exec123 --json
+
+# Retry a failed execution
+npx n8n-cli executions retry exec123 --json
+
+# Retry with latest workflow version (instead of snapshot)
+npx n8n-cli executions retry exec123 --load-latest --json
+
+# Delete an execution
+npx n8n-cli executions delete exec123 --force
+```
+
+### Credentials
+
+```bash
+# List all credentials (values masked for security)
+npx n8n-cli credentials list --json
+
+# Get credential type schema (to know required fields)
+npx n8n-cli credentials schema githubApi --json
+
+# Create a credential from file
+npx n8n-cli credentials create --type githubApi --name "My GitHub" --data @creds.json
+
+# Create with inline JSON
+npx n8n-cli credentials create --type githubApi --name "My GitHub" --data '{"accessToken":"xxx"}'
+
+# Delete a credential
+npx n8n-cli credentials delete credId123 --force
+```
+
+### Variables
+
+```bash
+# List all environment variables
+npx n8n-cli variables list --json
+
+# Create a variable
+npx n8n-cli variables create --key API_URL --value "https://api.example.com"
+
+# Update a variable
+npx n8n-cli variables update varId123 --key API_URL --value "https://new-api.example.com"
+
+# Delete a variable
+npx n8n-cli variables delete varId123 --force
+```
+
+### Tags
+
+```bash
+# List all tags
+npx n8n-cli tags list --json
+
+# Get tag details
+npx n8n-cli tags get tagId123 --json
+
+# Create a tag
+npx n8n-cli tags create --name "Production"
+
+# Update a tag
+npx n8n-cli tags update tagId123 --name "Staging"
+
+# Delete a tag
+npx n8n-cli tags delete tagId123 --force
+
+# Get workflow tags
+npx n8n-cli workflows tags workflowId123 --json
+
+# Assign tags to a workflow
+npx n8n-cli workflows tags workflowId123 --set tagId1,tagId2
+```
+
+### Security Audit
+
+```bash
+# Generate full security audit
+npx n8n-cli audit --json
+
+# Audit specific categories
+npx n8n-cli audit --categories credentials,database,nodes --json
+
+# Save audit report to file
+npx n8n-cli audit --save audit-report.json
+
+# Include abandoned workflow check (workflows not executed in N days)
+npx n8n-cli audit --days-abandoned 30
 ```
 
 ### Templates (Public n8n.io API)

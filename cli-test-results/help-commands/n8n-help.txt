@@ -1,0 +1,20 @@
+
+n8n v1.6.0
+
+Usage: n8n [options] [command]
+
+Full-featured n8n CLI - workflow management, validation, node search, and more
+
+Options:
+  -V, --version              Output version number
+  -h, --help                 Display help
+
+Commands:
+  auth                       Manage n8n CLI authentication
+  health [options]           Check n8n instance connectivity and API status
+  nodes                      Search and inspect n8n nodes
+  workflows                  Manage n8n workflows
+  executions                 View and manage workflow executions
+  templates                  Search and get workflow templates
+  validate [options] [file]  Validate workflow JSON file (legacy command)
+  help [command]             display help for command

@@ -7,8 +7,10 @@ import chalk from 'chalk';
 import { getApiClient } from '../../core/api/client.js';
 import { formatHeader } from '../../core/formatters/header.js';
 import { formatTable, columnFormatters } from '../../core/formatters/table.js';
-import { formatSummary } from '../../core/formatters/summary.js';
+import { formatSummary, formatHealthIndicator } from '../../core/formatters/summary.js';
 import { formatNextActions } from '../../core/formatters/next-actions.js';
+import { formatExportFooter } from '../../core/formatters/jq-recipes.js';
+import { getConfig } from '../../core/config/loader.js';
 import { saveToJson, outputJson } from '../../core/formatters/json.js';
 import { icons } from '../../core/formatters/theme.js';
 import { printError, N8nApiError } from '../../utils/errors.js';
@@ -24,9 +26,11 @@ interface ListOptions {
 
 export async function executionsListCommand(opts: ListOptions): Promise<void> {
   const limit = parseInt(opts.limit || '10', 10);
+  const startTime = Date.now();
   
   try {
     const client = getApiClient();
+    const config = getConfig();
     
     const params: any = {
       limit,
@@ -59,14 +63,15 @@ export async function executionsListCommand(opts: ListOptions): Promise<void> {
       await saveToJson(executions, { path: opts.save });
     }
     
-    // Human-friendly output
+    // Human-friendly output with context
     console.log(formatHeader({
       title: 'Executions',
       icon: icons.execution,
+      host: config.host ? new URL(config.host).host : undefined,
       context: {
         'Found': `${executions.length} executions`,
         ...(opts.workflowId && { 'Workflow': opts.workflowId }),
-        ...(opts.status && { 'Status': opts.status }),
+        ...(opts.status && { 'Status filter': opts.status }),
       },
     }));
     
@@ -122,27 +127,52 @@ export async function executionsListCommand(opts: ListOptions): Promise<void> {
       console.log(chalk.dim(`\n  More executions available. Use --cursor ${response.nextCursor}`));
     }
     
-    // Summary with success rate
+    // Summary with success rate and timing
     const successCount = executions.filter((e: any) => e.status === 'success').length;
     const errorCount = executions.filter((e: any) => e.status === 'error').length;
+    const durationMs = Date.now() - startTime;
     
     console.log('\n' + formatSummary({
       total: executions.length,
       success: successCount,
       failed: errorCount,
+      durationMs,
     }));
     
-    // Next actions
+    // Health indicator for executions
+    if (errorCount > 0) {
+      console.log(formatHealthIndicator({
+        total: executions.length,
+        failed: errorCount,
+      }));
+    }
+    
+    // Context-aware next actions
     if (executions.length > 0) {
+      const hasErrors = errorCount > 0;
+      const latestExec = executions[0];
+      
       console.log(formatNextActions([
-        { command: `n8n executions get ${executions[0].id}`, description: 'View execution details' },
-        { command: `n8n executions list --status error`, description: 'View failed executions' },
+        { command: `n8n executions get ${latestExec.id}`, description: 'View latest execution details' },
+        ...(hasErrors ? [
+          { command: `n8n executions list --status error`, description: '⚠️ Focus on failed executions' },
+          { command: `n8n executions get ${executions.find((e: any) => e.status === 'error')?.id}`, description: 'Debug first failure' },
+        ] : []),
+        ...(opts.workflowId ? [
+          { command: `n8n workflows get ${opts.workflowId}`, description: 'View workflow' },
+          { command: `n8n workflows validate ${opts.workflowId}`, description: 'Validate workflow' },
+        ] : []),
       ]));
+    }
+    
+    // Export & jq filter hints (always show for discoverability)
+    if (executions.length > 0) {
+      console.log(formatExportFooter('executions-list', 'executions list', opts.save));
     }
     
   } catch (error) {
     if (error instanceof N8nApiError) {
-      printError(error);
+      printError(error, false, 'executions list');
     } else {
       console.error(chalk.red(`\n${icons.error} Error: ${(error as Error).message}`));
     }

@@ -1,0 +1,45 @@
+# Command: npx n8n executions list --status waiting
+# Flags: --status waiting
+# Exit Code: 0
+# Duration: 2077ms
+# Timestamp: 2025-11-30T21:42:43.024Z
+# Success: true
+=== STDOUT ===
+╭─ ▶️ Executions @ aura.zeogen.com
+│  Fetched: 2025-11-30 21:42:42 UTC
+│  Found: 1 executions
+│  Status filter: waiting
+╰─
+
+┌────┬────────────┬────────────┬──────────────┬───────────────┬────────────┐
+│  # │ ID         │ Workflow   │ Status       │ Started       │ Duration   │
+├────┼────────────┼────────────┼──────────────┼───────────────┼────────────┤
+│  1 │ 1039       │ UmsgeawLt… │ ⊘ waiting    │ 10/31/2025    │ 239ms      │
+└────┴────────────┴────────────┴──────────────┴───────────────┴────────────┘
+
+📊 Summary: 1 found | ⏱️ 615ms
+
+⚡ Next steps:
+   n8n executions get 1039 # View latest execution details
+
+
+💡 Export & filter with jq:
+
+   # Pipe to jq (quick analysis):
+   n8n executions list --json | jq '.data[] | {id, workflowId, status}'
+      # Extract key fields
+   n8n executions list --json | jq '.data[] | select(.status == "error")'
+      # Only failed executions
+
+   # Save then filter (for larger datasets):
+   n8n executions list --save executions.json
+   jq '.[] | {id, workflowId, status}' executions.json
+   jq '.[] | select(.status == "error")' executions.json
+   jq '.[] | select(.status == "success")' executions.json
+
+   # Export as TSV/CSV:
+   jq -r '.[] | "\(.id)\t\(.status)\t\(.startedAt)"' executions.json
+
+
+=== STDERR ===
+(empty)

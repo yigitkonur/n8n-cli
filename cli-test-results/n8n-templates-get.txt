@@ -1,0 +1,60 @@
+# Command: npx n8n templates get 1
+# Flags: (none)
+# Exit Code: 0
+# Duration: 1037ms
+# Timestamp: 2025-11-30T21:43:11.989Z
+# Success: true
+=== STDOUT ===
+╭─ 📋 Insert Excel data to Postgres
+│  Fetched: 2025-11-30 21:43:11 UTC
+│  ID: 1
+│  Nodes: 4
+│  Author: jan
+╰─
+
+  1. Read XLS from file
+1. Convert it to JSON
+1. Insert it in Postgres
+
+  Categories: Engineering
+
+
+─── Nodes (4) ─────────────────────────────────────────
+
+┌────┬───────────────────────────────────┬──────────────────────────────┐
+│  # │ Name                              │ Type                         │
+├────┼───────────────────────────────────┼──────────────────────────────┤
+│  1 │ n8n-nodes-base.postgres           │                              │
+├────┼───────────────────────────────────┼──────────────────────────────┤
+│  2 │ n8n-nodes-base.readBinaryFile     │                              │
+├────┼───────────────────────────────────┼──────────────────────────────┤
+│  3 │ n8n-nodes-base.spreadsheetFile    │                              │
+├────┼───────────────────────────────────┼──────────────────────────────┤
+│  4 │ n8n-nodes-base.start              │                              │
+└────┴───────────────────────────────────┴──────────────────────────────┘
+
+⚡ Next steps:
+   n8n templates get 1 --save workflow.json # Download template
+   n8n workflows validate workflow.json # Validate after download
+   open https://n8n.io/workflows/1 # View on n8n.io
+
+
+💡 Export & filter with jq:
+
+   # Pipe to jq (quick analysis):
+   n8n templates get 1 --json | jq '.workflow.nodes | map(.type)'
+      # List node types used
+   n8n templates get 1 --json | jq '.workflow.nodes | length'
+      # Count nodes
+
+   # Save then filter (for larger datasets):
+   n8n templates get 1 --save templates.json
+   jq '.workflow.nodes | map(.type)' templates.json
+   jq '.workflow.nodes | length' templates.json
+   jq '.workflow.nodes | map(select(.type | contains("webhook")))' templates.json
+
+   # Export as TSV/CSV:
+
+
+=== STDERR ===
+(empty)

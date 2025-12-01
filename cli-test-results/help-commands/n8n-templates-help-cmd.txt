@@ -1,0 +1,14 @@
+
+n8n v1.6.0
+
+Usage: n8n templates [options] [command]
+
+Search and get workflow templates
+
+Options:
+  -h, --help                Display help
+
+Commands:
+  search [options] <query>  Search templates by keyword
+  get [options] <id>        Get template by ID
+  help [command]            display help for command

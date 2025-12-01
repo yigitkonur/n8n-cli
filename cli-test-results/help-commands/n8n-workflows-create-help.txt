@@ -1,0 +1,13 @@
+
+n8n v1.6.0
+
+Usage: n8n workflows create [options]
+
+Create a new workflow
+
+Options:
+  -f, --file <path>  Path to workflow JSON file (required)
+  -n, --name <name>  Workflow name (overrides file)
+  --dry-run          Preview without creating (default: true)
+  --json             Output as JSON
+  -h, --help         Display help

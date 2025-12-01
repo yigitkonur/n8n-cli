@@ -1,0 +1,21 @@
+# Command: npx n8n workflows list --active
+# Flags: --active
+# Exit Code: 0
+# Duration: 1619ms
+# Timestamp: 2025-11-30T21:41:53.877Z
+# Success: true
+=== STDOUT ===
+╭─ 🔄 Workflows @ aura.zeogen.com
+│  Fetched: 2025-11-30 21:41:53 UTC
+│  Found: 0 workflows
+│  Filter: Active only
+╰─
+
+  No workflows found.
+
+  Tips:
+  • Check your n8n instance has workflows
+  • Verify N8N_HOST and N8N_API_KEY are correct
+
+=== STDERR ===
+(empty)

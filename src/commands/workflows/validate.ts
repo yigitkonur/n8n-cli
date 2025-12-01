@@ -150,22 +150,63 @@ export async function workflowsValidateCommand(idOrFile: string | undefined, opt
     
     // Summary
     if (isValid) {
-      console.log(chalk.green(`\n${icons.success} Workflow is valid!`));
+      console.log(chalk.green(`\n${icons.success} Workflow is valid and ready to use!`));
+      console.log(chalk.dim(`\n   Workflow: ${workflow.name || 'Unnamed'}`));
+      console.log(chalk.dim(`   Nodes: ${workflow.nodes?.length || 0}`));
+      console.log(chalk.dim(`   Connections: ${Object.keys(workflow.connections || {}).length}`));
     } else {
       console.log(chalk.red(`\n${icons.error} Workflow has ${errors.length} error(s) and ${warnings.length} warning(s)`));
+      
+      // Common causes section
+      console.log(chalk.yellow('\n   This usually means:'));
+      console.log(chalk.dim('   • Node types may be misspelled or unavailable'));
+      console.log(chalk.dim('   • Required node parameters are missing'));
+      console.log(chalk.dim('   • Connection references non-existent nodes'));
+      console.log(chalk.dim('   • JSON structure is malformed'));
     }
     
-    // Save fixed workflow
-    if (opts.save && opts.fix) {
+    // Save workflow (fixed or original)
+    if (opts.save) {
       await saveToJson(workflow, { path: opts.save });
+      console.log(chalk.dim(`\n   Saved to: ${opts.save}`));
     }
     
-    // Next actions
-    if (!isValid) {
+    // Context-aware next actions
+    const isFromFile = opts.file || (idOrFile && existsSync(idOrFile));
+    
+    if (isValid) {
+      // SUCCESS: Guide to next logical steps
       console.log(formatNextActions([
-        { command: `n8n workflows validate ${source} --fix`, description: 'Auto-fix issues' },
-        { command: `n8n workflows validate ${source} --fix --save fixed.json`, description: 'Fix and save' },
+        ...(isFromFile ? [
+          { command: `n8n workflows create --file ${opts.file || idOrFile}`, description: '🚀 Deploy workflow to n8n' },
+        ] : []),
+        { command: `n8n workflows get ${idOrFile} --mode structure`, description: 'View workflow structure' },
+        { command: `n8n executions list --workflow-id ${idOrFile}`, description: 'Check execution history' },
+        ...(isFromFile ? [
+          { command: `n8n workflows validate ${opts.file || idOrFile} --save validated.json`, description: 'Export validated version' },
+        ] : []),
       ]));
+      
+      // Success tip for LLMs
+      if (isFromFile) {
+        console.log(chalk.cyan('\n💡 Ready to deploy? Run:'));
+        console.log(chalk.white(`   n8n workflows create --file ${opts.file || idOrFile}\n`));
+      }
+    } else {
+      // FAILURE: Guide to fixing
+      console.log(formatNextActions([
+        { command: `n8n workflows validate ${source} --fix`, description: 'Auto-fix known issues' },
+        { command: `n8n workflows validate ${source} --fix --save fixed.json`, description: 'Fix and save corrected version' },
+        { command: `n8n workflows autofix ${source}`, description: 'Interactive autofix with preview' },
+        { command: `n8n nodes search "<node-name>"`, description: 'Find correct node type names' },
+      ]));
+      
+      // jq tip for file-based validation
+      if (isFromFile) {
+        console.log(chalk.dim('\n💡 Extract error details with jq:'));
+        console.log(chalk.dim(`   n8n workflows validate ${opts.file || idOrFile} --json > validation.json`));
+        console.log(chalk.dim(`   jq '.errors[]' validation.json`));
+      }
     }
     
     process.exitCode = isValid ? 0 : 1;

@@ -27,6 +27,9 @@ program
   .version(version, '-V, --version', 'Output version number')
   .helpOption('-h, --help', 'Display help');
 
+// Show version in help header
+program.addHelpText('beforeAll', `\nn8n v${version}\n`);
+
 // ============================================================================
 // AUTH COMMAND
 // ============================================================================
@@ -124,6 +127,19 @@ nodesCmd
     const { nodesValidateCommand } = await import('./commands/nodes/validate.js');
     await nodesValidateCommand(nodeType, opts);
   });
+
+// Default action for 'n8n nodes' without subcommand - show help with exit 0
+nodesCmd.action((cmd) => {
+  // Check if an unknown subcommand was passed
+  const args = nodesCmd.args;
+  if (args.length > 0) {
+    console.error(`error: unknown command 'n8n nodes ${args[0]}'`);
+    console.error(`Run 'n8n nodes --help' to see available commands.`);
+    process.exitCode = 1;
+    return;
+  }
+  nodesCmd.help();
+});
 
 // ============================================================================
 // WORKFLOWS COMMANDS
@@ -224,6 +240,29 @@ workflowsCmd
     await workflowsTriggerCommand(webhookUrl, opts);
   });
 
+workflowsCmd
+  .command('tags <id>')
+  .description('Get or set workflow tags')
+  .option('--set <tagIds>', 'Comma-separated tag IDs to assign')
+  .option('--force, --yes', 'Skip confirmation prompt')
+  .option('--json', 'Output as JSON')
+  .action(async (id, opts) => {
+    const { workflowsTagsCommand } = await import('./commands/workflows/tags.js');
+    await workflowsTagsCommand(id, opts);
+  });
+
+// Default action for 'n8n workflows' without subcommand - show help with exit 0
+workflowsCmd.action(() => {
+  const args = workflowsCmd.args;
+  if (args.length > 0) {
+    console.error(`error: unknown command 'n8n workflows ${args[0]}'`);
+    console.error(`Run 'n8n workflows --help' to see available commands.`);
+    process.exitCode = 1;
+    return;
+  }
+  workflowsCmd.help();
+});
+
 // ============================================================================
 // EXECUTIONS COMMANDS
 // ============================================================================
@@ -256,6 +295,232 @@ executionsCmd
     await executionsGetCommand(id, opts);
   });
 
+executionsCmd
+  .command('retry <id>')
+  .description('Retry a failed execution')
+  .option('--load-latest', 'Use latest workflow version instead of snapshot')
+  .option('--json', 'Output as JSON')
+  .action(async (id, opts) => {
+    const { executionsRetryCommand } = await import('./commands/executions/retry.js');
+    await executionsRetryCommand(id, opts);
+  });
+
+executionsCmd
+  .command('delete <id>')
+  .description('Delete an execution')
+  .option('--force, --yes', 'Skip confirmation prompt')
+  .option('--json', 'Output as JSON')
+  .action(async (id, opts) => {
+    const { executionsDeleteCommand } = await import('./commands/executions/delete.js');
+    await executionsDeleteCommand(id, opts);
+  });
+
+// Default action for 'n8n executions' without subcommand - show help with exit 0
+executionsCmd.action(() => {
+  const args = executionsCmd.args;
+  if (args.length > 0) {
+    console.error(`error: unknown command 'n8n executions ${args[0]}'`);
+    console.error(`Run 'n8n executions --help' to see available commands.`);
+    process.exitCode = 1;
+    return;
+  }
+  executionsCmd.help();
+});
+
+// ============================================================================
+// CREDENTIALS COMMANDS
+// ============================================================================
+const credentialsCmd = program
+  .command('credentials')
+  .description('Manage n8n credentials');
+
+credentialsCmd
+  .command('list')
+  .description('List all credentials')
+  .option('-l, --limit <n>', 'Limit results', '10')
+  .option('--cursor <cursor>', 'Pagination cursor')
+  .option('-s, --save <path>', 'Save to JSON file')
+  .option('--json', 'Output as JSON')
+  .action(async (opts) => {
+    const { credentialsListCommand } = await import('./commands/credentials/index.js');
+    await credentialsListCommand(opts);
+  });
+
+credentialsCmd
+  .command('schema <typeName>')
+  .description('Get credential type schema')
+  .option('-s, --save <path>', 'Save to JSON file')
+  .option('--json', 'Output as JSON')
+  .action(async (typeName, opts) => {
+    const { credentialsSchemaCommand } = await import('./commands/credentials/index.js');
+    await credentialsSchemaCommand(typeName, opts);
+  });
+
+credentialsCmd
+  .command('create')
+  .description('Create a new credential')
+  .requiredOption('-t, --type <type>', 'Credential type (e.g., githubApi)')
+  .requiredOption('-n, --name <name>', 'Credential name')
+  .option('-d, --data <json>', 'Credential data as JSON or @file.json')
+  .option('--json', 'Output as JSON')
+  .action(async (opts) => {
+    const { credentialsCreateCommand } = await import('./commands/credentials/index.js');
+    await credentialsCreateCommand(opts);
+  });
+
+credentialsCmd
+  .command('delete <id>')
+  .description('Delete a credential')
+  .option('--force, --yes', 'Skip confirmation prompt')
+  .option('--json', 'Output as JSON')
+  .action(async (id, opts) => {
+    const { credentialsDeleteCommand } = await import('./commands/credentials/index.js');
+    await credentialsDeleteCommand(id, opts);
+  });
+
+// Default action for 'n8n credentials' without subcommand
+credentialsCmd.action(async () => {
+  const { showCredentialsHelp } = await import('./commands/credentials/index.js');
+  showCredentialsHelp();
+});
+
+// ============================================================================
+// VARIABLES COMMANDS
+// ============================================================================
+const variablesCmd = program
+  .command('variables')
+  .description('Manage n8n environment variables');
+
+variablesCmd
+  .command('list')
+  .description('List all variables')
+  .option('-l, --limit <n>', 'Limit results', '100')
+  .option('--cursor <cursor>', 'Pagination cursor')
+  .option('-s, --save <path>', 'Save to JSON file')
+  .option('--json', 'Output as JSON')
+  .action(async (opts) => {
+    const { variablesListCommand } = await import('./commands/variables/index.js');
+    await variablesListCommand(opts);
+  });
+
+variablesCmd
+  .command('create')
+  .description('Create a new variable')
+  .requiredOption('-k, --key <key>', 'Variable key')
+  .requiredOption('-v, --value <value>', 'Variable value')
+  .option('--json', 'Output as JSON')
+  .action(async (opts) => {
+    const { variablesCreateCommand } = await import('./commands/variables/index.js');
+    await variablesCreateCommand(opts);
+  });
+
+variablesCmd
+  .command('update <id>')
+  .description('Update a variable')
+  .requiredOption('-k, --key <key>', 'Variable key')
+  .requiredOption('-v, --value <value>', 'Variable value')
+  .option('--json', 'Output as JSON')
+  .action(async (id, opts) => {
+    const { variablesUpdateCommand } = await import('./commands/variables/index.js');
+    await variablesUpdateCommand(id, opts);
+  });
+
+variablesCmd
+  .command('delete <id>')
+  .description('Delete a variable')
+  .option('--force, --yes', 'Skip confirmation prompt')
+  .option('--json', 'Output as JSON')
+  .action(async (id, opts) => {
+    const { variablesDeleteCommand } = await import('./commands/variables/index.js');
+    await variablesDeleteCommand(id, opts);
+  });
+
+// Default action for 'n8n variables' without subcommand
+variablesCmd.action(async () => {
+  const { showVariablesHelp } = await import('./commands/variables/index.js');
+  showVariablesHelp();
+});
+
+// ============================================================================
+// TAGS COMMANDS
+// ============================================================================
+const tagsCmd = program
+  .command('tags')
+  .description('Manage n8n tags');
+
+tagsCmd
+  .command('list')
+  .description('List all tags')
+  .option('-l, --limit <n>', 'Limit results', '100')
+  .option('--cursor <cursor>', 'Pagination cursor')
+  .option('-s, --save <path>', 'Save to JSON file')
+  .option('--json', 'Output as JSON')
+  .action(async (opts) => {
+    const { tagsListCommand } = await import('./commands/tags/index.js');
+    await tagsListCommand(opts);
+  });
+
+tagsCmd
+  .command('get <id>')
+  .description('Get tag by ID')
+  .option('-s, --save <path>', 'Save to JSON file')
+  .option('--json', 'Output as JSON')
+  .action(async (id, opts) => {
+    const { tagsGetCommand } = await import('./commands/tags/index.js');
+    await tagsGetCommand(id, opts);
+  });
+
+tagsCmd
+  .command('create')
+  .description('Create a new tag')
+  .requiredOption('-n, --name <name>', 'Tag name')
+  .option('--json', 'Output as JSON')
+  .action(async (opts) => {
+    const { tagsCreateCommand } = await import('./commands/tags/index.js');
+    await tagsCreateCommand(opts);
+  });
+
+tagsCmd
+  .command('update <id>')
+  .description('Update a tag')
+  .requiredOption('-n, --name <name>', 'New tag name')
+  .option('--json', 'Output as JSON')
+  .action(async (id, opts) => {
+    const { tagsUpdateCommand } = await import('./commands/tags/index.js');
+    await tagsUpdateCommand(id, opts);
+  });
+
+tagsCmd
+  .command('delete <id>')
+  .description('Delete a tag')
+  .option('--force, --yes', 'Skip confirmation prompt')
+  .option('--json', 'Output as JSON')
+  .action(async (id, opts) => {
+    const { tagsDeleteCommand } = await import('./commands/tags/index.js');
+    await tagsDeleteCommand(id, opts);
+  });
+
+// Default action for 'n8n tags' without subcommand
+tagsCmd.action(async () => {
+  const { showTagsHelp } = await import('./commands/tags/index.js');
+  showTagsHelp();
+});
+
+// ============================================================================
+// AUDIT COMMAND
+// ============================================================================
+program
+  .command('audit')
+  .description('Generate security audit for n8n instance')
+  .option('-c, --categories <list>', 'Comma-separated categories: credentials,database,nodes,filesystem,instance')
+  .option('--days-abandoned <n>', 'Days for workflow to be considered abandoned')
+  .option('-s, --save <path>', 'Save report to JSON file')
+  .option('--json', 'Output as JSON')
+  .action(async (opts) => {
+    const { auditCommand } = await import('./commands/audit/index.js');
+    await auditCommand(opts);
+  });
+
 // ============================================================================
 // TEMPLATES COMMANDS
 // ============================================================================
@@ -284,6 +549,18 @@ templatesCmd
     await templatesGetCommand(id, opts);
   });
 
+// Default action for 'n8n templates' without subcommand - show help with exit 0
+templatesCmd.action(() => {
+  const args = templatesCmd.args;
+  if (args.length > 0) {
+    console.error(`error: unknown command 'n8n templates ${args[0]}'`);
+    console.error(`Run 'n8n templates --help' to see available commands.`);
+    process.exitCode = 1;
+    return;
+  }
+  templatesCmd.help();
+});
+
 // ============================================================================
 // LEGACY VALIDATE COMMAND (backwards compatibility)
 // ============================================================================
@@ -293,12 +570,24 @@ program
   .option('--repair', 'Attempt to repair malformed JSON')
   .option('--fix', 'Auto-fix known issues')
   .option('--json', 'Output as JSON')
-  .option('-o, --output <path>', 'Save fixed workflow')
+  .option('-s, --save <path>', 'Save fixed workflow')
   .action(async (file, opts) => {
     // Redirect to workflows validate
     const { workflowsValidateCommand } = await import('./commands/workflows/validate.js');
     await workflowsValidateCommand(file, { ...opts, file: file || opts.file });
   });
+
+// BUG-006: Handle unknown commands with helpful error
+program.on('command:*', (operands) => {
+  console.error(`error: unknown command '${operands[0]}'`);
+  console.error(`Run 'n8n --help' to see available commands.`);
+  process.exitCode = 1;
+});
+
+// Default action for 'n8n' without any command - show help with exit 0
+program.action(() => {
+  program.help();
+});
 
 // Register shutdown handlers for graceful cleanup
 registerShutdownHandlers();
