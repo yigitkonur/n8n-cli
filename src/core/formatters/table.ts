@@ -11,6 +11,10 @@ export interface TableColumn<T = unknown> {
   header: string;
   /** Optional fixed width */
   width?: number;
+  /** Minimum width for auto-sizing */
+  minWidth?: number;
+  /** Weight for proportional sizing (default: 1) */
+  weight?: number;
   /** Text alignment */
   align?: 'left' | 'center' | 'right';
   /** Custom formatter function */
@@ -27,6 +31,59 @@ export interface TableOptions {
   limit?: number;
   /** Show row index column */
   showIndex?: boolean;
+  /** Auto-adjust columns to terminal width (default: true) */
+  autoWidth?: boolean;
+  /** Compact mode (reduced padding) */
+  compact?: boolean;
+}
+
+/**
+ * Get terminal width with fallback
+ */
+export function getTerminalWidth(): number {
+  return process.stdout.columns || 80;
+}
+
+/**
+ * Calculate column widths based on terminal size
+ * Distributes available space proportionally
+ */
+export function calculateColumnWidths(
+  columns: TableColumn[],
+  options: { showIndex?: boolean; compact?: boolean } = {}
+): (number | null)[] {
+  const termWidth = getTerminalWidth();
+  const { showIndex = false, compact = false } = options;
+  
+  // Account for table borders and padding
+  // Each cell has: | padding content padding |
+  const borderChars = columns.length + 1; // Vertical bars
+  const paddingPerCell = compact ? 1 : 2; // Chars on each side
+  const totalPadding = columns.length * paddingPerCell * 2;
+  const indexColumnWidth = showIndex ? 4 : 0;
+  
+  const availableWidth = termWidth - borderChars - totalPadding - indexColumnWidth;
+  
+  // Calculate weights
+  const totalWeight = columns.reduce((sum, col) => sum + (col.weight ?? 1), 0);
+  
+  // Calculate widths
+  const widths = columns.map(col => {
+    // If column has fixed width, use it
+    if (col.width) {
+      return col.width;
+    }
+    
+    // Calculate proportional width
+    const weight = col.weight ?? 1;
+    const proportionalWidth = Math.floor((availableWidth * weight) / totalWeight);
+    
+    // Apply minimum width
+    const minWidth = col.minWidth ?? 8;
+    return Math.max(proportionalWidth, minWidth);
+  });
+  
+  return showIndex ? [4, ...widths] : widths;
 }
 
 /**
@@ -36,7 +93,7 @@ export function formatTable<T extends Record<string, unknown>>(
   data: T[],
   options: TableOptions
 ): string {
-  const { columns, limit = 10, showIndex = false } = options;
+  const { columns, limit = 10, showIndex = false, autoWidth = true, compact = false } = options;
   
   // Truncate data if limit specified
   const displayLimit = limit > 0 ? limit : data.length;
@@ -48,22 +105,36 @@ export function formatTable<T extends Record<string, unknown>>(
     ? ['#', ...columns.map(c => c.header)]
     : columns.map(c => c.header);
   
+  // Calculate column widths
+  const colWidths = autoWidth 
+    ? calculateColumnWidths(columns, { showIndex, compact })
+    : showIndex 
+      ? [4, ...columns.map(c => c.width ?? null)]
+      : columns.map(c => c.width ?? null);
+  
   // Build table
   const table = new Table({
     head: headers.map(h => chalk.bold.cyan(h)),
     style: {
       head: [],
       border: ['gray'],
+      'padding-left': compact ? 1 : 1,
+      'padding-right': compact ? 1 : 1,
     },
-    chars: {
-      'top': '─', 'top-mid': '┬', 'top-left': '┌', 'top-right': '┐',
-      'bottom': '─', 'bottom-mid': '┴', 'bottom-left': '└', 'bottom-right': '┘',
-      'left': '│', 'left-mid': '├', 'mid': '─', 'mid-mid': '┼',
-      'right': '│', 'right-mid': '┤', 'middle': '│'
-    },
-    colWidths: showIndex 
-      ? [4, ...columns.map(c => c.width ?? null)]
-      : columns.map(c => c.width ?? null),
+    chars: compact 
+      ? {
+          'top': '', 'top-mid': '', 'top-left': '', 'top-right': '',
+          'bottom': '', 'bottom-mid': '', 'bottom-left': '', 'bottom-right': '',
+          'left': '', 'left-mid': '', 'mid': '', 'mid-mid': '',
+          'right': '', 'right-mid': '', 'middle': ' '
+        }
+      : {
+          'top': '─', 'top-mid': '┬', 'top-left': '┌', 'top-right': '┐',
+          'bottom': '─', 'bottom-mid': '┴', 'bottom-left': '└', 'bottom-right': '┘',
+          'left': '│', 'left-mid': '├', 'mid': '─', 'mid-mid': '┼',
+          'right': '│', 'right-mid': '┤', 'middle': '│'
+        },
+    colWidths: colWidths as (number | null)[],
     colAligns: showIndex
       ? ['right', ...columns.map(c => c.align || 'left')]
       : columns.map(c => c.align || 'left'),

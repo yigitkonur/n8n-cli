@@ -6,3 +6,6 @@ export * from './workflow-diff.js';
 
 // CLI Configuration Types
 export * from './config.js';
+
+// Global CLI Options
+export * from './global-options.js';

@@ -53,4 +53,11 @@ export function showCredentialsHelp(): void {
   console.log(chalk.dim('  • Use --data @file.json to avoid secrets in shell history'));
   console.log(chalk.dim('  • Credentials are stored encrypted in n8n'));
   console.log('');
+  
+  console.log(chalk.bold.yellow('⚠️  API Requirements:'));
+  console.log('');
+  console.log(chalk.dim('  • credentials list requires n8n API v1.1+'));
+  console.log(chalk.dim('  • Some self-hosted instances may return HTTP 405'));
+  console.log(chalk.dim('  • Use "n8n credentials schema <type>" as alternative'));
+  console.log('');
 }

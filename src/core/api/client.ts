@@ -496,7 +496,24 @@ export class N8nApiClient {
   }
 
   private cleanWorkflowForCreate(workflow: Partial<Workflow>): Partial<Workflow> {
-    const { id, createdAt, updatedAt, versionId, active, ...rest } = workflow as any;
+    // Strip all read-only properties that cause API rejection on create
+    // These are server-generated or managed via separate endpoints (tags, sharing)
+    const { 
+      id, 
+      createdAt, 
+      updatedAt, 
+      versionId, 
+      active,
+      // Additional read-only properties from exported workflows
+      tags,
+      pinData,
+      meta,
+      staticData,
+      homeProject,
+      shared,
+      sharedWithProjects,
+      ...rest 
+    } = workflow as any;
     return rest;
   }
 

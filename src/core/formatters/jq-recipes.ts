@@ -265,7 +265,11 @@ export function formatExportFooter(
       ? recipe.filter.replace(/^\.\[\]/, '.data[]').replace(/^sort_by/, '.data | sort_by').replace(/^group_by/, '.data | group_by').replace(/^map/, '.data | map').replace(/^-r '\.\[\]/, `-r '.data[]`)
       : recipe.filter;
     
-    lines.push(chalk.green(`   n8n ${cliCommand} --json | jq '${jsonFilter}'`));
+    // Handle filters that start with flags (e.g., '-r') - don't double-wrap in quotes
+    const pipeCmd = jsonFilter.startsWith('-') 
+      ? `n8n ${cliCommand} --json | jq ${jsonFilter}`
+      : `n8n ${cliCommand} --json | jq '${jsonFilter}'`;
+    lines.push(chalk.green(`   ${pipeCmd}`));
     lines.push(chalk.dim(`      # ${recipe.description}`));
   }
   
@@ -277,7 +281,11 @@ export function formatExportFooter(
   // Show remaining recipes for file-based filtering
   const fileRecipes = recipes.slice(0, 3);
   for (const recipe of fileRecipes) {
-    lines.push(chalk.green(`   jq '${recipe.filter}' ${filename}`));
+    // Handle filters that start with flags (e.g., '-r') - don't double-wrap in quotes
+    const fileCmd = recipe.filter.startsWith('-') 
+      ? `jq ${recipe.filter} ${filename}`
+      : `jq '${recipe.filter}' ${filename}`;
+    lines.push(chalk.green(`   ${fileCmd}`));
   }
   
   // Export tips

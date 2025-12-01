@@ -1,5 +1,12 @@
 import chalk from 'chalk';
 
+// Explicit color detection fallback for non-TTY environments
+// Chalk should auto-detect, but some terminal contexts fail (e.g., certain CI/pipes)
+// Respect NO_COLOR standard: https://no-color.org/
+if (!process.stdout.isTTY || process.env.NO_COLOR) {
+  chalk.level = 0;
+}
+
 /**
  * Consistent color theme for CLI output
  */

@@ -68,7 +68,15 @@ export async function workflowsValidateCommand(idOrFile: string | undefined, opt
     }
     
     // Validate
+    // TODO: Profile parameter not yet fully implemented - all profiles currently run the same validation
+    // Future: differentiate between minimal (structure only), runtime (+ node params), and strict (+ best practices)
     const result = validateWorkflowStructure(workflow, { rawSource });
+    
+    // Warn if non-default profile selected (not yet differentiated)
+    if (opts.profile && opts.profile !== 'runtime' && !opts.json) {
+      console.log(chalk.yellow(`\n${icons.warning} Note: Validation profiles are not yet fully differentiated.`));
+      console.log(chalk.dim(`   Profile '${opts.profile}' currently runs the same checks as 'runtime'.`));
+    }
     
     // Collect all issues
     const errors = [...result.errors];

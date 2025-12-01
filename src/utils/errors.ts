@@ -5,6 +5,7 @@
  */
 
 import chalk from 'chalk';
+import { ExitCode, getExitCode, getExitCodeDescription } from './exit-codes.js';
 
 // Custom error classes for n8n API operations
 
@@ -86,6 +87,14 @@ export function handleN8nApiError(error: unknown): N8nApiError {
           return new N8nNotFoundError('Resource', message);
         case 400:
           return new N8nValidationError(message, data);
+        case 405:
+          // Method not allowed - often means endpoint doesn't exist in this n8n version
+          return new N8nApiError(
+            'Method not allowed - this endpoint may not be available on your n8n version or requires different permissions',
+            405,
+            'METHOD_NOT_ALLOWED',
+            data
+          );
         case 429:
           const retryAfter = axiosError.response.headers['retry-after'];
           return new N8nRateLimitError(retryAfter ? parseInt(retryAfter) : undefined);
@@ -190,6 +199,12 @@ export function getErrorCauses(code: string | undefined): string[] {
       'Database connectivity issues on server',
       'Resource exhaustion on n8n instance',
     ],
+    METHOD_NOT_ALLOWED: [
+      'This API endpoint may not exist in your n8n version',
+      'The endpoint requires different HTTP method',
+      'Enterprise/Pro features may not be available on Community edition',
+      'The API has changed between n8n versions',
+    ],
   };
   
   return causes[code || ''] || [];
@@ -244,6 +259,11 @@ export function getErrorSuggestions(code: string | undefined, commandContext?: s
       '# Check n8n server logs for details',
       '# Retry in a few minutes',
     ],
+    METHOD_NOT_ALLOWED: [
+      'n8n health                      # Verify n8n version',
+      '# Check n8n API documentation for your version',
+      '# Some features require Enterprise/Pro license',
+    ],
   };
   
   return suggestions[code || ''] || [];
@@ -286,11 +306,42 @@ export function sanitizeForLogging(obj: unknown): unknown {
 }
 
 /**
+ * Print error options
+ */
+export interface PrintErrorOptions {
+  /** Show verbose debug information */
+  verbose?: boolean;
+  /** Command context for suggestions (e.g., 'workflows list') */
+  commandContext?: string;
+  /** Automatically set process.exitCode based on error type */
+  setProcessExitCode?: boolean;
+}
+
+/**
  * Print error to console with formatting and actionable guidance
  * Follows LLM-first CLI design: descriptive, actionable, with causes and suggestions
+ * 
+ * @param error - The error to print
+ * @param optsOrVerbose - Options object or boolean for backward compatibility
+ * @param commandContext - Optional command context (deprecated, use options)
  */
-export function printError(error: N8nApiError, verbose = false, commandContext?: string): void {
+export function printError(
+  error: N8nApiError, 
+  optsOrVerbose: PrintErrorOptions | boolean = false, 
+  commandContext?: string
+): void {
+  // Handle backward compatibility: printError(error, verbose, commandContext)
+  const opts: PrintErrorOptions = typeof optsOrVerbose === 'boolean' 
+    ? { verbose: optsOrVerbose, commandContext, setProcessExitCode: true }
+    : { setProcessExitCode: true, ...optsOrVerbose };
+  
   const friendlyMessage = getUserFriendlyErrorMessage(error);
+  const exitCode = getExitCode(error);
+  
+  // Set process exit code if requested (default: true)
+  if (opts.setProcessExitCode !== false) {
+    process.exitCode = exitCode;
+  }
   
   // Error header with code
   console.error(chalk.red(`\n❌ ${friendlyMessage}`));
@@ -308,7 +359,8 @@ export function printError(error: N8nApiError, verbose = false, commandContext?:
   }
   
   // "Try:" section with actionable commands
-  const suggestions = getErrorSuggestions(error.code, commandContext);
+  const ctx = opts.commandContext || commandContext;
+  const suggestions = getErrorSuggestions(error.code, ctx);
   if (suggestions.length > 0) {
     console.error(chalk.cyan('\n   Try:'));
     for (const suggestion of suggestions) {
@@ -320,11 +372,12 @@ export function printError(error: N8nApiError, verbose = false, commandContext?:
   console.error(chalk.dim(`\n   Docs: ${getErrorDocsUrl(error.code)}`));
   
   // Verbose mode: additional technical details
-  if (verbose) {
+  if (opts.verbose) {
     console.error(chalk.dim('\n   Debug info:'));
     console.error(chalk.dim(`   Code: ${error.code || 'UNKNOWN'}`));
+    console.error(chalk.dim(`   Exit Code: ${exitCode} (${getExitCodeDescription(exitCode)})`));
     if (error.statusCode) {
-      console.error(chalk.dim(`   Status: ${error.statusCode}`));
+      console.error(chalk.dim(`   HTTP Status: ${error.statusCode}`));
     }
     if (error.details) {
       const sanitizedDetails = sanitizeForLogging(error.details);

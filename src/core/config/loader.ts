@@ -3,21 +3,26 @@ import { dirname } from 'node:path';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import chalk from 'chalk';
-import type { CliConfig } from '../../types/config.js';
+import type { CliConfig, PartialCliConfig, ProfiledConfig } from '../../types/config.js';
+import { hasProfiles } from '../../types/config.js';
 
-// Re-export CliConfig for backward compatibility
-export type { CliConfig } from '../../types/config.js';
+// Re-export types for backward compatibility
+export type { CliConfig, PartialCliConfig, ProfiledConfig } from '../../types/config.js';
 
 /**
- * Partial config from file or env
+ * Partial config from file or env (legacy alias)
  */
-export interface PartialConfig {
-  host?: string;
-  apiKey?: string;
-  timeout?: number;
-  dbPath?: string;
-  debug?: boolean;
-}
+export type PartialConfig = PartialCliConfig;
+
+/**
+ * Currently active profile name
+ */
+let _activeProfile: string | null = null;
+
+/**
+ * Config file path that was loaded
+ */
+let _configFilePath: string | null = null;
 
 /**
  * Default configuration values
@@ -70,12 +75,12 @@ function checkFilePermissions(filePath: string): { secure: boolean; mode: string
 }
 
 /**
- * Load config from file
+ * Load raw config file content
  */
-function loadConfigFile(): PartialConfig {
+function loadRawConfigFile(): { path: string; content: unknown } | null {
   for (const configPath of configPaths) {
     if (existsSync(configPath)) {
-      // Task 04: Check file permissions before reading secrets
+      // Check file permissions before reading secrets
       const permCheck = checkFilePermissions(configPath);
       if (!permCheck.secure) {
         console.warn(chalk.yellow(`⚠️  Config file ${configPath} has insecure permissions (${permCheck.mode})`));
@@ -93,15 +98,10 @@ function loadConfigFile(): PartialConfig {
       try {
         const content = readFileSync(configPath, 'utf8');
         const parsed = JSON.parse(content);
-        return {
-          host: parsed.host || parsed.N8N_HOST || parsed.n8n_host,
-          apiKey: parsed.apiKey || parsed.N8N_API_KEY || parsed.n8n_api_key,
-          timeout: parsed.timeout,
-          dbPath: parsed.dbPath || parsed.db_path,
-          debug: parsed.debug,
-        };
+        _configFilePath = configPath;
+        return { path: configPath, content: parsed };
       } catch (error) {
-        // Warn user about invalid JSON in config file (CLI-018)
+        // Warn user about invalid JSON in config file
         if (error instanceof SyntaxError) {
           console.warn(`Warning: Config file ${configPath} contains invalid JSON: ${error.message}`);
           console.warn('  Using default configuration instead.\n');
@@ -110,7 +110,55 @@ function loadConfigFile(): PartialConfig {
       }
     }
   }
-  return {};
+  return null;
+}
+
+/**
+ * Extract partial config from parsed config object
+ */
+function extractPartialConfig(parsed: Record<string, unknown>): PartialConfig {
+  return {
+    host: (parsed.host || parsed.N8N_HOST || parsed.n8n_host) as string | undefined,
+    apiKey: (parsed.apiKey || parsed.N8N_API_KEY || parsed.n8n_api_key) as string | undefined,
+    timeout: parsed.timeout as number | undefined,
+    dbPath: (parsed.dbPath || parsed.db_path) as string | undefined,
+    debug: parsed.debug as boolean | undefined,
+  };
+}
+
+/**
+ * Load config from file, with optional profile support
+ * @param profileName - Profile to load (optional, uses default if not specified)
+ */
+function loadConfigFile(profileName?: string): PartialConfig {
+  const rawConfig = loadRawConfigFile();
+  if (!rawConfig) {
+    return {};
+  }
+  
+  const parsed = rawConfig.content;
+  
+  // Check if config uses profile structure
+  if (hasProfiles(parsed)) {
+    // Determine which profile to use
+    const requestedProfile = profileName || process.env.N8N_PROFILE || parsed.default || 'default';
+    const profile = parsed.profiles[requestedProfile];
+    
+    if (!profile) {
+      const availableProfiles = Object.keys(parsed.profiles).join(', ');
+      console.warn(chalk.yellow(`⚠️  Profile "${requestedProfile}" not found in config.`));
+      console.warn(chalk.yellow(`   Available profiles: ${availableProfiles}`));
+      console.warn(chalk.yellow(`   Using empty config.\n`));
+      return {};
+    }
+    
+    _activeProfile = requestedProfile;
+    return extractPartialConfig(profile as Record<string, unknown>);
+  }
+  
+  // Flat config (backward compatible)
+  _activeProfile = null;
+  return extractPartialConfig(parsed as Record<string, unknown>);
 }
 
 /**
@@ -149,9 +197,11 @@ function getDefaultDbPath(): string {
 /**
  * Load and merge configuration from all sources
  * Priority: env > file > defaults
+ * 
+ * @param profileName - Optional profile name to load
  */
-export function loadConfig(): CliConfig {
-  const fileConfig = loadConfigFile();
+export function loadConfig(profileName?: string): CliConfig {
+  const fileConfig = loadConfigFile(profileName);
   const envConfig = loadEnvConfig();
   
   const config: CliConfig = {
@@ -163,6 +213,39 @@ export function loadConfig(): CliConfig {
   };
   
   return config;
+}
+
+/**
+ * Get the currently active profile name
+ * Returns null if using flat config or no config loaded
+ */
+export function getActiveProfile(): string | null {
+  return _activeProfile;
+}
+
+/**
+ * Get the path to the loaded config file
+ * Returns null if no config file was loaded
+ */
+export function getLoadedConfigPath(): string | null {
+  return _configFilePath;
+}
+
+/**
+ * List available profiles from the config file
+ * Returns empty array if no profiles or flat config
+ */
+export function listProfiles(): string[] {
+  const rawConfig = loadRawConfigFile();
+  if (!rawConfig) {
+    return [];
+  }
+  
+  if (hasProfiles(rawConfig.content)) {
+    return Object.keys(rawConfig.content.profiles);
+  }
+  
+  return [];
 }
 
 /**
@@ -342,15 +425,34 @@ export function isConfigured(): boolean {
 
 // Singleton config instance
 let _config: CliConfig | null = null;
+let _configProfile: string | undefined = undefined;
 
 /**
  * Get config singleton
+ * @param profileName - Optional profile name (only used on first load)
  */
-export function getConfig(): CliConfig {
+export function getConfig(profileName?: string): CliConfig {
+  // If profile changed, reload
+  if (profileName !== undefined && profileName !== _configProfile) {
+    _config = null;
+    _configProfile = profileName;
+  }
+  
   if (!_config) {
-    _config = loadConfig();
+    _config = loadConfig(_configProfile);
   }
   return _config;
+}
+
+/**
+ * Set the profile for subsequent getConfig calls
+ * Use this to set profile from CLI --profile flag
+ */
+export function setConfigProfile(profileName: string | undefined): void {
+  if (profileName !== _configProfile) {
+    _configProfile = profileName;
+    _config = null; // Invalidate cached config
+  }
 }
 
 /**
@@ -358,4 +460,7 @@ export function getConfig(): CliConfig {
  */
 export function resetConfig(): void {
   _config = null;
+  _configProfile = undefined;
+  _activeProfile = null;
+  _configFilePath = null;
 }

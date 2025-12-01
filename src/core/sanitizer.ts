@@ -76,3 +76,49 @@ export function sanitizeWorkflow(workflow: Workflow, options: SanitizeOptions): 
 
   return { workflow, warnings };
 }
+
+/**
+ * Read-only properties that must be stripped from exported workflows
+ * before creating via API. The n8n API rejects these with:
+ * - "must NOT have additional properties"
+ * - "tags is read-only"
+ * 
+ * @see https://github.com/n8n-io/n8n/issues/7881
+ * @see https://github.com/n8n-io/n8n/issues/19587
+ */
+const READ_ONLY_KEYS = [
+  'id',
+  'versionId', 
+  'meta',
+  'createdAt',
+  'updatedAt',
+  'staticData',
+  'pinData',
+  'tags',
+  'shared',
+  'homeProject',
+  'sharedWithProjects',
+  'triggerCount',
+  'lastNodeExecuted',
+  'templateData',
+  'activeExecutions',
+] as const;
+
+/**
+ * Strip read-only properties from exported workflow before API submission.
+ * Use this when creating workflows from n8n UI exports to avoid API errors.
+ * 
+ * Note: 'active' is intentionally preserved as it's writable on create.
+ * 
+ * @example
+ * const exported = JSON.parse(fs.readFileSync('workflow.json'));
+ * const clean = stripReadOnlyProperties(exported);
+ * await client.createWorkflow(clean);
+ */
+export function stripReadOnlyProperties<T extends Record<string, unknown>>(workflow: T): T {
+  const cleaned = { ...workflow };
+  for (const key of READ_ONLY_KEYS) {
+    delete cleaned[key];
+  }
+  return cleaned;
+}

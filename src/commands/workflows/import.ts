@@ -1,42 +1,46 @@
 /**
- * Workflows Create Command
- * Create new workflow from file or stdin
+ * Workflows Import Command
+ * Import workflow from JSON file
  */
 
 import chalk from 'chalk';
 import { readFile } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import { getApiClient } from '../../core/api/client.js';
 import { jsonParse } from '../../core/json-parser.js';
-import { formatHeader } from '../../core/formatters/header.js';
+import { formatHeader, formatDivider } from '../../core/formatters/header.js';
 import { formatNextActions } from '../../core/formatters/next-actions.js';
 import { outputJson } from '../../core/formatters/json.js';
 import { icons } from '../../core/formatters/theme.js';
 import { printError, N8nApiError } from '../../utils/errors.js';
 import { stripReadOnlyProperties } from '../../core/sanitizer.js';
 import { validateWorkflowStructure } from '../../core/validator.js';
-import { formatDivider } from '../../core/formatters/header.js';
+import type { GlobalOptions } from '../../types/global-options.js';
 
-interface CreateOptions {
-  file?: string;
+interface ImportOptions extends GlobalOptions {
   name?: string;
-  active?: boolean;
   dryRun?: boolean;
+  activate?: boolean;
   json?: boolean;
 }
 
-export async function workflowsCreateCommand(opts: CreateOptions): Promise<void> {
+export async function workflowsImportCommand(filePath: string, opts: ImportOptions): Promise<void> {
   try {
-    if (!opts.file) {
-      console.error(chalk.red(`\n${icons.error} Please provide --file with workflow JSON`));
-      process.exitCode = 1; return;
+    // Check file exists
+    if (!existsSync(filePath)) {
+      console.error(chalk.red(`\n${icons.error} File not found: ${filePath}`));
+      process.exitCode = 1;
+      return;
     }
     
-    const content = await readFile(opts.file, 'utf8');
+    // Read and parse file
+    const content = await readFile(filePath, 'utf8');
     const workflow = jsonParse(content, { repairJSON: true }) as any;
     
     if (!workflow) {
-      console.error(chalk.red(`\n${icons.error} Failed to parse workflow from ${opts.file}`));
-      process.exitCode = 1; return;
+      console.error(chalk.red(`\n${icons.error} Failed to parse workflow from ${filePath}`));
+      process.exitCode = 1;
+      return;
     }
     
     // Override name if provided
@@ -49,7 +53,7 @@ export async function workflowsCreateCommand(opts: CreateOptions): Promise<void>
       workflow.name = `Imported Workflow ${new Date().toISOString().split('T')[0]}`;
     }
     
-    // Ensure workflow has required settings (n8n API requires this)
+    // Ensure workflow has required settings
     if (!workflow.settings) {
       workflow.settings = { executionOrder: 'v1' };
     }
@@ -59,17 +63,20 @@ export async function workflowsCreateCommand(opts: CreateOptions): Promise<void>
       workflow.connections = {};
     }
     
-    // Validate and prepare workflow
-    const validation = validateWorkflowStructure(workflow);
+    // Strip read-only properties
     const cleanedWorkflow = stripReadOnlyProperties(workflow);
     
-    // Dry-run mode: preview what would be created without actually creating
+    // Dry-run mode: validate and preview without creating
     if (opts.dryRun) {
+      const validation = validateWorkflowStructure(cleanedWorkflow);
+      
       if (opts.json) {
         outputJson({
           dryRun: true,
           valid: validation.valid,
-          payload: cleanedWorkflow,
+          file: filePath,
+          name: cleanedWorkflow.name,
+          nodes: cleanedWorkflow.nodes?.length || 0,
           errors: validation.errors,
           warnings: validation.warnings,
         });
@@ -78,11 +85,12 @@ export async function workflowsCreateCommand(opts: CreateOptions): Promise<void>
       }
       
       console.log(formatHeader({
-        title: 'Dry Run Preview',
+        title: 'Import Preview (Dry Run)',
         icon: icons.info,
         context: {
-          'Mode': 'Preview only (no workflow created)',
-          'Validation': validation.valid ? 'Passed' : 'Failed',
+          'File': filePath,
+          'Name': cleanedWorkflow.name,
+          'Validation': validation.valid ? '✓ Passed' : '✗ Failed',
         },
       }));
       
@@ -109,41 +117,41 @@ export async function workflowsCreateCommand(opts: CreateOptions): Promise<void>
       }
       
       console.log('');
-      console.log(formatDivider('Payload Preview'));
-      console.log(chalk.dim(JSON.stringify(cleanedWorkflow, null, 2).slice(0, 500)));
-      if (JSON.stringify(cleanedWorkflow).length > 500) {
-        console.log(chalk.dim('  ... (truncated)'));
-      }
-      
-      console.log('');
-      console.log(chalk.cyan(`💡 To create this workflow, run without --dry-run`));
+      console.log(chalk.cyan(`💡 To import this workflow, run without --dry-run`));
       console.log(formatNextActions([
-        { command: `n8n workflows create --file ${opts.file}`, description: 'Create workflow' },
-        { command: `n8n workflows validate --file ${opts.file}`, description: 'Full validation' },
+        { command: `n8n workflows import ${filePath}`, description: 'Import workflow' },
+        { command: `n8n workflows import ${filePath} --activate`, description: 'Import and activate' },
       ]));
       
       process.exitCode = validation.valid ? 0 : 1;
       return;
     }
     
+    // Create the workflow
     const client = getApiClient();
     const created = await client.createWorkflow(cleanedWorkflow);
     
     // Activate if requested
-    if (opts.active && created.id) {
+    if (opts.activate && created.id) {
       await client.activateWorkflow(created.id);
       created.active = true;
     }
     
     // JSON output
     if (opts.json) {
-      outputJson(created);
+      outputJson({
+        success: true,
+        id: created.id,
+        name: created.name,
+        active: created.active,
+        file: filePath,
+      });
       return;
     }
     
     // Human-friendly output
     console.log(formatHeader({
-      title: 'Workflow Created',
+      title: 'Workflow Imported',
       icon: icons.success,
       context: {
         'ID': created.id || 'Unknown',
@@ -153,20 +161,21 @@ export async function workflowsCreateCommand(opts: CreateOptions): Promise<void>
     }));
     
     console.log('');
-    console.log(chalk.green(`  ${icons.success} Workflow created successfully!`));
+    console.log(chalk.green(`  ${icons.success} Workflow imported successfully from ${filePath}`));
     
     // Next actions
     console.log(formatNextActions([
       { command: `n8n workflows get ${created.id}`, description: 'View workflow' },
-      ...(!created.active ? [{ command: `n8n workflows activate ${created.id}`, description: 'Activate workflow' }] : []),
+      ...(!created.active ? [{ command: `n8n workflows update ${created.id} --activate`, description: 'Activate workflow' }] : []),
+      { command: `n8n executions list --workflow-id ${created.id}`, description: 'View executions' },
     ]));
     
   } catch (error) {
     if (error instanceof N8nApiError) {
-      printError(error);
+      printError(error, { commandContext: 'workflows import' });
     } else {
       console.error(chalk.red(`\n${icons.error} Error: ${(error as Error).message}`));
+      process.exitCode = 1;
     }
-    process.exitCode = 1; return;
   }
 }

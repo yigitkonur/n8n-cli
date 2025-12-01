@@ -54,4 +54,10 @@ export function showVariablesHelp(): void {
   console.log(chalk.dim('    • Contain only letters, numbers, and underscores'));
   console.log(chalk.dim('    • Example: MY_API_KEY, config_value_1'));
   console.log('');
+  
+  console.log(chalk.bold.red('⚠️  License Requirement:'));
+  console.log('');
+  console.log(chalk.dim('  Variables require n8n Enterprise or Pro license with feat:variables.'));
+  console.log(chalk.dim('  Community edition will return HTTP 403 (license error).'));
+  console.log('');
 }

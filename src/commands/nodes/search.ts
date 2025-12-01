@@ -21,6 +21,17 @@ interface SearchOptions {
 }
 
 export async function nodesSearchCommand(query: string, opts: SearchOptions): Promise<void> {
+  // Validate query is not empty or whitespace-only
+  if (!query || !query.trim()) {
+    console.error(chalk.red(`\n${icons.error} Search query cannot be empty`));
+    console.log(chalk.dim('\n  Examples:'));
+    console.log(chalk.dim('  n8n nodes search "slack"'));
+    console.log(chalk.dim('  n8n nodes search "http request"'));
+    console.log(chalk.dim('  n8n nodes search "email" --mode FUZZY'));
+    process.exitCode = 1;
+    return;
+  }
+  
   const mode = (opts.mode?.toUpperCase() || 'OR') as 'OR' | 'AND' | 'FUZZY';
   const limit = parseInt(opts.limit || '10', 10);
   const displayLimit = Math.min(limit, 20); // Cap display at 20 for readability

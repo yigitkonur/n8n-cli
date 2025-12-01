@@ -79,10 +79,18 @@ async function verifyCredentials(host: string, apiKey: string): Promise<{ valid:
   }
 }
 
+interface UsageOptions {
+  /** If true, shows error message and sets exit code 1. If false, shows friendly options. */
+  isError?: boolean;
+}
+
 /**
- * Show non-interactive usage instructions
+ * Show usage instructions
+ * @param options.isError - If true (default), shows error message for CI/missing creds. If false, shows friendly options for TTY.
  */
-function showUsageInstructions(): void {
+function showUsageInstructions(options: UsageOptions = {}): void {
+  const { isError = true } = options;
+  
   console.log(formatHeader({
     title: 'n8n Authentication',
     icon: icons.auth,
@@ -90,8 +98,14 @@ function showUsageInstructions(): void {
   }));
   
   console.log('');
-  console.log(theme.error(`${icons.error} Missing required credentials`));
-  console.log('');
+  
+  if (isError) {
+    console.log(theme.error(`${icons.error} Missing required credentials`));
+    console.log('');
+  } else {
+    console.log(chalk.bold('Choose your authentication method:'));
+    console.log('');
+  }
   
   console.log(chalk.bold('Non-interactive login (recommended for CI/agents):'));
   console.log('');
@@ -116,7 +130,9 @@ function showUsageInstructions(): void {
   console.log(chalk.dim('  3. Create a new API key'));
   console.log('');
   
-  process.exitCode = 1;
+  if (isError) {
+    process.exitCode = 1;
+  }
 }
 
 /**
@@ -300,8 +316,21 @@ export async function authLoginCommand(opts: LoginOptions): Promise<void> {
     showUsageInstructions();
     return;
   } else {
-    // Interactive terminal without credentials - offer to prompt
-    result = await handleInteractiveLogin();
+    // TTY terminal without credentials - show usage, require explicit -i flag
+    if (opts.json) {
+      console.log(JSON.stringify({
+        success: false,
+        message: 'Choose an authentication method',
+        usage: {
+          interactive: 'n8n auth login --interactive',
+          flags: 'n8n auth login --host <url> --api-key <key>',
+          env: 'N8N_HOST=<url> N8N_API_KEY=<key> n8n auth login',
+        },
+      }, null, 2));
+      return;
+    }
+    showUsageInstructions({ isError: false });
+    return;
   }
   
   // Output result
