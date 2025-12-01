@@ -24,3 +24,16 @@ export type { JqRecipe } from './jq-recipes.js';
 // JSON output
 export { saveToJson, formatBytes, outputJson, formatJsonResponse } from './json.js';
 export type { JsonOutputOptions } from './json.js';
+
+// Tree formatting
+export {
+  formatAlphaTree,
+  formatCategoryTree,
+  formatSimpleTree,
+  formatOperationsTree,
+  formatCategoryStats,
+  formatAuthMethodTree,
+  renderTreeBranch,
+  CATEGORY_META,
+} from './tree.js';
+export type { TreeItem, TreeOptions, CategoryMeta } from './tree.js';

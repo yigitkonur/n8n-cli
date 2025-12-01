@@ -91,7 +91,48 @@ program
 // ============================================================================
 const nodesCmd = program
   .command('nodes')
-  .description('Search and inspect n8n nodes');
+  .description('Search, list, and inspect n8n nodes');
+
+nodesCmd
+  .command('list')
+  .description('List all available nodes')
+  .option('--by-category', 'Group nodes by category')
+  .option('-c, --category <name>', 'Filter by category')
+  .option('-s, --search <query>', 'Search with fuzzy matching')
+  .option('-l, --limit <n>', 'Limit results (0 = all)', '0')
+  .option('--compact', 'Compact table format')
+  .option('--save <path>', 'Save to JSON file')
+  .option('--json', 'Output as JSON')
+  .action(async (opts) => {
+    const { nodesListCommand } = await import('./commands/nodes/list.js');
+    await nodesListCommand(opts);
+  });
+
+nodesCmd
+  .command('show <nodeType>')
+  .description('Show node details, schema, and examples')
+  .option('--schema', 'Show full property schema')
+  .option('--minimal', 'Show operations only')
+  .option('--examples', 'Show usage examples')
+  .option('-m, --mode <mode>', 'Output mode: info, docs, versions', 'info')
+  .option('-d, --detail <level>', 'Detail level: minimal, standard, full', 'standard')
+  .option('--json', 'Output as JSON')
+  .option('-s, --save <path>', 'Save to JSON file')
+  .action(async (nodeType, opts) => {
+    const { nodesShowCommand } = await import('./commands/nodes/show.js');
+    await nodesShowCommand(nodeType, opts);
+  });
+
+nodesCmd
+  .command('categories')
+  .description('List all node categories with counts')
+  .option('--detailed', 'Show descriptions and examples')
+  .option('-s, --save <path>', 'Save to JSON file')
+  .option('--json', 'Output as JSON')
+  .action(async (opts) => {
+    const { nodesCategoriesCommand } = await import('./commands/nodes/categories.js');
+    await nodesCategoriesCommand(opts);
+  });
 
 nodesCmd
   .command('search <query>')
@@ -105,16 +146,17 @@ nodesCmd
     await nodesSearchCommand(query, opts);
   });
 
+// Alias 'get' to 'show' for backwards compatibility
 nodesCmd
   .command('get <nodeType>')
-  .description('Get node schema and documentation')
+  .description('Get node schema (alias for "show")')
   .option('-m, --mode <mode>', 'Output mode: info, docs, versions', 'info')
   .option('-d, --detail <level>', 'Detail level: minimal, standard, full', 'standard')
   .option('--json', 'Output as JSON')
   .option('-s, --save <path>', 'Save to JSON file')
   .action(async (nodeType, opts) => {
-    const { nodesGetCommand } = await import('./commands/nodes/get.js');
-    await nodesGetCommand(nodeType, opts);
+    const { nodesShowCommand } = await import('./commands/nodes/show.js');
+    await nodesShowCommand(nodeType, opts);
   });
 
 nodesCmd
@@ -376,6 +418,29 @@ credentialsCmd
   .action(async (id, opts) => {
     const { credentialsDeleteCommand } = await import('./commands/credentials/index.js');
     await credentialsDeleteCommand(id, opts);
+  });
+
+credentialsCmd
+  .command('types')
+  .description('List all available credential types')
+  .option('--by-auth', 'Group by authentication method')
+  .option('-s, --search <query>', 'Search credential types')
+  .option('-l, --limit <n>', 'Limit results', '0')
+  .option('--save <path>', 'Save to JSON file')
+  .option('--json', 'Output as JSON')
+  .action(async (opts) => {
+    const { credentialTypesCommand } = await import('./commands/credentials/types.js');
+    await credentialTypesCommand(opts);
+  });
+
+credentialsCmd
+  .command('show-type <typeName>')
+  .description('Show credential type schema')
+  .option('-s, --save <path>', 'Save to JSON file')
+  .option('--json', 'Output as JSON')
+  .action(async (typeName, opts) => {
+    const { credentialTypeShowCommand } = await import('./commands/credentials/type-show.js');
+    await credentialTypeShowCommand(typeName, opts);
   });
 
 // Default action for 'n8n credentials' without subcommand

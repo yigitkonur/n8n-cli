@@ -22,11 +22,16 @@ export type CommandType =
   | 'executions-list' 
   | 'nodes-search' 
   | 'nodes-get'
+  | 'nodes-list'
+  | 'nodes-show'
+  | 'nodes-categories'
   | 'templates-search'
   | 'templates-get'
   | 'workflows-get'
   | 'executions-get'
   | 'credentials-list'
+  | 'credentials-types'
+  | 'credentials-type-show'
   | 'variables-list'
   | 'tags-list'
   | 'audit';
@@ -92,6 +97,38 @@ export function getCommandRecipes(command: CommandType): JqRecipe[] {
     ],
 
     // ═══════════════════════════════════════════════════════════════════════
+    // NODES LIST
+    // Returns: { nodes[]: { name, type, category, description, isTrigger } }
+    // ═══════════════════════════════════════════════════════════════════════
+    'nodes-list': [
+      { filter: `.nodes | map(.name)`, description: 'List node names only' },
+      { filter: `.nodes | map(select(.isTrigger == true))`, description: 'Only trigger nodes' },
+      { filter: `.nodes | group_by(.category) | map({category: .[0].category, count: length})`, description: 'Count by category' },
+      { filter: `-r '.nodes[].type'`, description: 'List node types for scripting' },
+      { filter: `.nodes | map(select(.category == "trigger"))`, description: 'Filter by category' },
+    ],
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // NODES SHOW (alias for nodes-get, same structure)
+    // ═══════════════════════════════════════════════════════════════════════
+    'nodes-show': [
+      { filter: `.properties | map(.name)`, description: 'List property names' },
+      { filter: `.properties | map(select(.required == true))`, description: 'Required properties only' },
+      { filter: `.operations | map(.value)`, description: 'List operations' },
+      { filter: `.credentials | map(.name)`, description: 'List required credentials' },
+    ],
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // NODES CATEGORIES
+    // Returns: [{ category, count, icon, description }]
+    // ═══════════════════════════════════════════════════════════════════════
+    'nodes-categories': [
+      { filter: `.[] | {category, count}`, description: 'Category and count' },
+      { filter: `sort_by(.count) | reverse`, description: 'Sort by count descending' },
+      { filter: `map(.count) | add`, description: 'Total node count' },
+    ],
+
+    // ═══════════════════════════════════════════════════════════════════════
     // TEMPLATES SEARCH
     // Returns: { id, name, totalViews, user: {username}, description }
     // ═══════════════════════════════════════════════════════════════════════
@@ -142,6 +179,28 @@ export function getCommandRecipes(command: CommandType): JqRecipe[] {
       { filter: `.[] | {id, name, type}`, description: 'Extract key fields' },
       { filter: `group_by(.type) | map({type: .[0].type, count: length})`, description: 'Count by type' },
       { filter: `-r '.[] | "\(.id)\t\(.name)\t\(.type)"'`, description: 'TSV export' },
+    ],
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // CREDENTIALS TYPES (local credential type definitions)
+    // Returns: [{ name, displayName, authType, propertyCount }]
+    // ═══════════════════════════════════════════════════════════════════════
+    'credentials-types': [
+      { filter: `.[] | {name, displayName, authType}`, description: 'Extract key fields' },
+      { filter: `group_by(.authType) | map({authType: .[0].authType, count: length})`, description: 'Count by auth method' },
+      { filter: `.[] | select(.authType == "OAuth2")`, description: 'Only OAuth2 credentials' },
+      { filter: `-r '.[].name'`, description: 'List credential type names' },
+    ],
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // CREDENTIALS TYPE SHOW (single credential type schema)
+    // Returns: { name, displayName, authType, properties[], usedByNodes[] }
+    // ═══════════════════════════════════════════════════════════════════════
+    'credentials-type-show': [
+      { filter: `.properties | map(.name)`, description: 'List property names' },
+      { filter: `.properties | map(select(.required == true))`, description: 'Required properties only' },
+      { filter: `.usedByNodes`, description: 'Nodes using this credential' },
+      { filter: `{name, authType, fields: (.properties | length)}`, description: 'Summary' },
     ],
 
     // ═══════════════════════════════════════════════════════════════════════

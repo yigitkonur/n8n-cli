@@ -224,6 +224,64 @@ export class NodeRepository {
   }
   
   /**
+   * Get all nodes sorted by display name
+   */
+  getAllNodes(): NodeSearchResult[] {
+    const rows = this.db.prepare(`
+      SELECT node_type, display_name, description, category, package_name,
+             is_ai_tool, is_trigger, is_webhook
+      FROM nodes 
+      ORDER BY display_name COLLATE NOCASE
+    `).all() as any[];
+    
+    return rows.map(row => this.parseSearchRow(row));
+  }
+  
+  /**
+   * Get category statistics with counts
+   */
+  getCategoryStats(): Array<{ category: string; count: number }> {
+    const rows = this.db.prepare(`
+      SELECT category, COUNT(*) as count 
+      FROM nodes 
+      WHERE category IS NOT NULL AND category != ''
+      GROUP BY category 
+      ORDER BY count DESC
+    `).all() as any[];
+    
+    return rows.map(row => ({
+      category: row.category,
+      count: row.count,
+    }));
+  }
+  
+  /**
+   * Get nodes by first letter of display name (for alphabetical pagination)
+   */
+  getNodesByFirstLetter(letter: string): NodeSearchResult[] {
+    const upperLetter = letter.toUpperCase();
+    const rows = this.db.prepare(`
+      SELECT node_type, display_name, description, category, package_name,
+             is_ai_tool, is_trigger, is_webhook
+      FROM nodes 
+      WHERE UPPER(SUBSTR(display_name, 1, 1)) = ?
+      ORDER BY display_name COLLATE NOCASE
+    `).all(upperLetter) as any[];
+    
+    return rows.map(row => this.parseSearchRow(row));
+  }
+  
+  /**
+   * Format node type for display (add n8n-nodes-base prefix if needed)
+   */
+  static formatNodeType(nodeType: string): string {
+    if (nodeType.includes('.')) {
+      return `n8n-nodes-base.${nodeType.split('.').pop()}`;
+    }
+    return `n8n-nodes-base.${nodeType}`;
+  }
+  
+  /**
    * Search node properties
    */
   searchNodeProperties(nodeType: string, query: string, maxResults: number = 20): any[] {
