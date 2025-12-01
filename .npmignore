@@ -1,0 +1,48 @@
+# Development files
+src/
+tsconfig.json
+tsup.config.ts
+.eslintrc*
+.prettierrc*
+
+# Test files
+*.test.ts
+*.spec.ts
+__tests__/
+coverage/
+.nyc_output/
+testsprite_tests/
+
+# Database files
+data/
+*.db
+
+# Notes and docs (keep README)
+notes/
+CHANGELOG.md
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Git
+.git/
+.gitignore
+
+# Temp
+*.tmp
+.cache/
+output/
+scripts/
+tools/
+bugs/
+
+# Sensitive
+.env
+.env.*
+*.key
+key.txt
