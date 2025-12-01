@@ -32,3 +32,19 @@ coverage/
 
 # n8n source reference (for development only)
 n8n-source/
+
+# Test artifacts
+cli-test-results/
+testsprite_tests/
+
+# Temp/scratch dirs
+output/
+scripts/
+tools/
+bugs/
+
+# Sensitive files
+key.txt
+*.key
+.env
+.env.*

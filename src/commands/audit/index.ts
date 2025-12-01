@@ -39,7 +39,7 @@ function parseCategories(categoriesStr?: string): AuditCategory[] | undefined {
   return valid.length > 0 ? valid : undefined;
 }
 
-function getRiskColor(risk: string): chalk.Chalk {
+function getRiskColor(risk: string) {
   switch (risk.toLowerCase()) {
     case 'credentials': return chalk.red;
     case 'database': return chalk.yellow;
