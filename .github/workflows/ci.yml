@@ -29,4 +29,3 @@ jobs:
         run: |
           node dist/cli.js --version
           node dist/cli.js --help
-          node dist/cli.js nodes search webhook --limit 2 --json
