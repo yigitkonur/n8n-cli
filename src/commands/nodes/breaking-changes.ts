@@ -7,7 +7,6 @@
  */
 
 import chalk from 'chalk';
-import { NodeTypeNormalizer } from '../../utils/node-type-normalizer.js';
 import { formatHeader, formatDivider } from '../../core/formatters/header.js';
 import { formatNextActions } from '../../core/formatters/next-actions.js';
 import { saveToJson, outputJson } from '../../core/formatters/json.js';
@@ -154,13 +153,17 @@ function formatBreakingChangesBox(
 
 export async function nodesBreakingChangesCommand(nodeType: string, opts: BreakingChangesOptions): Promise<void> {
   try {
-    // Normalize node type
+    // Normalize node type - registry uses full n8n-nodes-base.* format
     let normalizedType = nodeType;
     if (!nodeType.includes('.')) {
-      normalizedType = `n8n-nodes-base.${nodeType.toLowerCase()}`;
-    } else {
-      normalizedType = NodeTypeNormalizer.normalizeToFullForm(nodeType);
+      // Short form like "webhook" or "executeWorkflow" -> "n8n-nodes-base.webhook"
+      // Preserve original casing for camelCase names like executeWorkflow
+      normalizedType = `n8n-nodes-base.${nodeType}`;
+    } else if (!nodeType.startsWith('n8n-') && !nodeType.startsWith('@')) {
+      // Partial form like "nodes-base.webhook" -> "n8n-nodes-base.webhook"
+      normalizedType = `n8n-${nodeType}`;
     }
+    // Full form already (n8n-nodes-base.* or @n8n/*) - keep as is
     
     // Create detector and service
     const detector = new BreakingChangeDetector();

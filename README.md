@@ -241,7 +241,7 @@ n8n workflows get <id> [options]
 
 #### `workflows validate`
 
-Validate a workflow JSON file or by ID.
+Validate a workflow JSON file or by ID with enhanced validation.
 
 ```bash
 n8n workflows validate [idOrFile] [options]
@@ -251,6 +251,7 @@ n8n workflows validate [idOrFile] [options]
 |--------|-------------|---------|
 | `-f, --file <path>` | Path to workflow JSON file | - |
 | `--profile <profile>` | Validation profile: `minimal`, `runtime`, `ai-friendly`, `strict` | `runtime` |
+| `--mode <mode>` | Validation mode: `minimal`, `operation`, `full` | `operation` |
 | `--repair` | Attempt to repair malformed JSON | - |
 | `--fix` | Auto-fix known issues | - |
 | `--check-upgrades` | Check for node version upgrades and breaking changes | - |
@@ -259,6 +260,34 @@ n8n workflows validate [idOrFile] [options]
 | `--no-validate-expressions` | Skip expression format validation | - |
 | `-s, --save <path>` | Save fixed workflow | - |
 | `--json` | Output as JSON | - |
+
+**Enhanced Validation Profiles:**
+
+| Profile | Errors Kept | Warnings Kept | Use Case |
+|---------|------------|---------------|----------|
+| `minimal` | Missing required only | Security, deprecated | Fast structure check |
+| `runtime` | Critical runtime errors | Security, deprecated | Default for CLI |
+| `ai-friendly` | All errors | + Best practice, missing common | AI agent workflows |
+| `strict` | All errors | All + enforced error handling | Production validation |
+
+**Validation Modes:**
+
+| Mode | Scope | Description |
+|------|-------|-------------|
+| `minimal` | Required + visible | Only required properties that are currently visible |
+| `operation` | Operation-specific | Properties relevant to current resource/operation (default) |
+| `full` | All properties | All properties regardless of visibility |
+
+```bash
+# Strict validation with full mode (most thorough)
+n8n workflows validate workflow.json --profile strict --mode full
+
+# AI-friendly validation (balanced for LLM processing)
+n8n workflows validate workflow.json --profile ai-friendly
+
+# Minimal validation (structure only)
+n8n workflows validate workflow.json --profile minimal --mode minimal
+```
 
 **Version Upgrade Checking:**
 
@@ -896,7 +925,7 @@ n8n nodes categories [options]
 
 #### `nodes validate`
 
-Validate node configuration.
+Validate node configuration with enhanced validation.
 
 ```bash
 n8n nodes validate <nodeType> [options]
@@ -905,8 +934,33 @@ n8n nodes validate <nodeType> [options]
 | Option | Description | Default |
 |--------|-------------|---------|
 | `-c, --config <json>` | Node configuration to validate | `{}` |
-| `--profile <profile>` | Validation profile: `minimal`, `runtime`, `strict` | `runtime` |
+| `--profile <profile>` | Validation profile: `minimal`, `runtime`, `ai-friendly`, `strict` | `runtime` |
+| `--mode <mode>` | Validation mode: `minimal`, `operation`, `full` | `operation` |
 | `--json` | Output as JSON | - |
+
+**Examples:**
+
+```bash
+# Validate Slack node with strict profile
+n8n nodes validate n8n-nodes-base.slack --config '{"resource":"message","operation":"send"}' --profile strict
+
+# Validate HTTP Request node with full mode
+n8n nodes validate httpRequest --config '{"url":"https://api.example.com"}' --mode full
+
+# Get JSON output with autofix suggestions
+n8n nodes validate webhook --config '{"path":"test"}' --json
+```
+
+**Node-Specific Validation:**
+
+The enhanced validator includes operation-aware validation for common nodes:
+- **Slack**: Channel/message validation, API rate limit warnings
+- **HTTP Request**: URL/method validation, authentication warnings
+- **Webhook**: Path validation, error handling recommendations
+- **Code**: JS/Python syntax checks, return statement validation
+- **Database** (Postgres, MySQL, MongoDB): SQL injection detection, query validation
+- **OpenAI**: Model selection, token limit warnings
+- **Google Sheets**: Range format validation, operation checks
 
 ---
 

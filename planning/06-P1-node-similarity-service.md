@@ -1,8 +1,11 @@
-# P1: Node Similarity Service
+# P1: Similarity Services (Node, Operation, Resource)
 
 ## Priority: P1 (High)
-## Status: Not Implemented in CLI
-## MCP Source: `n8n-mcp/src/services/node-similarity-service.ts`
+## Status: ⚠️ Partial (Basic Levenshtein only)
+## MCP Sources:
+- `n8n-mcp/src/services/node-similarity-service.ts` (512 lines)
+- `n8n-mcp/src/services/operation-similarity-service.ts` (502 lines)
+- `n8n-mcp/src/services/resource-similarity-service.ts` (522 lines)
 
 ---
 
