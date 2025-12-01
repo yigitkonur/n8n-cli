@@ -3,7 +3,7 @@
  * Task 03: Backup Before Workflow Mutations
  */
 
-import { copyFile, mkdir, writeFile, chmod, readFile } from 'node:fs/promises';
+import { copyFile, mkdir, writeFile, chmod } from 'node:fs/promises';
 import { join, basename } from 'node:path';
 import { homedir } from 'node:os';
 import chalk from 'chalk';

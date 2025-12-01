@@ -91,13 +91,6 @@ export function disableColors(): void {
 }
 
 /**
- * Get terminal width with fallback
- */
-export function getTerminalWidth(): number {
-  return process.stdout.columns || 80;
-}
-
-/**
  * Check if running in a TTY (interactive terminal)
  */
 export function isTTY(): boolean {
