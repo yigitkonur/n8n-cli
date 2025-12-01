@@ -1,7 +1,5 @@
 import type { Workflow } from './types.js';
 import type { FixDetail, PostUpdateGuidance, FixType, FixConfidenceLevel } from './autofix/types.js';
-import { NodeSimilarityService } from './autofix/node-similarity.js';
-import { getNodeRepository, type NodeRepository } from './db/nodes.js';
 import { NodeMigrationService, NodeVersionService } from './versioning/index.js';
 
 export interface FixResult {
@@ -463,53 +461,6 @@ const allExperimentalFixes: ExperimentalFix[] = [
   fixOutdatedTypeVersions,
 ];
 
-/**
- * Async fix: Correct unknown node types using similarity service
- * Fixes node types with 90%+ confidence match
- */
-async function fixNodeTypeCorrection(
-  workflow: Workflow,
-  similarityService?: NodeSimilarityService,
-  nodeRepository?: NodeRepository,
-): Promise<FixResult> {
-  const warnings: string[] = [];
-  let fixed = 0;
-
-  if (!Array.isArray(workflow.nodes)) {
-    return { fixed, warnings };
-  }
-
-  // Initialize services if not provided
-  const repo = nodeRepository || await getNodeRepository();
-  const service = similarityService || new NodeSimilarityService(repo);
-
-  for (const node of workflow.nodes) {
-    if (!node || typeof node !== 'object') {continue;}
-    if (!node.type || typeof node.type !== 'string') {continue;}
-
-    // Check if node type is known
-    const nodeInfo = repo.getNode(node.type);
-    if (nodeInfo) {continue;} // Valid node type, skip
-
-    // Try to find similar nodes
-    const suggestions = await service.findSimilarNodes(node.type, 1);
-    if (suggestions.length === 0) {continue;}
-
-    const topSuggestion = suggestions[0];
-    
-    // Only auto-fix with high confidence (90%+)
-    if (service.isAutoFixable(topSuggestion)) {
-      const originalType = node.type;
-      node.type = topSuggestion.nodeType;
-      fixed++;
-      warnings.push(
-        `Fixed node "${node.name}": "${originalType}" → "${topSuggestion.nodeType}" (${topSuggestion.reason}, ${Math.round(topSuggestion.confidence * 100)}% match)`
-      );
-    }
-  }
-
-  return { fixed, warnings };
-}
 
 export function applyExperimentalFixes(
   workflow: Workflow,

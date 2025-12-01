@@ -117,9 +117,8 @@ export async function workflowsValidateCommand(idOrFile: string | undefined, opt
           }
         }
       }
-    } catch (err) {
+    } catch {
       // Similarity service unavailable - continue without suggestions
-      // Debug: uncomment to see error: console.error('Similarity error:', err);
     }
     
     // Validate with enhanced validation when profile or mode is specified

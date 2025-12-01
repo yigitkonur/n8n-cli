@@ -560,7 +560,7 @@ export class NodeSpecificValidators {
   private static checkPythonForSQLInjection(code: string, warnings: ValidationWarning[]): void {
     const sqlKeywords = /\b(SELECT|INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|TRUNCATE)\b/i;
     
-    if (!sqlKeywords.test(code)) return;
+    if (!sqlKeywords.test(code)) {return;}
     
     // Python f-string with SQL: f"SELECT * FROM users WHERE id = {user_id}"
     const fStringPattern = /f['"]\s*[^'"]*\b(SELECT|INSERT|UPDATE|DELETE|DROP)\b[^'"]*\{[^}]+\}[^'"]*['"]/i;

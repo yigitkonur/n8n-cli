@@ -45,12 +45,6 @@ export interface OutputContext {
 }
 
 /**
- * No-op function for suppressed output
- */
- 
-const noop = () => {};
-
-/**
  * Check if colors should be used
  * Respects NO_COLOR env var and --no-color flag
  */
