@@ -14,8 +14,8 @@ import { EnhancedConfigValidator, type ValidationMode, type ValidationProfile } 
 
 interface ValidateOptions {
   config?: string;
-  profile?: ValidationProfile;
-  mode?: ValidationMode;
+  validationProfile?: ValidationProfile;
+  validationMode?: ValidationMode;
   json?: boolean;
 }
 
@@ -51,8 +51,8 @@ export async function nodesValidateCommand(nodeType: string, opts: ValidateOptio
     }
     
     // Validate configuration using EnhancedConfigValidator
-    const profile = opts.profile || 'runtime';
-    const mode = opts.mode || 'operation';
+    const profile = opts.validationProfile || 'runtime';
+    const mode = opts.validationMode || 'operation';
     
     // Use enhanced validation
     const result = EnhancedConfigValidator.validateWithMode(

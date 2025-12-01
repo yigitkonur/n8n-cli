@@ -50,9 +50,14 @@ Generated from comprehensive feature-parity audit comparing:
 | Operation Similarity | `operation-similarity-service.ts` | P1 (extend 06) |
 | Resource Similarity | `resource-similarity-service.ts` | P1 (extend 06) |
 | Type Structure Service | `type-structure-service.ts` | P2 (extend 14) |
-| Example Generator | `example-generator.ts` | P2 (new doc) |
-| Node Documentation Service | `node-documentation-service.ts` | P2 (new doc) |
-| Execution Processor | `execution-processor.ts` | P3 |
+
+### Already Implemented (No New Docs Needed) ✅
+
+| MCP Service | CLI Feature | README Reference |
+|-------------|-------------|------------------|
+| `example-generator.ts` | `n8n nodes show --include-examples` | line 856 |
+| `node-documentation-service.ts` | `n8n nodes show --mode docs` | line 876 |
+| `execution-processor.ts` | `n8n executions get --mode filtered/preview/summary` | line 1126 |
 
 ---
 
@@ -121,19 +126,24 @@ Generated from comprehensive feature-parity audit comparing:
 | `node-version-service.ts` | 378 | 08-P1 | Missing upgrade path analysis |
 | `breaking-change-detector.ts` | 322 | 09-P1 | Missing dynamic detection |
 
-### NOT Covered (New Docs Needed) ❌
+### NOT Covered (Extend Existing Docs) ⚠️
 
-| MCP Service | Lines | Purpose | Suggested Priority |
-|-------------|-------|---------|-------------------|
-| `operation-similarity-service.ts` | 502 | Operation typo suggestions (Slack send→postMessage) | **P1** (extend 06) |
-| `resource-similarity-service.ts` | 522 | Resource typo suggestions (messages→message) | **P1** (extend 06) |
-| `type-structure-service.ts` | 428 | Validate 22 NodePropertyTypes (filter, resourceMapper) | **P2** (extend 14) |
-| `example-generator.ts` | 835 | Generate node config examples | **P2** (new 15) |
-| `node-documentation-service.ts` | 685 | Format node documentation | **P2** (new 16) |
-| `execution-processor.ts` | 388 | Execution filtering/processing | **P3** |
-| `node-sanitizer.ts` | 362 | Sanitize node structures | Covered in 01-P0 |
-| `workflow-validator.ts` | 1935 | Main validation (skips langchain) | Distributed |
-| `n8n-validation.ts` | 800 | n8n-specific validation | Distributed |
+| MCP Service | Lines | Purpose | Action |
+|-------------|-------|---------|--------|
+| `operation-similarity-service.ts` | 502 | Operation typo suggestions (Slack send→postMessage) | Extend 06-P1 |
+| `resource-similarity-service.ts` | 522 | Resource typo suggestions (messages→message) | Extend 06-P1 |
+| `type-structure-service.ts` | 428 | Validate 22 NodePropertyTypes (filter, resourceMapper) | Extend 14-P2 |
+
+### Already Implemented in CLI ✅
+
+| MCP Service | Lines | CLI Command | Status |
+|-------------|-------|-------------|--------|
+| `example-generator.ts` | 835 | `n8n nodes show --include-examples` | ✅ Done |
+| `node-documentation-service.ts` | 685 | `n8n nodes show --mode docs` | ✅ Done |
+| `execution-processor.ts` | 388 | `n8n executions get --mode filtered/preview/summary` | ✅ Done |
+| `node-sanitizer.ts` | 362 | Used in `workflows deploy-template`, diff engine | ✅ Done |
+| `workflow-validator.ts` | 1935 | Core of `workflows validate` | ✅ Done |
+| `n8n-validation.ts` | 800 | Integrated in validator | ✅ Done |
 
 ---
 
@@ -158,9 +168,9 @@ Generated from comprehensive feature-parity audit comparing:
 
 | Command | Gap | MCP Reference |
 |---------|-----|---------------|
-| `n8n workflows validate` | Operation/resource suggestions | `operation-similarity-service.ts`, `resource-similarity-service.ts` |
-| `n8n nodes show --examples` | Example generation | `example-generator.ts` |
-| `n8n nodes show --docs` | Enhanced documentation | `node-documentation-service.ts` |
+| `n8n workflows validate` | Operation/resource typo suggestions | `operation-similarity-service.ts`, `resource-similarity-service.ts` |
+
+> **Note:** `--include-examples` and `--mode docs` are already implemented. The only remaining gap is operation/resource similarity suggestions integrated into validation.
 
 ---
 

@@ -28,8 +28,8 @@ import { getLatestRegistryVersion } from '../../core/versioning/breaking-changes
 
 interface ValidateOptions {
   file?: string;
-  profile?: 'minimal' | 'runtime' | 'ai-friendly' | 'strict';
-  mode?: 'minimal' | 'operation' | 'full';
+  validationProfile?: 'minimal' | 'runtime' | 'ai-friendly' | 'strict';
+  validationMode?: 'minimal' | 'operation' | 'full';
   repair?: boolean;
   fix?: boolean;
   validateExpressions?: boolean;
