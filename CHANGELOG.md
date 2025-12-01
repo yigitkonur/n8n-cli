@@ -64,8 +64,7 @@ All notable changes to the n8n CLI will be documented in this file.
 - All commands now properly inherit global options
 
 ### Technical
-- Added `ora` for progress spinners
-- Added `p-retry` for API retry logic (network failures)
+- Implemented built-in API retry logic with exponential backoff (network failures, 5xx errors)
 - Added output context utilities for verbose/quiet handling
 
 ---
