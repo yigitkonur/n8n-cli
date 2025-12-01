@@ -1,6 +1,6 @@
 ---
 trigger: model_decision
-description: you MUST read this rule WHEN working with Supabase/Postgres: migrations, schema changes, RLS policies, database logs, type generation.
+description: you MUST read this rule WHEN working with Supabase/Postgres, migrations, schema changes, RLS policies, database logs, type generation.
 ---
 
 # Supabase Remote MCP

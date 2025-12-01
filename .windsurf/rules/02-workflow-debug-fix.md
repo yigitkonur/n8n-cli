@@ -1,6 +1,6 @@
 ---
 trigger: model_decision
-description: you MUST read this rule WHEN something is broken: errors, exceptions, 'doesn't work', 'used to work', 'expected X got Y', stack traces, wrong output. NOT when: adding features (→01), cleanup (→03), wanting opinion (→04).
+description: you MUST read this rule WHEN something is broken, errors, exceptions, 'doesn't work', 'used to work', 'expected X got Y', stack traces, wrong output. NOT when, adding features (→01), cleanup (→03), wanting opinion (→04).
 ---
 
 # DEBUG & FIX EXISTING ISSUE

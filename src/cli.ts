@@ -7,6 +7,7 @@ import { dirname, join } from 'node:path';
 import { registerShutdownHandlers, shutdown } from './core/lifecycle.js';
 import { disableColors } from './utils/output.js';
 import { setConfigProfile } from './core/config/loader.js';
+import { ExitCode, getExitCode, setExitCode } from './utils/exit-codes.js';
 import type { GlobalOptions } from './types/global-options.js';
 
 // Get package.json for version
@@ -29,6 +30,19 @@ program
   .description('Full-featured n8n CLI - workflow management, validation, node search, and more')
   .version(version, '-V, --version', 'Output version number')
   .helpOption('-h, --help', 'Display help')
+  // Enable proper unknown command handling
+  .allowExcessArguments(false)
+  .showHelpAfterError(false)
+  // Override exit to use POSIX codes
+  .exitOverride((err) => {
+    // Map commander exit codes to POSIX
+    if (err.exitCode === 1) {
+      setExitCode(ExitCode.USAGE); // Usage error = 64
+    } else {
+      setExitCode(err.exitCode as ExitCode);
+    }
+    throw err; // Re-throw for catch block
+  })
   // Global options - available on all commands
   .option('-v, --verbose', 'Enable verbose/debug output')
   .option('-q, --quiet', 'Suppress non-essential output')
@@ -1676,11 +1690,20 @@ Examples:
     await completionCommand(shell, mergeOpts(opts));
   });
 
-// BUG-006: Handle unknown commands with helpful error
+// BUG-006: Handle unknown commands with POSIX USAGE exit code (64)
 program.on('command:*', (operands) => {
   console.error(`error: unknown command '${operands[0]}'`);
   console.error(`Run 'n8n --help' to see available commands.`);
-  process.exitCode = 1;
+  setExitCode(ExitCode.USAGE); // POSIX: 64 = command line usage error
+});
+
+// Configure commander error handling for POSIX compliance
+program.configureOutput({
+  writeErr: (str) => process.stderr.write(str),
+  outputError: (str, write) => {
+    write(str);
+    setExitCode(ExitCode.USAGE); // Usage errors get code 64
+  }
 });
 
 // Default action for 'n8n' without any command - show help with exit 0
@@ -1691,19 +1714,40 @@ program.action(() => {
 // Register shutdown handlers for graceful cleanup
 registerShutdownHandlers();
 
-// Handle unhandled rejections - set exitCode instead of exit() to allow cleanup
+// Handle unhandled rejections with proper POSIX exit codes
 process.on('unhandledRejection', (reason) => {
   console.error('Unhandled rejection:', reason);
-  process.exitCode = 1;
+  setExitCode(getExitCode(reason)); // Map error to appropriate POSIX code
+});
+
+// Handle uncaught exceptions with SOFTWARE exit code (70)
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught exception:', error.message);
+  setExitCode(ExitCode.SOFTWARE); // POSIX: 70 = internal software error
+});
+
+// Handle SIGINT (Ctrl+C) gracefully
+process.on('SIGINT', () => {
+  setExitCode(ExitCode.GENERAL); // Use general error for user interrupt
+  shutdown().finally(() => process.exit());
 });
 
 // Parse and execute (async to properly await all command handlers)
 (async () => {
   try {
     await program.parseAsync(process.argv);
-  } catch (error) {
-    console.error(error);
-    process.exitCode = 1;
+  } catch (error: unknown) {
+    // Commander errors are already handled via exitOverride
+    const isCommanderError = error instanceof Error && 'code' in error && 
+      typeof (error as { code: string }).code === 'string' &&
+      (error as { code: string }).code.startsWith('commander.');
+    
+    if (!isCommanderError) {
+      // Only log non-commander errors (commander already outputs its errors)
+      console.error(error);
+      setExitCode(getExitCode(error)); // Map error to appropriate POSIX code
+    }
+    // Exit code already set by exitOverride for commander errors
   } finally {
     // Ensure cleanup runs on normal completion
     await shutdown();

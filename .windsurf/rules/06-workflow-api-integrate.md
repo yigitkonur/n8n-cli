@@ -1,6 +1,6 @@
 ---
 trigger: model_decision
-description: you MUST read this rule WHEN connecting to external service: 'integrate Stripe', 'add OAuth', 'call their API', 'webhook from', 'send to', 'pull from'.
+description: you MUST read this rule WHEN connecting to external service, 'integrate Stripe', 'add OAuth', 'call their API', 'webhook from', 'send to', 'pull from'.
 ---
 
 # INTEGRATE EXTERNAL API / SERVICE

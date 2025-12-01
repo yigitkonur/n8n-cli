@@ -1,6 +1,6 @@
 ---
 trigger: model_decision
-description: you MUST read this rule WHEN code works but needs restructuring: 'refactor', 'clean up', 'DRY', 'consolidate', 'modernize', 'too messy'. NOT when: bugs exist (→02), adding features (→01).
+description: you MUST read this rule WHEN code works but needs restructuring, 'refactor', 'clean up', 'DRY', 'consolidate', 'modernize', 'too messy'. NOT when, bugs exist (→02), adding features (→01).
 ---
 
 # REFACTOR / MODERNIZE EXISTING CODEBASE

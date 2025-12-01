@@ -1,6 +1,6 @@
 ---
 trigger: model_decision
-description: you MUST read this rule WHEN answer is outside codebase: 'best practice?', 'X vs Y?', unfamiliar technology, architecture decisions, need community opinions. NOT when: codebase questions (→10).
+description: you MUST read this rule WHEN answer is outside codebase, 'best practice?', 'X vs Y?', unfamiliar technology, architecture decisions, need community opinions. NOT when, codebase questions (→10).
 ---
 
 # Research Powerpack MCP

@@ -1,6 +1,6 @@
 ---
 trigger: model_decision
-description: you MUST read this rule WHEN starting new project AND user provides NO docs/URLs/specs: 'build me an app', 'new project', 'from scratch' with empty folder and zero guidance.
+description: you MUST read this rule WHEN starting new project AND user provides NO docs/URLs/specs, 'build me an app', 'new project', 'from scratch' with empty folder and zero guidance.
 ---
 
 # BUILD NEW PROJECT FROM SCRATCH (NO RESOURCES)

@@ -1,6 +1,6 @@
 ---
 trigger: model_decision
-description: you MUST read this rule WHEN starting new project AND user provides docs/URLs/specs: 'follow this guide', 'based on these docs', 'here's the API', user shares links or tutorials.
+description: you MUST read this rule WHEN starting new project AND user provides docs/URLs/specs, 'follow this guide', 'based on these docs', 'here's the API', user shares links or tutorials.
 ---
 
 # BUILD NEW PROJECT WITH PROVIDED DOCS

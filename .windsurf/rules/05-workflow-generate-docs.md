@@ -1,6 +1,6 @@
 ---
 trigger: model_decision
-description: you MUST read this rule WHEN user needs documentation: 'write README', 'document this', 'explain to new devs', 'API docs', 'add comments', 'how does this work?'.
+description: you MUST read this rule WHEN user needs documentation, 'write README', 'document this', 'explain to new devs', 'API docs', 'add comments', 'how does this work?'.
 ---
 
 # GENERATE DOCUMENTATION

@@ -84,7 +84,10 @@ export async function auditCommand(opts: AuditOptions): Promise<void> {
     const categories = parseCategories(opts.categories);
     const daysAbandoned = opts.daysAbandoned ? parseInt(opts.daysAbandoned, 10) : undefined;
     
-    console.log(chalk.dim('  Generating security audit...'));
+    // Only show progress message for human output (not JSON)
+    if (!opts.json) {
+      console.log(chalk.dim('  Generating security audit...'));
+    }
     
     const report = await client.generateAudit({
       additionalOptions: {

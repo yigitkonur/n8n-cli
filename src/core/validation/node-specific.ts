@@ -457,14 +457,157 @@ export class NodeSpecificValidators {
         fix: 'Use $getWorkflowStaticData("global") or $getWorkflowStaticData("node") directly',
       });
     }
+
+    // SQL injection pattern detection in Code nodes
+    this.checkCodeForSQLInjection(code, warnings);
+  }
+
+  /**
+   * Check code for potential SQL injection patterns
+   * Detects: template literals, string concat, UNION injection, comment injection, boolean injection
+   */
+  private static checkCodeForSQLInjection(code: string, warnings: ValidationWarning[]): void {
+    // SQL keywords that indicate query building
+    const sqlKeywords = /\b(SELECT|INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|TRUNCATE)\b/i;
+    
+    // Pattern 1: Template literal with variable interpolation containing SQL
+    const templateSqlPattern = /`[^`]*\b(SELECT|INSERT|UPDATE|DELETE|DROP)\b[^`]*\$\{[^}]+\}[^`]*`/i;
+    
+    // Pattern 2: String concatenation with SQL keywords
+    const concatSqlPattern = /['"][^'"]*\b(SELECT|INSERT|UPDATE|DELETE|DROP)\b[^'"]*['"]\s*\+/i;
+    const concatSqlPattern2 = /\+\s*['"][^'"]*\b(SELECT|INSERT|UPDATE|DELETE|DROP|WHERE|AND|OR)\b/i;
+    
+    // Pattern 3: UNION SELECT injection (common attack vector)
+    const unionInjection = /UNION\s+(ALL\s+)?SELECT/i;
+    
+    // Pattern 4: Comment injection (-- or /* */)
+    const commentInjection = /['"];\s*--/;
+    const blockCommentInjection = /\/\*[\s\S]*?\*\//;
+    
+    // Pattern 5: Boolean injection (OR 1=1, AND 1=0)
+    const booleanInjection = /\bOR\s+['"]?1['"]?\s*=\s*['"]?1['"]?/i;
+    const booleanInjection2 = /\bAND\s+['"]?1['"]?\s*=\s*['"]?0['"]?/i;
+    
+    // Pattern 6: MySQL CONCAT with variables
+    const concatFunction = /CONCAT\s*\([^)]*\$\{/i;
+    
+    if (sqlKeywords.test(code)) {
+      // Check template literal injection
+      if (templateSqlPattern.test(code)) {
+        warnings.push({
+          type: 'security',
+          property: 'jsCode',
+          message: 'Code contains SQL query with template literal interpolation - potential SQL injection vulnerability',
+          suggestion: 'Use parameterized queries instead of string interpolation (e.g., db.query("SELECT * FROM users WHERE id = ?", [userId]))',
+        });
+      }
+      
+      // Check string concatenation
+      if (concatSqlPattern.test(code) || concatSqlPattern2.test(code)) {
+        warnings.push({
+          type: 'security',
+          property: 'jsCode',
+          message: 'Code contains SQL query built with string concatenation - potential SQL injection vulnerability',
+          suggestion: 'Use parameterized queries instead of string concatenation',
+        });
+      }
+      
+      // Check UNION SELECT (highly suspicious)
+      if (unionInjection.test(code)) {
+        warnings.push({
+          type: 'security',
+          property: 'jsCode',
+          message: 'Code contains UNION SELECT pattern - common SQL injection attack vector',
+          suggestion: 'UNION SELECT in dynamic queries is dangerous. Use parameterized queries or ORM.',
+        });
+      }
+      
+      // Check comment injection
+      if (commentInjection.test(code) || blockCommentInjection.test(code)) {
+        warnings.push({
+          type: 'security',
+          property: 'jsCode',
+          message: 'Code contains SQL comment pattern that may indicate injection vulnerability',
+          suggestion: 'Avoid building queries with user input that could contain SQL comments (-- or /* */)',
+        });
+      }
+      
+      // Check boolean injection
+      if (booleanInjection.test(code) || booleanInjection2.test(code)) {
+        warnings.push({
+          type: 'security',
+          property: 'jsCode',
+          message: 'Code contains boolean injection pattern (OR 1=1 or AND 1=0) - classic SQL injection',
+          suggestion: 'Never use boolean conditions with user input. Use parameterized queries.',
+        });
+      }
+      
+      // Check MySQL CONCAT
+      if (concatFunction.test(code)) {
+        warnings.push({
+          type: 'security',
+          property: 'jsCode',
+          message: 'Code uses CONCAT() with variable interpolation - potential SQL injection',
+          suggestion: 'Use parameterized queries instead of CONCAT() with variables',
+        });
+      }
+    }
+  }
+
+  /**
+   * Check Python code for SQL injection patterns (f-strings, format(), %)
+   */
+  private static checkPythonForSQLInjection(code: string, warnings: ValidationWarning[]): void {
+    const sqlKeywords = /\b(SELECT|INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|TRUNCATE)\b/i;
+    
+    if (!sqlKeywords.test(code)) return;
+    
+    // Python f-string with SQL: f"SELECT * FROM users WHERE id = {user_id}"
+    const fStringPattern = /f['"]\s*[^'"]*\b(SELECT|INSERT|UPDATE|DELETE|DROP)\b[^'"]*\{[^}]+\}[^'"]*['"]/i;
+    
+    // Python .format() with SQL: "SELECT * FROM users WHERE id = {}".format(user_id)
+    const formatPattern = /['"]\s*[^'"]*\b(SELECT|INSERT|UPDATE|DELETE|DROP)\b[^'"]*\{\}[^'"]*['"]\.format\(/i;
+    
+    // Python % formatting: "SELECT * FROM users WHERE id = %s" % user_id
+    const percentPattern = /['"]\s*[^'"]*\b(SELECT|INSERT|UPDATE|DELETE|DROP)\b[^'"]*%[sd][^'"]*['"]\s*%/i;
+    
+    if (fStringPattern.test(code)) {
+      warnings.push({
+        type: 'security',
+        property: 'pythonCode',
+        message: 'Python f-string contains SQL query with variable interpolation - potential SQL injection',
+        suggestion: 'Use parameterized queries: cursor.execute("SELECT * FROM users WHERE id = %s", (user_id,))',
+      });
+    }
+    
+    if (formatPattern.test(code)) {
+      warnings.push({
+        type: 'security',
+        property: 'pythonCode',
+        message: 'Python .format() used with SQL query - potential SQL injection',
+        suggestion: 'Use parameterized queries instead of .format()',
+      });
+    }
+    
+    if (percentPattern.test(code)) {
+      warnings.push({
+        type: 'security',
+        property: 'pythonCode',
+        message: 'Python % formatting used with SQL query - potential SQL injection',
+        suggestion: 'Use parameterized queries: cursor.execute("SELECT * FROM users WHERE id = %s", (user_id,))',
+      });
+    }
   }
 
   private static validatePythonCode(
     code: string,
     errors: ValidationError[],
-    _warnings: ValidationWarning[],
+    warnings: ValidationWarning[],
     _suggestions: string[]
   ): void {
+    // Check for SQL injection in Python f-strings
+    this.checkPythonForSQLInjection(code, warnings);
+    
     // Check for unavailable imports
     const unavailableImports = ['requests', 'pandas', 'numpy', 'pip'];
     for (const module of unavailableImports) {
@@ -507,8 +650,8 @@ export class NodeSpecificValidators {
     const { config, errors, warnings: _warnings, suggestions, autofix: _autofix } = context;
     const operation = config.operation as string | undefined;
 
-    // Common query validation
-    if (['execute', 'select', 'insert', 'update', 'delete'].includes(operation || '')) {
+    // Common query validation - check any operation that involves SQL
+    if (['execute', 'executeQuery', 'select', 'insert', 'update', 'delete'].includes(operation || '') || config.query) {
       this.validateSQLQuery(context, 'postgres');
     }
 
@@ -558,8 +701,8 @@ export class NodeSpecificValidators {
     const { config, errors, warnings: _warnings, suggestions } = context;
     const operation = config.operation as string | undefined;
 
-    // Similar to Postgres
-    if (['execute', 'insert', 'update', 'delete'].includes(operation || '')) {
+    // Similar to Postgres - check any operation that involves SQL
+    if (['execute', 'executeQuery', 'select', 'insert', 'update', 'delete'].includes(operation || '') || config.query) {
       this.validateSQLQuery(context, 'mysql');
     }
 

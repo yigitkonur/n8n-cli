@@ -1,6 +1,6 @@
 ---
 trigger: model_decision
-description: you MUST read this rule WHEN editing any file or when tracing code flow ('how does X work?', 'where is Y defined?', 'what calls Z?'). NOT when: read-only exploration (→15).
+description: you MUST read this rule WHEN editing any file or when tracing code flow ('how does X work?', 'where is Y defined?', 'what calls Z?'). NOT when, read-only exploration (→15).
 ---
 
 # Morph MCP Tools

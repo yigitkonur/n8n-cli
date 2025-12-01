@@ -15,6 +15,7 @@ import { formatNextActions } from '../../core/formatters/next-actions.js';
 import { saveToJson, outputJson } from '../../core/formatters/json.js';
 import { icons } from '../../core/formatters/theme.js';
 import { printError, N8nApiError } from '../../utils/errors.js';
+import { ExitCode, setExitCode, getExitCode } from '../../utils/exit-codes.js';
 import { getSimilarityService } from '../../core/similarity/index.js';
 import { getNodeRepository } from '../../core/db/nodes.js';
 import type { ValidationIssue } from '../../core/types.js';
@@ -63,7 +64,7 @@ export async function workflowsValidateCommand(idOrFile: string | undefined, opt
       
       if (!workflow) {
         console.error(chalk.red(`\n${icons.error} Failed to parse workflow JSON from ${filePath}`));
-        process.exitCode = 1;
+        setExitCode(ExitCode.DATAERR); // POSIX 65: Data format error
         return;
       }
     } else if (idOrFile) {
@@ -73,7 +74,7 @@ export async function workflowsValidateCommand(idOrFile: string | undefined, opt
       workflow = await client.getWorkflow(idOrFile);
     } else {
       console.error(chalk.red(`\n${icons.error} Please provide a workflow ID or --file path`));
-      process.exitCode = 1;
+      setExitCode(ExitCode.USAGE); // POSIX 64: Usage error
       return;
     }
     
@@ -116,8 +117,9 @@ export async function workflowsValidateCommand(idOrFile: string | undefined, opt
           }
         }
       }
-    } catch {
+    } catch (err) {
       // Similarity service unavailable - continue without suggestions
+      // Debug: uncomment to see error: console.error('Similarity error:', err);
     }
     
     // Validate with enhanced validation when profile or mode is specified
@@ -180,7 +182,7 @@ export async function workflowsValidateCommand(idOrFile: string | undefined, opt
           },
         }),
       });
-      process.exitCode = result.valid && errors.length === 0 ? 0 : 1;
+      setExitCode(result.valid && errors.length === 0 ? ExitCode.SUCCESS : ExitCode.DATAERR);
       return;
     }
     
@@ -358,15 +360,15 @@ export async function workflowsValidateCommand(idOrFile: string | undefined, opt
       }
     }
     
-    process.exitCode = isValid ? 0 : 1;
+    setExitCode(isValid ? ExitCode.SUCCESS : ExitCode.DATAERR);
     
   } catch (error) {
     if (error instanceof N8nApiError) {
-      printError(error);
+      printError(error, false, 'validate');
     } else {
       console.error(chalk.red(`\n${icons.error} Error: ${(error as Error).message}`));
     }
-    process.exitCode = 1;
+    setExitCode(getExitCode(error)); // Map to appropriate POSIX code
   }
 }
 

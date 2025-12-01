@@ -248,10 +248,10 @@ export function validateWorkflowStructure(data: unknown, options?: ValidateOptio
           issues.push(issue);
           nodeTypeIssues.push(issue.message);
         } else if (suggestions && suggestions.length > 0) {
-          // Unknown node type with suggestions available
+          // Unknown node type with suggestions available - treat as error so valid:false
           const issue = enrichWithSourceInfo({
             code: 'UNKNOWN_NODE_TYPE',
-            severity: 'warning',
+            severity: 'error',
             message: `Node "${nodeName}" has unknown type "${node.type}"`,
             location: { ...baseLocation, path: `${nodePath}.type` },
             context: { value: node.type, fullObject: node },
@@ -259,6 +259,7 @@ export function validateWorkflowStructure(data: unknown, options?: ValidateOptio
             hint: hintText,
           }, sourceMap, `${nodePath}.type`);
           issues.push(issue);
+          errors.push(issue.message);
           nodeTypeIssues.push(issue.message);
         }
       }
@@ -351,6 +352,18 @@ export function validateWorkflowStructure(data: unknown, options?: ValidateOptio
           const relativePath = nativeIssue.location?.path ?? '';
           const fullPath = relativePath ? `${nodePath}.${relativePath}` : nodePath;
 
+          // Add suggestions to UNKNOWN_NODE_TYPE issues if available
+          let suggestions = nativeIssue.suggestions;
+          let hint = nativeIssue.hint;
+          if (nativeIssue.code === 'UNKNOWN_NODE_TYPE' && options?.nodeSuggestions) {
+            const nodeSuggestions = options.nodeSuggestions.get(node.type);
+            if (nodeSuggestions && nodeSuggestions.length > 0) {
+              suggestions = nodeSuggestions;
+              const topSuggestion = nodeSuggestions[0];
+              hint = `Did you mean: ${topSuggestion.value}? (${Math.round(topSuggestion.confidence * 100)}% match)`;
+            }
+          }
+
           const enriched = enrichWithSourceInfo(
             {
               code: nativeIssue.code,
@@ -359,7 +372,8 @@ export function validateWorkflowStructure(data: unknown, options?: ValidateOptio
               location: { ...baseLocation, ...nativeIssue.location, path: fullPath },
               context: nativeIssue.context,
               validAlternatives: nativeIssue.validAlternatives,
-              hint: nativeIssue.hint,
+              suggestions,
+              hint,
             },
             sourceMap,
             fullPath,

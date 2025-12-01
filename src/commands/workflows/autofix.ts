@@ -229,6 +229,14 @@ export async function workflowsAutofixCommand(idOrFile: string, opts: AutofixOpt
       workflow = result.workflow;
     }
     
+    // Save to file if --save option provided (works with both --json and human output)
+    let savedPath: string | undefined;
+    if (opts.save) {
+      const workflowToSave = result.workflow || workflow;
+      const saveResult = await saveToJson(workflowToSave, { path: opts.save, silent: opts.json });
+      savedPath = saveResult.path;
+    }
+    
     // JSON output
     if (opts.json) {
       // Generate guidance for JSON output
@@ -237,6 +245,7 @@ export async function workflowsAutofixCommand(idOrFile: string, opts: AutofixOpt
       
       outputJson({
         success: true,
+        savedTo: savedPath,
         workflow: {
           id: workflow.id,
           name: workflow.name,
@@ -337,11 +346,9 @@ export async function workflowsAutofixCommand(idOrFile: string, opts: AutofixOpt
     // Determine if --force or --yes was passed
     const forceFlag = opts.force || opts.yes;
     
-    // Save if requested
-    if (opts.save) {
-      const workflowToSave = result.workflow || workflow;
-      await saveToJson(workflowToSave, { path: opts.save });
-      console.log(chalk.green(`  ${icons.success} Saved to ${opts.save}`));
+    // Show save confirmation (save already happened above, just show message for human output)
+    if (savedPath) {
+      console.log(chalk.green(`  ${icons.success} Saved to ${savedPath}`));
     } else if (isFile && shouldApply && result.fixes.length > 0) {
       // Confirm before file mutation
       displayChangeSummary({

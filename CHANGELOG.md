@@ -2,6 +2,64 @@
 
 All notable changes to the n8n CLI will be documented in this file.
 
+## [1.9.0] - 2024-12-01
+
+### Added
+
+#### POSIX Exit Codes
+- Implemented POSIX-compliant exit codes for better CI/CD integration
+  - `0` (SUCCESS): Command completed successfully
+  - `64` (USAGE): Command line usage error (unknown command, bad args)
+  - `65` (DATAERR): Data format error (invalid workflow, validation failure)
+  - `66` (NOINPUT): Cannot open input file (file not found)
+  - `69` (UNAVAILABLE): Service unavailable (network error)
+  - `70` (SOFTWARE): Internal software error
+- New utility: `src/utils/exit-codes.ts` with `ExitCode` enum and helpers
+
+#### JSON Schema Documentation
+- New `docs/json-schemas/` directory with comprehensive documentation
+- Documented output schemas for: workflows, nodes, executions, audit, templates
+- Added TypeScript interfaces for all JSON outputs
+- Included `jq` recipes for common data extraction patterns
+
+#### SQL Injection Detection Enhancements
+- Added 6 new detection patterns:
+  - `UNION SELECT` injection attacks
+  - SQL comment injection (`--` and `/* */`)
+  - Boolean injection (`OR 1=1`, `AND 1=0`)
+  - MySQL `CONCAT()` with variables
+  - Python f-string SQL interpolation
+  - Python `.format()` and `%` formatting with SQL
+
+#### Short-Form Node Type Resolution
+- `n8n nodes show httpRequest` now works (resolves to `nodes-base.httpRequest`)
+- Supports common prefixes: `nodes-base.`, `nodes-langchain.`
+- Graceful fallback with search suggestions on failure
+
+### Improvements
+- Exit code handling in CLI core with proper signal handlers (SIGINT, SIGTERM)
+- Commander.js configured for proper unknown command handling
+- Better error categorization with `ErrorCategory` enum
+
+## [1.8.4] - 2024-12-01
+
+### Bug Fixes
+- **autofix --save**: Fixed `--save` flag not creating output file when used with `--json`
+- **validation**: Unknown node types now return `valid: false` instead of `valid: true`
+- **audit --json**: Fixed leading "Generating security audit..." text breaking JSON parsing
+- **SQL injection detection**: Fixed operation name check (now includes `executeQuery`)
+
+### Security
+- **SQL injection detection**: Added detection for Postgres, MySQL, and Code nodes
+  - Template literal interpolation (`${variable}`) in SQL queries
+  - String concatenation in SQL queries
+  - n8n expression syntax (`{{ $json.value }}`) in database queries
+  - DROP/DELETE without WHERE warnings
+
+### Improvements
+- Node-specific validators now trigger for all SQL-related operations
+- Enhanced validation warnings include property field for better deduplication
+
 ## [1.8.0] - 2024-12-01
 
 ### Added

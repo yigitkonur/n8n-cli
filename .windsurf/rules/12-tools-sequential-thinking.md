@@ -1,6 +1,6 @@
 ---
 trigger: model_decision
-description: you MUST read this rule WHEN problem needs reasoning through: complex planning, multiple hypotheses, architecture decisions, tradeoff evaluation. MANDATORY when: before git ops, before marking complete, choosing between approaches.
+description: you MUST read this rule WHEN problem needs reasoning through, complex planning, multiple hypotheses, architecture decisions, tradeoff evaluation. MANDATORY when, before git ops, before marking complete, choosing between approaches.
 ---
 
 # Sequential Thinking MCP

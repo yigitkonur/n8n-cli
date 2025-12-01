@@ -1,6 +1,6 @@
 ---
 trigger: model_decision
-description: you MUST read this rule WHEN user wants opinion only: 'review this', 'is this good?', 'any issues?', 'check my code', 'before I merge', 'what do you think?'.
+description: you MUST read this rule WHEN user wants opinion only, 'review this', 'is this good?', 'any issues?', 'check my code', 'before I merge', 'what do you think?'.
 ---
 
 # CODE REVIEW & QUALITY EVALUATION

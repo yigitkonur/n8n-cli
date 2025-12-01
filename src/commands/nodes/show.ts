@@ -31,17 +31,42 @@ export async function nodesShowCommand(nodeType: string, opts: ShowOptions): Pro
   try {
     const repo = await getNodeRepository();
     
-    // Normalize node type
-    let normalizedType = nodeType;
-    if (!nodeType.includes('.')) {
-      normalizedType = `nodes-base.${nodeType.toLowerCase()}`;
-    } else {
-      normalizedType = NodeTypeNormalizer.normalizeToShortForm(nodeType);
+    // Resolve short-form node types to full form
+    let node: NodeInfo | null = null;
+    const searchPrefixes = [
+      'nodes-base.',
+      'nodes-langchain.',
+      'nodes-langchain.tool',
+    ];
+    
+    // Try direct lookup first (full type or already normalized)
+    let normalizedType = nodeType.includes('.') 
+      ? NodeTypeNormalizer.normalizeToShortForm(nodeType)
+      : nodeType;
+    
+    node = repo.getNode(normalizedType);
+    
+    // If not found and short-form, try common prefixes
+    if (!node && !nodeType.includes('.')) {
+      for (const prefix of searchPrefixes) {
+        // Try exact case first
+        const candidate = `${prefix}${nodeType}`;
+        node = repo.getNode(candidate);
+        if (node) {
+          normalizedType = candidate;
+          break;
+        }
+        // Try lowercase
+        const candidateLower = `${prefix}${nodeType.toLowerCase()}`;
+        node = repo.getNode(candidateLower);
+        if (node) {
+          normalizedType = candidateLower;
+          break;
+        }
+      }
     }
     
-    let node = repo.getNode(normalizedType);
-    
-    // Fallback to original input
+    // Final fallback to original input
     if (!node && normalizedType !== nodeType) {
       node = repo.getNode(nodeType);
     }

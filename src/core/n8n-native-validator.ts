@@ -43,7 +43,7 @@ export function validateNodeWithN8n(node: WorkflowNode): ValidationIssue[] {
   if (!nodeTypeDescription) {
     issues.push({
       code: 'UNKNOWN_NODE_TYPE',
-      severity: 'warning',
+      severity: 'error',
       message: `Unknown node type: ${node.type}`,
       location: {
         nodeName: node.name,

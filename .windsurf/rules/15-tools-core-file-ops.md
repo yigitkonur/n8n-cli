@@ -1,6 +1,6 @@
 ---
 trigger: model_decision
-description: you MUST read this rule WHEN reading or searching files without modification: exploring structure, finding files, searching content. NOT when: editing files (→10).
+description: you MUST read this rule WHEN reading or searching files without modification, exploring structure, finding files, searching content. NOT when, editing files (→10).
 ---
 
 # Core File Operations
