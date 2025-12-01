@@ -1,6 +1,6 @@
 ---
 trigger: model_decision
-description: you MUST read this rule WHEN user says 'add', 'implement', 'create', 'build', 'I need', 'make it do' AND codebase already exists. NOT when, broken (→02), empty project (→07/08), restructuring (→03).
+description: you MUST read this rule WHEN user says 'add', 'implement', 'create', 'build', 'I need', 'make it do' AND codebase already exists. NOT when, broken (→02), empty project (→07/08), restructuring (→03)
 ---
 
 # BUILD FEATURE ON EXISTING CODEBASE

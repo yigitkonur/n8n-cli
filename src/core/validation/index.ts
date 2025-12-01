@@ -51,6 +51,8 @@ export {
   applyProfileFilters,
   generateNextSteps,
   deduplicateErrors,
+  filterIssuesByProfile,
+  filterErrorsByProfile,
 } from './profile-filter.js';
 
 // ========== Expression Validation ==========

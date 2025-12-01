@@ -12,6 +12,7 @@ import type {
   ValidationError,
   ValidationWarning,
 } from './types.js';
+import type { ValidationIssue } from '../types.js';
 
 /**
  * Check if a warning should be filtered out (hardcoded credentials shown only in strict mode)
@@ -232,4 +233,150 @@ export function deduplicateErrors(errors: ValidationError[]): ValidationError[] 
   }
 
   return Array.from(seen.values());
+}
+
+// ========== Issue-Based Profile Filtering ==========
+
+/**
+ * Map issue codes to their category for filtering
+ */
+function categorizeIssue(issue: ValidationIssue): 'structural' | 'runtime' | 'security' | 'best_practice' | 'info' {
+  const code = issue.code || '';
+  
+  // Structural errors - always included
+  if (code.includes('MISSING_') || code.includes('INVALID_')) {
+    return 'structural';
+  }
+  
+  // Security issues
+  if (code.includes('SECURITY') || code.includes('INJECTION') || code.includes('EVAL') || 
+      issue.message?.toLowerCase().includes('security') ||
+      issue.message?.toLowerCase().includes('eval')) {
+    return 'security';
+  }
+  
+  // Runtime issues (node type, connection, expression)
+  if (code.includes('NODE_TYPE') || code.includes('CONNECTION') || code.includes('EXPRESSION')) {
+    return 'runtime';
+  }
+  
+  // AI validation info messages
+  if (issue.severity === 'info' || code === 'AI_VALIDATION_ERROR') {
+    return 'info';
+  }
+  
+  // Best practice warnings
+  if (code.includes('DEPRECATED') || code.includes('BEST_PRACTICE') || code.includes('ENHANCED_')) {
+    return 'best_practice';
+  }
+  
+  return 'runtime';
+}
+
+/**
+ * Filter ValidationIssue[] based on validation profile
+ * 
+ * Profiles:
+ * - minimal: Only structural errors + critical security warnings
+ * - runtime: Structural + runtime errors, security warnings (DEFAULT for CLI)
+ * - ai-friendly: All errors + best practice warnings (DEFAULT for AI agents)
+ * - strict: Everything including info-level suggestions
+ * 
+ * @param issues - Array of validation issues to filter
+ * @param profile - The validation profile to apply
+ * @returns Filtered array of issues
+ */
+export function filterIssuesByProfile(
+  issues: ValidationIssue[],
+  profile: ValidationProfile
+): ValidationIssue[] {
+  return issues.filter(issue => {
+    const category = categorizeIssue(issue);
+    
+    switch (profile) {
+      case 'minimal':
+        // Only structural errors and critical security warnings
+        if (issue.severity === 'error') {
+          return category === 'structural';
+        }
+        if (issue.severity === 'warning') {
+          return category === 'security';
+        }
+        return false;
+        
+      case 'runtime':
+        // Structural + runtime errors, security warnings
+        if (issue.severity === 'error') {
+          return category === 'structural' || category === 'runtime';
+        }
+        if (issue.severity === 'warning') {
+          return category === 'security';
+        }
+        return false;
+        
+      case 'ai-friendly':
+        // All errors + best practice warnings, skip info unless AI-related
+        if (issue.severity === 'error') {
+          return true;
+        }
+        if (issue.severity === 'warning') {
+          return true;
+        }
+        // Include AI-specific info messages
+        if (issue.severity === 'info' && issue.code?.startsWith('AI_')) {
+          return true;
+        }
+        return false;
+        
+      case 'strict':
+        // Everything
+        return true;
+        
+      default:
+        return true;
+    }
+  });
+}
+
+/**
+ * Filter string arrays (errors[], warnings[]) based on profile
+ * Simpler version for backward compatibility
+ */
+export function filterErrorsByProfile(
+  errors: string[],
+  warnings: string[],
+  profile: ValidationProfile
+): { errors: string[]; warnings: string[] } {
+  // Convert strings to pseudo-issues for categorization
+  const categorizeString = (msg: string, severity: 'error' | 'warning'): 'keep' | 'filter' => {
+    const msgLower = msg.toLowerCase();
+    
+    switch (profile) {
+      case 'minimal':
+        if (severity === 'error') {
+          return msgLower.includes('missing') || msgLower.includes('required') ? 'keep' : 'filter';
+        }
+        return msgLower.includes('security') ? 'keep' : 'filter';
+        
+      case 'runtime':
+        if (severity === 'error') {
+          return 'keep'; // Keep all runtime errors
+        }
+        return msgLower.includes('security') || msgLower.includes('deprecated') ? 'keep' : 'filter';
+        
+      case 'ai-friendly':
+        return 'keep'; // Keep all errors and warnings
+        
+      case 'strict':
+        return 'keep';
+        
+      default:
+        return 'keep';
+    }
+  };
+  
+  return {
+    errors: errors.filter(e => categorizeString(e, 'error') === 'keep'),
+    warnings: warnings.filter(w => categorizeString(w, 'warning') === 'keep'),
+  };
 }

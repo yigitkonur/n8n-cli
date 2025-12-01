@@ -86,7 +86,11 @@ export class NodeSimilarityService {
       { pattern: 'htprequest', suggestion: 'n8n-nodes-base.httpRequest', confidence: 0.85, reason: 'Likely typo' },
       { pattern: 'httpreqest', suggestion: 'n8n-nodes-base.httpRequest', confidence: 0.85, reason: 'Likely typo' },
       { pattern: 'webook', suggestion: 'n8n-nodes-base.webhook', confidence: 0.85, reason: 'Likely typo' },
+      { pattern: 'webhok', suggestion: 'n8n-nodes-base.webhook', confidence: 0.9, reason: 'Likely typo' },
+      { pattern: 'webbhook', suggestion: 'n8n-nodes-base.webhook', confidence: 0.85, reason: 'Likely typo' },
+      { pattern: 'webhhook', suggestion: 'n8n-nodes-base.webhook', confidence: 0.85, reason: 'Likely typo' },
       { pattern: 'slak', suggestion: 'n8n-nodes-base.slack', confidence: 0.85, reason: 'Likely typo' },
+      { pattern: 'slck', suggestion: 'n8n-nodes-base.slack', confidence: 0.85, reason: 'Likely typo' },
       { pattern: 'gogle', suggestion: 'n8n-nodes-base.google', confidence: 0.8, reason: 'Likely typo' },
       { pattern: 'telegramm', suggestion: 'n8n-nodes-base.telegram', confidence: 0.85, reason: 'Likely typo' },
     ]);
@@ -153,16 +157,24 @@ export class NodeSimilarityService {
   private checkCommonMistakes(invalidType: string): NodeSuggestion | null {
     const cleanType = invalidType.trim();
     const lowerType = cleanType.toLowerCase();
+    
+    // Extract just the node name for matching (e.g., "n8n-nodes-base.webhok" -> "webhok")
+    const nodeName = cleanType.includes('.') ? cleanType.split('.').pop() || cleanType : cleanType;
+    const nodeNameLower = nodeName.toLowerCase();
 
     // Check all pattern categories
     for (const [category, patterns] of this.commonMistakes) {
       for (const pattern of patterns) {
         // Case-insensitive match for most, case-sensitive for case_variations
-        const match = category === 'case_variations'
+        // Match against both full type and extracted node name
+        const fullMatch = category === 'case_variations'
           ? cleanType === pattern.pattern
           : lowerType === pattern.pattern.toLowerCase();
+        const nameMatch = category === 'case_variations'
+          ? nodeName === pattern.pattern
+          : nodeNameLower === pattern.pattern.toLowerCase();
 
-        if (match && pattern.suggestion) {
+        if ((fullMatch || nameMatch) && pattern.suggestion) {
           const node = this.repository.getNode(pattern.suggestion);
           if (node) {
             return {

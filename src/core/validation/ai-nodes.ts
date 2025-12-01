@@ -181,8 +181,10 @@ export function validateAIAgent(
       code: 'TOO_MANY_LANGUAGE_MODELS'
     });
   } else if (languageModelConnections.length === 2) {
-    // Check if fallback is enabled
-    if (!params.needsFallback) {
+    // Check if fallback is enabled - check both locations where needsFallback can be set
+    const needsFallback = params.needsFallback === true || 
+                          (params.options as Record<string, unknown> | undefined)?.needsFallback === true;
+    if (!needsFallback) {
       issues.push({
         severity: 'warning',
         nodeId: node.id,
@@ -190,14 +192,19 @@ export function validateAIAgent(
         message: `AI Agent "${nodeName}" has 2 language models but needsFallback is not enabled. Set needsFallback=true or remove the second model.`
       });
     }
-  } else if (languageModelConnections.length === 1 && params.needsFallback === true) {
-    issues.push({
-      severity: 'error',
-      nodeId: node.id,
-      nodeName,
-      message: `AI Agent "${nodeName}" has needsFallback=true but only 1 language model connected. Connect a second model for fallback or disable needsFallback.`,
-      code: 'FALLBACK_MISSING_SECOND_MODEL'
-    });
+  } else if (languageModelConnections.length === 1) {
+    // Check if fallback is enabled but only 1 model connected - check both locations
+    const needsFallback = params.needsFallback === true || 
+                          (params.options as Record<string, unknown> | undefined)?.needsFallback === true;
+    if (needsFallback) {
+      issues.push({
+        severity: 'error',
+        nodeId: node.id,
+        nodeName,
+        message: `AI Agent "${nodeName}" has needsFallback=true but only 1 language model connected. Connect a second model for fallback or disable needsFallback.`,
+        code: 'FALLBACK_MISSING_SECOND_MODEL'
+      });
+    }
   }
 
   // 2. Validate output parser configuration
@@ -359,7 +366,8 @@ export function validateChatTrigger(
   const nodeName = node.name || 'Unnamed Chat Trigger';
   const params = node.parameters || {};
   const options = params.options as Record<string, unknown> | undefined;
-  const responseMode = options?.responseMode || 'lastNode';
+  // Check both possible locations for responseMode/mode - different n8n versions use different paths
+  const responseMode = options?.responseMode || params.mode || params.responseMode || 'lastNode';
 
   // Get outgoing main connections from Chat Trigger
   const nodeConnections = workflow.connections[nodeName] as Record<string, unknown[][]> | undefined;

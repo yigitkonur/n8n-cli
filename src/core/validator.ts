@@ -3,7 +3,7 @@ import { createSourceMap, findSourceLocation, extractSnippet, type SourceMap } f
 import { validateNodeWithN8n } from './n8n-native-validator.js';
 import { NodeVersionService } from './versioning/index.js';
 import { hasAINodes, validateAISpecificNodes } from './validation/ai-nodes.js';
-import { ExpressionFormatValidator, EnhancedConfigValidator, type EnhancedValidationResult } from './validation/index.js';
+import { ExpressionFormatValidator, EnhancedConfigValidator, filterIssuesByProfile, filterErrorsByProfile, type EnhancedValidationResult } from './validation/index.js';
 import { nodeRegistry } from './n8n-loader.js';
 
 interface IssueBuilder {
@@ -658,11 +658,23 @@ export function validateWorkflowStructure(data: unknown, options?: ValidateOptio
     }
   }
 
+  // Apply profile-based filtering if a profile is specified
+  let filteredIssues = issues;
+  let filteredErrors = errors;
+  let filteredWarnings = warnings;
+  
+  if (options?.profile) {
+    filteredIssues = filterIssuesByProfile(issues, options.profile);
+    const filtered = filterErrorsByProfile(errors, warnings, options.profile);
+    filteredErrors = filtered.errors;
+    filteredWarnings = filtered.warnings;
+  }
+
   return { 
-    valid: errors.length === 0, 
-    errors, 
-    warnings, 
-    issues,
+    valid: filteredErrors.length === 0, 
+    errors: filteredErrors, 
+    warnings: filteredWarnings, 
+    issues: filteredIssues,
     nodeTypeIssues: nodeTypeIssues.length > 0 ? nodeTypeIssues : undefined,
     versionIssues: versionIssues.length > 0 ? versionIssues : undefined,
   };

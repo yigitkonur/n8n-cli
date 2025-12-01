@@ -1,0 +1,13 @@
+{
+  "name": "Version Test",
+  "nodes": [
+    {
+      "name": "HTTP",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [400, 300],
+      "parameters": {"url": "http://example.com"}
+    }
+  ],
+  "connections": {}
+}

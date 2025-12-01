@@ -3,8 +3,8 @@
  * Task 03: Backup Before Workflow Mutations
  */
 
-import { copyFile, mkdir, writeFile, chmod } from 'node:fs/promises';
-import { join } from 'node:path';
+import { copyFile, mkdir, writeFile, chmod, readFile } from 'node:fs/promises';
+import { join, basename } from 'node:path';
 import { homedir } from 'node:os';
 import chalk from 'chalk';
 
@@ -33,14 +33,18 @@ async function ensureBackupDir(dir: string = BACKUP_DIR): Promise<void> {
 }
 
 /**
- * Create a backup of a local file
+ * Create a backup of a local file to the centralized backup directory
  * 
  * @param filePath - Path to the file to backup
- * @returns Path to the backup file
+ * @returns Path to the backup file in ~/.n8n-cli/backups/
  */
 export async function createFileBackup(filePath: string): Promise<string> {
+  await ensureBackupDir();
+  
   const timestamp = getTimestamp();
-  const backupPath = `${filePath}.backup-${timestamp}.json`;
+  const originalName = basename(filePath, '.json');
+  const filename = `file-${originalName}-${timestamp}.json`;
+  const backupPath = join(BACKUP_DIR, filename);
   
   await copyFile(filePath, backupPath);
   

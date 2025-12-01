@@ -63,22 +63,33 @@ export class CredentialRegistry {
 
     let credsRoot: string;
     try {
+      const n8nBasePath = require.resolve('n8n-nodes-base/package.json');
       credsRoot = path.join(
-        path.dirname(require.resolve('n8n-nodes-base/package.json')),
+        path.dirname(n8nBasePath),
         'dist',
         'credentials',
       );
-    } catch {
-      throw new Error('Could not locate n8n-nodes-base. Please ensure it is installed.');
+      debug('credential-loader', `Found n8n-nodes-base at: ${path.dirname(n8nBasePath)}`);
+    } catch (e) {
+      const errorMsg = e instanceof Error ? e.message : String(e);
+      debug('credential-loader', `Could not locate n8n-nodes-base: ${errorMsg}`);
+      throw new Error(
+        'Could not locate n8n-nodes-base package. Please ensure it is installed:\n' +
+        '  npm install n8n-nodes-base\n\n' +
+        'This package is required for credential type schema lookups.'
+      );
     }
 
     if (!fs.existsSync(credsRoot)) {
       debug('credential-loader', `Credentials directory not found: ${credsRoot}`);
+      console.warn(`Warning: n8n-nodes-base found but credentials directory missing at: ${credsRoot}`);
       this.initialized = true;
       return;
     }
 
+    debug('credential-loader', `Scanning credentials from: ${credsRoot}`);
     this.scanDirectory(credsRoot);
+    debug('credential-loader', `Loaded ${this.credentialTypes.size} credential types, ${this.failedLoads.length} failures`);
     this.initialized = true;
   }
 

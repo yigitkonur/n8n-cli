@@ -26,6 +26,7 @@ import {
   type NodeUpgradeSummary,
 } from '../../core/versioning/index.js';
 import { getLatestRegistryVersion } from '../../core/versioning/breaking-changes-registry.js';
+import { NodeTypeNormalizer } from '../../utils/node-type-normalizer.js';
 
 interface ValidateOptions {
   file?: string;
@@ -96,9 +97,13 @@ export async function workflowsValidateCommand(idOrFile: string | undefined, opt
         const uniqueTypes = new Set<string>();
         for (const node of workflow.nodes) {
           if (node?.type && typeof node.type === 'string') {
-            // Check if node type is unknown
-            const nodeInfo = nodeRepository.getNode(node.type);
+            // Normalize node type to short form (database format) before checking
+            // e.g., "n8n-nodes-base.webhok" -> "nodes-base.webhok"
+            const normalizedType = NodeTypeNormalizer.normalizeToShortForm(node.type);
+            // Check if node type is unknown in the repository
+            const nodeInfo = nodeRepository.getNode(normalizedType);
             if (!nodeInfo) {
+              // Store the ORIGINAL type for suggestions (as that's what the user wrote)
               uniqueTypes.add(node.type);
             }
           }

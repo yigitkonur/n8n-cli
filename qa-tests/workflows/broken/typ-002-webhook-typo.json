@@ -1,0 +1,13 @@
+{
+  "name": "Type Test",
+  "nodes": [
+    {
+      "name": "My Webhook",
+      "type": "n8n-nodes-base.webhok",
+      "typeVersion": 1,
+      "position": [200, 200],
+      "parameters": {}
+    }
+  ],
+  "connections": {}
+}

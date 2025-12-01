@@ -1,0 +1,16 @@
+{
+  "name": "Test Workflow",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "start-node",
+      "name": "Start",
+      "type": "n8n-nodes-base.start",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+  ],
+  "connections": {},
+  "active": false,
+  "settings": {}
+}

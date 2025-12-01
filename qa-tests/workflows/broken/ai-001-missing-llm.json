@@ -1,0 +1,15 @@
+{
+  "name": "AI Agent Test - Missing LLM",
+  "nodes": [
+    {
+      "name": "AI Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.6,
+      "position": [400, 300],
+      "parameters": {
+        "options": {}
+      }
+    }
+  ],
+  "connections": {}
+}

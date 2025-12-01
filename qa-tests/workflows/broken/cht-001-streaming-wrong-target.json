@@ -1,0 +1,24 @@
+{
+  "name": "Chat Trigger Streaming Wrong Target",
+  "nodes": [
+    {
+      "name": "Chat Trigger",
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.1,
+      "position": [200, 300],
+      "parameters": {
+        "mode": "streaming"
+      }
+    },
+    {
+      "name": "Set",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [400, 300],
+      "parameters": {}
+    }
+  ],
+  "connections": {
+    "Chat Trigger": {"main": [[{"node": "Set", "type": "main", "index": 0}]]}
+  }
+}
