@@ -56,7 +56,7 @@ Your AI assistant writes a workflow JSON locally → validates it → gets schem
 </td>
 <td align="center">
 <h3>📦</h3>
-<b>544 Nodes Bundled</b><br/>
+<b>800+ Nodes Bundled</b><br/>
 <sub>Offline node search & validation</sub>
 </td>
 <td align="center">
@@ -176,11 +176,20 @@ n8n --help
 Your agent just needs to execute shell commands. That's it.
 
 ```bash
-# Search for nodes (offline, 544 nodes bundled)
+# List all available nodes (800+ nodes bundled)
+npx n8n-cli nodes list --json
+
+# Search for nodes with fuzzy matching
 npx n8n-cli nodes search "webhook" --json
 
-# Get node schema for reference
-npx n8n-cli nodes get webhook --json
+# Get node schema with operations and examples
+npx n8n-cli nodes show webhook --schema --json
+
+# List credential types grouped by auth method
+npx n8n-cli credentials types --by-auth --json
+
+# Get credential type schema
+npx n8n-cli credentials show-type slackOAuth2Api --json
 
 # Validate a workflow file
 npx n8n-cli workflows validate workflow.json --json
@@ -215,7 +224,8 @@ N8N_API_KEY=your-api-key
 | :---: | :--- | :--- |
 | **🤖 Agent-First `--json`**<br/>`Structured output everywhere` | Every command supports `--json` for machine parsing | Agents get clean JSON, not human-formatted tables |
 | **💡 Schema Hints**<br/>`Fix errors with examples` | Validation errors include the correct schema structure | Agent knows exactly how to fix the issue |
-| **📦 544 Nodes Bundled**<br/>`Offline node database` | Search and inspect nodes without API calls | No network latency for node lookups |
+| **📦 800+ Nodes Bundled**<br/>`Offline node database` | Search, list, and inspect nodes without API calls | No network latency for node lookups |
+| **🔑 200+ Credential Types**<br/>`Offline credential schemas` | Browse credential types with auth method detection | Know exactly what fields are required |
 | **🔧 Auto-Fix Mode**<br/>`--fix flag` | Repairs common mistakes (Switch v3, fallbackOutput, etc.) | Let the tool do the boring work |
 | **🎯 Schema Delta**<br/>`Missing/extra key detection` | Shows exactly which keys are wrong vs expected | Fix the right thing the first time |
 | **📍 Source Locations**<br/>`Line & column numbers` | Points to exact JSON location with code snippet | No hunting through 1000-line workflows |
@@ -231,14 +241,38 @@ N8N_API_KEY=your-api-key
 
 ## 🎮 CLI Usage
 
-### Node Operations (Offline)
+### Node Operations (Offline - 800+ nodes bundled)
 
 ```bash
-# Search nodes by keyword
+# List all available nodes
+npx n8n-cli nodes list --json
+
+# List nodes grouped by category
+npx n8n-cli nodes list --by-category
+
+# List nodes in a specific category
+npx n8n-cli nodes list --category trigger
+
+# Search nodes by keyword (with fuzzy matching)
 npx n8n-cli nodes search "slack" --limit 5 --json
 
-# Get node schema (for agent reference)
-npx n8n-cli nodes get slack --json
+# Show node details with full schema
+npx n8n-cli nodes show slack --json
+
+# Show node schema (properties, operations, credentials)
+npx n8n-cli nodes show slack --schema
+
+# Show just operations (minimal view)
+npx n8n-cli nodes show slack --minimal
+
+# Show usage examples
+npx n8n-cli nodes show slack --examples
+
+# List all node categories with counts
+npx n8n-cli nodes categories --json
+
+# Show categories with descriptions
+npx n8n-cli nodes categories --detailed
 
 # Validate node configuration
 npx n8n-cli nodes validate webhook --config '{"httpMethod":"POST"}' --json
@@ -308,7 +342,7 @@ npx n8n-cli executions delete exec123 --force
 # List all credentials (values masked for security)
 npx n8n-cli credentials list --json
 
-# Get credential type schema (to know required fields)
+# Get credential type schema from n8n API
 npx n8n-cli credentials schema githubApi --json
 
 # Create a credential from file
@@ -319,6 +353,24 @@ npx n8n-cli credentials create --type githubApi --name "My GitHub" --data '{"acc
 
 # Delete a credential
 npx n8n-cli credentials delete credId123 --force
+```
+
+### Credential Types (Offline - 200+ types bundled)
+
+```bash
+# List all available credential types
+npx n8n-cli credentials types --json
+
+# Group credential types by auth method (OAuth2, API Key, etc.)
+npx n8n-cli credentials types --by-auth
+
+# Search credential types
+npx n8n-cli credentials types --search slack
+
+# Show credential type schema with all properties
+npx n8n-cli credentials show-type slackOAuth2Api --json
+
+# Output includes: name, displayName, authType, required/optional fields, setup guide
 ```
 
 ### Variables
@@ -443,7 +495,7 @@ When validation fails, you don't just get "invalid parameter". You get actionabl
 | **Switch node errors** | Use `--fix` flag—auto-fixes Switch v3 condition structure |
 | **Malformed JSON** | Use `--repair` flag to fix common JSON syntax errors |
 | **API connection failed** | Check `N8N_HOST` and `N8N_API_KEY` environment variables |
-| **Node type not found** | Node database has 544 nodes from n8n-nodes-base v1.120 |
+| **Node type not found** | Node database has 800+ nodes from latest n8n-nodes-base |
 
 </details>
 
@@ -456,7 +508,7 @@ When validation fails, you don't just get "invalid parameter". You get actionabl
 | **Setup** | `npx n8n-cli` | Configure server, manage connections |
 | **Large Payloads** | Write to file, validate locally | Stream through tool calls, risk hallucinations |
 | **Error Handling** | Structured JSON with schema hints | Varies by implementation |
-| **Offline Capable** | Yes (544 nodes bundled) | Usually requires connection |
+| **Offline Capable** | Yes (800+ nodes, 200+ credential types) | Usually requires connection |
 | **Agent Complexity** | Execute shell commands | Implement MCP protocol |
 | **Iteration Speed** | Local validation loop | Network round-trips |
 

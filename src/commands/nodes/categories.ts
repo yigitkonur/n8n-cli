@@ -7,7 +7,6 @@ import chalk from 'chalk';
 import { getNodeRepository } from '../../core/db/nodes.js';
 import { formatHeader } from '../../core/formatters/header.js';
 import { formatCategoryStats, CATEGORY_META } from '../../core/formatters/tree.js';
-import { formatTable } from '../../core/formatters/table.js';
 import { formatSummary } from '../../core/formatters/summary.js';
 import { formatNextActions } from '../../core/formatters/next-actions.js';
 import { formatExportFooter } from '../../core/formatters/jq-recipes.js';
