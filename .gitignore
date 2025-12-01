@@ -42,6 +42,11 @@ output/
 scripts/
 tools/
 bugs/
+notes/
+
+# Database files
+data/
+*.db
 
 # Sensitive files
 key.txt
