@@ -253,6 +253,54 @@ export async function confirmAction(
 }
 
 /**
+ * Require typed confirmation for dangerous operations
+ * User must type the exact expected text to confirm
+ * 
+ * @param prompt - The prompt message (should include what to type)
+ * @param expectedText - The exact text the user must type
+ * @returns Promise<boolean> - true if user typed correctly
+ */
+export async function requireTypedConfirmation(
+  prompt: string,
+  expectedText: string
+): Promise<boolean> {
+  // Error in non-interactive mode
+  if (isNonInteractive()) {
+    throw new Error(
+      'Typed confirmation required but running in non-interactive mode.\n' +
+      'Use --force or --yes to proceed without confirmation.'
+    );
+  }
+  
+  return new Promise((resolve) => {
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout,
+    });
+    
+    // Handle Ctrl+C during prompt
+    rl.on('SIGINT', () => {
+      rl.close();
+      console.log(chalk.yellow('\nAborted.'));
+      resolve(false);
+    });
+    
+    rl.question(chalk.yellow(prompt), (answer) => {
+      rl.close();
+      
+      const typed = answer.trim();
+      
+      if (typed === expectedText) {
+        resolve(true);
+      } else {
+        console.log(chalk.red(`Expected "${expectedText}", got "${typed}". Operation cancelled.`));
+        resolve(false);
+      }
+    });
+  });
+}
+
+/**
  * Display a summary of changes before confirmation
  */
 export function displayChangeSummary(changes: {

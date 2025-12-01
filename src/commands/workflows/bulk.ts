@@ -10,7 +10,8 @@ import { formatNextActions } from '../../core/formatters/next-actions.js';
 import { outputJson } from '../../core/formatters/json.js';
 import { icons } from '../../core/formatters/theme.js';
 import { printError, N8nApiError } from '../../utils/errors.js';
-import { confirmAction } from '../../utils/prompts.js';
+import { confirmAction, isNonInteractive, requireTypedConfirmation } from '../../utils/prompts.js';
+import { maybeBackupWorkflow } from '../../utils/backup.js';
 import type { GlobalOptions } from '../../types/global-options.js';
 
 interface BulkOptions extends GlobalOptions {
@@ -19,6 +20,7 @@ interface BulkOptions extends GlobalOptions {
   force?: boolean;
   yes?: boolean;
   json?: boolean;
+  noBackup?: boolean;
 }
 
 type BulkOperation = 'activate' | 'deactivate' | 'delete';
@@ -53,6 +55,18 @@ async function performBulkOperation(
           await client.deactivateWorkflow(id);
           break;
         case 'delete':
+          // Backup before delete (unless --no-backup)
+          if (!opts.noBackup) {
+            try {
+              const workflow = await client.getWorkflow(id);
+              await maybeBackupWorkflow(workflow, id, { noBackup: opts.noBackup });
+            } catch (backupErr) {
+              // Log but don't fail - backup is best-effort
+              if (!opts.quiet) {
+                console.log(chalk.dim(`  ⚠ Could not backup ${id}: ${(backupErr as Error).message}`));
+              }
+            }
+          }
           await client.deleteWorkflow(id);
           break;
       }
@@ -140,16 +154,39 @@ async function executeBulkCommand(operation: BulkOperation, opts: BulkOptions): 
     // Confirmation for destructive operations (unless --force/--yes)
     const skipConfirm = opts.force || opts.yes;
     
-    if (!skipConfirm && !opts.json) {
-      const actionWord = operation === 'delete' ? 'DELETE' : operation;
-      const confirmed = await confirmAction(
-        `${actionWord} ${workflowIds.length} workflow(s)?`,
-        { defaultNo: true }
-      );
-      
-      if (!confirmed) {
-        console.log(chalk.yellow('Operation cancelled.'));
+    if (!skipConfirm) {
+      // In non-interactive mode (CI, --json piped), require explicit --force
+      if (isNonInteractive()) {
+        console.error(chalk.red(`\n${icons.error} Destructive operation requires --force in non-interactive mode`));
+        console.error(chalk.dim('  This prevents accidental data loss in CI/CD pipelines.'));
+        process.exitCode = 1;
         return;
+      }
+      
+      // For delete operations with --all or many items, require typed confirmation
+      const BULK_THRESHOLD = 10;
+      if (operation === 'delete' && (opts.all || workflowIds.length > BULK_THRESHOLD)) {
+        const expectedText = `DELETE ${workflowIds.length}`;
+        console.log(chalk.red(`\n⚠️  DESTRUCTIVE OPERATION: This will permanently delete ${workflowIds.length} workflow(s).`));
+        const typedConfirm = await requireTypedConfirmation(
+          `Type "${expectedText}" to confirm: `,
+          expectedText
+        );
+        if (!typedConfirm) {
+          return;
+        }
+      } else {
+        // Standard y/N confirmation for smaller operations
+        const actionWord = operation === 'delete' ? 'DELETE' : operation;
+        const confirmed = await confirmAction(
+          `${actionWord} ${workflowIds.length} workflow(s)?`,
+          { defaultNo: true }
+        );
+        
+        if (!confirmed) {
+          console.log(chalk.yellow('Operation cancelled.'));
+          return;
+        }
       }
     }
     

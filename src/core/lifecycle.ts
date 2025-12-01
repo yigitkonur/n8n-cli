@@ -55,8 +55,8 @@ function createSignalHandler(signal: string): () => void {
   return () => {
     debug('lifecycle', `Received ${signal}`);
     performCleanup(signal).finally(() => {
-      // Set exit code and let event loop drain
-      process.exitCode = 0;
+      // Explicit exit after cleanup - don't rely on event loop drain
+      process.exit(0);
     });
   };
 }
@@ -79,6 +79,25 @@ export function registerShutdownHandlers(): void {
       // Synchronous close since we're exiting
       closeDatabase();
     }
+  });
+  
+  // uncaughtException: Sync-only, fatal error
+  process.on('uncaughtException', (err) => {
+    debug('lifecycle', `Uncaught exception: ${err.message}`);
+    console.error(`\nFatal error: ${err.message}`);
+    // Sync cleanup only - async won't complete
+    closeDatabase();
+    process.exit(1);
+  });
+  
+  // unhandledRejection: Async cleanup allowed
+  process.on('unhandledRejection', (reason) => {
+    const message = reason instanceof Error ? reason.message : String(reason);
+    debug('lifecycle', `Unhandled rejection: ${message}`);
+    console.error(`\nUnhandled promise rejection: ${message}`);
+    performCleanup('unhandledRejection').finally(() => {
+      process.exit(1);
+    });
   });
   
   debug('lifecycle', 'Shutdown handlers registered');

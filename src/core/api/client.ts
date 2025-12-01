@@ -4,7 +4,8 @@
  * Simplified for CLI use
  */
 
-import axios, { AxiosInstance, AxiosRequestConfig, AxiosError } from 'axios';
+import axios, { AxiosInstance, AxiosRequestConfig, AxiosError, InternalAxiosRequestConfig } from 'axios';
+import { debug } from '../debug.js';
 import { getConfig, maskApiKey } from '../config/loader.js';
 import { 
   handleN8nApiError, 
@@ -57,6 +58,18 @@ export interface N8nApiClientConfig {
   timeout?: number;
 }
 
+// Retry configuration
+const RETRY_CONFIG = {
+  maxRetries: 3,
+  baseDelayMs: 100,
+  maxDelayMs: 5000,
+};
+
+// Extend axios config to track retry count
+interface RetryableRequestConfig extends InternalAxiosRequestConfig {
+  _retryCount?: number;
+}
+
 export class N8nApiClient {
   private client: AxiosInstance;
 
@@ -88,6 +101,74 @@ export class N8nApiClient {
         return Promise.reject(n8nError);
       }
     );
+    
+    // Retry interceptor for transient failures (5xx, network errors)
+    this.client.interceptors.response.use(
+      (response) => response,
+      async (error: AxiosError) => {
+        const config = error.config as RetryableRequestConfig | undefined;
+        if (!config) {
+          return Promise.reject(error);
+        }
+        
+        config._retryCount = config._retryCount || 0;
+        
+        // Check if we should retry
+        const shouldRetry = this.shouldRetryRequest(error, config._retryCount);
+        
+        if (shouldRetry && config._retryCount < RETRY_CONFIG.maxRetries) {
+          config._retryCount++;
+          
+          // Calculate delay with exponential backoff + jitter
+          const delay = Math.min(
+            RETRY_CONFIG.baseDelayMs * Math.pow(2, config._retryCount) + Math.random() * 100,
+            RETRY_CONFIG.maxDelayMs
+          );
+          
+          debug('api', `Retry ${config._retryCount}/${RETRY_CONFIG.maxRetries} after ${Math.round(delay)}ms: ${config.url}`);
+          
+          await new Promise(resolve => setTimeout(resolve, delay));
+          return this.client.request(config);
+        }
+        
+        return Promise.reject(error);
+      }
+    );
+  }
+  
+  /**
+   * Determine if a request should be retried based on error type
+   */
+  private shouldRetryRequest(error: AxiosError, retryCount: number): boolean {
+    // Don't retry if we've exhausted retries
+    if (retryCount >= RETRY_CONFIG.maxRetries) {
+      return false;
+    }
+    
+    // Retry on network errors (no response)
+    if (!error.response) {
+      const retryableCodes = ['ECONNRESET', 'ETIMEDOUT', 'ECONNABORTED', 'ENOTFOUND', 'ENETUNREACH'];
+      if (error.code && retryableCodes.includes(error.code)) {
+        debug('api', `Retryable network error: ${error.code}`);
+        return true;
+      }
+      return false;
+    }
+    
+    const status = error.response.status;
+    
+    // Don't retry client errors (4xx) - they won't succeed on retry
+    if (status >= 400 && status < 500) {
+      return false;
+    }
+    
+    // Retry server errors (5xx)
+    if (status >= 500) {
+      debug('api', `Retryable server error: ${status}`);
+      return true;
+    }
+    
+    return false;
   }
   
   /**

@@ -652,6 +652,7 @@ workflowsCmd
   .option('--ids <ids>', 'Comma-separated workflow IDs')
   .option('--all', 'Delete all workflows (DANGEROUS)')
   .option('--force, --yes', 'Skip confirmation prompt')
+  .option('--no-backup', 'Skip creating backup before delete')
   .option('--json', 'Output as JSON')
   .action(async (opts) => {
     const { workflowsDeleteCommand } = await import('./commands/workflows/bulk.js');
