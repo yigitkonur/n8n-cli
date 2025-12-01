@@ -513,6 +513,8 @@ n8n workflows autofix <idOrFile> [options]
 | `--apply` | Apply fixes (to file or n8n server) | - |
 | `--confidence <level>` | Minimum confidence: `high`, `medium`, `low` | `medium` |
 | `--fix-types <types>` | Comma-separated fix types to apply | all |
+| `--upgrade-versions` | Apply version migration fixes from breaking changes registry | - |
+| `--target-version <version>` | Target version for upgrades | Latest |
 | `--max-fixes <n>` | Maximum number of fixes | `50` |
 | `-s, --save <path>` | Save fixed workflow locally | - |
 | `--force, --yes` | Skip confirmation prompts | - |
