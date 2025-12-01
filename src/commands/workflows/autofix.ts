@@ -30,7 +30,6 @@ import {
   type FixOperation,
   type AutoFixResult,
   type FixDetail,
-  type PostUpdateGuidance,
 } from '../../core/autofix/index.js';
 import { 
   formatPostUpdateGuidance, 

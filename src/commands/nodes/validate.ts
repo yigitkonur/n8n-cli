@@ -1,6 +1,6 @@
 /**
  * Nodes Validate Command
- * Validate node configuration against schema
+ * Validate node configuration against schema with enhanced validation
  */
 
 import chalk from 'chalk';
@@ -10,10 +10,12 @@ import { formatHeader, formatDivider } from '../../core/formatters/header.js';
 import { formatNextActions } from '../../core/formatters/next-actions.js';
 import { outputJson } from '../../core/formatters/json.js';
 import { icons } from '../../core/formatters/theme.js';
+import { EnhancedConfigValidator, type ValidationMode, type ValidationProfile } from '../../core/validation/index.js';
 
 interface ValidateOptions {
   config?: string;
-  profile?: 'minimal' | 'runtime' | 'strict';
+  profile?: ValidationProfile;
+  mode?: ValidationMode;
   json?: boolean;
 }
 
@@ -48,62 +50,42 @@ export async function nodesValidateCommand(nodeType: string, opts: ValidateOptio
       }
     }
     
-    // Validate configuration based on profile
+    // Validate configuration using EnhancedConfigValidator
     const profile = opts.profile || 'runtime';
-    const errors: string[] = [];
-    const warnings: string[] = [];
-    const suggestions: string[] = [];
+    const mode = opts.mode || 'operation';
     
-    // Check required properties
-    if (node.properties) {
-      for (const prop of node.properties) {
-        // minimal: only check if explicitly marked required
-        // runtime: check required + basic type validation (default)
-        // strict: check everything including optional properties
-        
-        const isRequired = prop.required;
-        const hasValue = config[prop.name] !== undefined;
-        
-        // Required property check (all profiles)
-        if (isRequired && !hasValue) {
-          errors.push(`Missing required property: ${prop.name}`);
-        }
-        
-        // Type validation (runtime and strict only)
-        if (hasValue && profile !== 'minimal') {
-          const value = config[prop.name];
-          const expectedType = prop.type;
-          
-          if (expectedType === 'number' && typeof value !== 'number') {
-            warnings.push(`Property '${prop.name}' should be a number`);
-          }
-          if (expectedType === 'boolean' && typeof value !== 'boolean') {
-            warnings.push(`Property '${prop.name}' should be a boolean`);
-          }
-          if (expectedType === 'options' && prop.options) {
-            const validValues = prop.options.map((o: any) => o.value || o);
-            if (!validValues.includes(value)) {
-              errors.push(`Invalid value for '${prop.name}': ${value}. Valid: ${validValues.join(', ')}`);
-            }
-          }
-        }
-        
-        // Strict mode: warn about missing optional properties
-        if (profile === 'strict' && !isRequired && !hasValue && prop.default === undefined) {
-          warnings.push(`Optional property '${prop.name}' not set (no default)`);
-        }
+    // Use enhanced validation
+    const result = EnhancedConfigValidator.validateWithMode(
+      normalizedType,
+      config,
+      node.properties || [],
+      mode,
+      profile
+    );
+    
+    // Convert enhanced errors/warnings to string arrays for output
+    const errors: string[] = result.errors.map(e => 
+      e.fix ? `${e.message} (Fix: ${e.fix})` : e.message
+    );
+    const warnings: string[] = result.warnings.map(w => 
+      w.suggestion ? `${w.message} (${w.suggestion})` : w.message
+    );
+    const suggestions: string[] = [...result.suggestions];
+    
+    // Add credential suggestions if not already present
+    if (node.credentials && node.credentials.length > 0 && !config.credentials) {
+      const credSuggestion = `This node requires credentials: ${node.credentials.map((c: any) => c.name || c).join(', ')}`;
+      if (!suggestions.includes(credSuggestion)) {
+        suggestions.push(credSuggestion);
       }
     }
     
-    // Add suggestions based on common patterns
-    if (node.credentials && node.credentials.length > 0 && !config.credentials) {
-      suggestions.push(`This node requires credentials: ${node.credentials.map((c: any) => c.name || c).join(', ')}`);
-    }
-    
-    // Strict mode: additional checks
-    if (profile === 'strict') {
-      if (!node.description) {
-        warnings.push('Node has no description');
+    // Add next steps from enhanced result
+    if (result.nextSteps) {
+      for (const step of result.nextSteps) {
+        if (!suggestions.includes(step)) {
+          suggestions.push(step);
+        }
       }
     }
     
