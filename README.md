@@ -250,8 +250,8 @@ n8n workflows validate [idOrFile] [options]
 | Option | Description | Default |
 |--------|-------------|---------|
 | `-f, --file <path>` | Path to workflow JSON file | - |
-| `--profile <profile>` | Validation profile: `minimal`, `runtime`, `ai-friendly`, `strict` | `runtime` |
-| `--mode <mode>` | Validation mode: `minimal`, `operation`, `full` | `operation` |
+| `-P, --validation-profile <profile>` | Validation profile: `minimal`, `runtime`, `ai-friendly`, `strict` | `runtime` |
+| `-M, --validation-mode <mode>` | Validation mode: `minimal`, `operation`, `full` | `operation` |
 | `--repair` | Attempt to repair malformed JSON | - |
 | `--fix` | Auto-fix known issues | - |
 | `--check-upgrades` | Check for node version upgrades and breaking changes | - |
@@ -280,13 +280,13 @@ n8n workflows validate [idOrFile] [options]
 
 ```bash
 # Strict validation with full mode (most thorough)
-n8n workflows validate workflow.json --profile strict --mode full
+n8n workflows validate workflow.json -P strict -M full
 
 # AI-friendly validation (balanced for LLM processing)
-n8n workflows validate workflow.json --profile ai-friendly
+n8n workflows validate workflow.json --validation-profile ai-friendly
 
 # Minimal validation (structure only)
-n8n workflows validate workflow.json --profile minimal --mode minimal
+n8n workflows validate workflow.json -P minimal -M minimal
 ```
 
 **Version Upgrade Checking:**
@@ -969,18 +969,18 @@ n8n nodes validate <nodeType> [options]
 | Option | Description | Default |
 |--------|-------------|---------|
 | `-c, --config <json>` | Node configuration to validate | `{}` |
-| `--profile <profile>` | Validation profile: `minimal`, `runtime`, `ai-friendly`, `strict` | `runtime` |
-| `--mode <mode>` | Validation mode: `minimal`, `operation`, `full` | `operation` |
+| `-P, --validation-profile <profile>` | Validation profile: `minimal`, `runtime`, `ai-friendly`, `strict` | `runtime` |
+| `-M, --validation-mode <mode>` | Validation mode: `minimal`, `operation`, `full` | `operation` |
 | `--json` | Output as JSON | - |
 
 **Examples:**
 
 ```bash
 # Validate Slack node with strict profile
-n8n nodes validate n8n-nodes-base.slack --config '{"resource":"message","operation":"send"}' --profile strict
+n8n nodes validate n8n-nodes-base.slack --config '{"resource":"message","operation":"send"}' -P strict
 
 # Validate HTTP Request node with full mode
-n8n nodes validate httpRequest --config '{"url":"https://api.example.com"}' --mode full
+n8n nodes validate httpRequest --config '{"url":"https://api.example.com"}' -M full
 
 # Get JSON output with autofix suggestions
 n8n nodes validate webhook --config '{"path":"test"}' --json

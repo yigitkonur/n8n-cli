@@ -121,7 +121,7 @@ export async function workflowsValidateCommand(idOrFile: string | undefined, opt
     }
     
     // Validate with enhanced validation when profile or mode is specified
-    const useEnhanced = opts.profile !== undefined || opts.mode !== undefined;
+    const useEnhanced = opts.validationProfile !== undefined || opts.validationMode !== undefined;
     const result = validateWorkflowStructure(workflow, {
       rawSource,
       nodeSuggestions,
@@ -131,17 +131,17 @@ export async function workflowsValidateCommand(idOrFile: string | undefined, opt
       skipCommunityNodes: opts.skipCommunityNodes,
       // Enhanced validation options
       enhanced: useEnhanced,
-      mode: opts.mode || 'operation',
-      profile: opts.profile || 'runtime',
+      mode: opts.validationMode || 'operation',
+      profile: opts.validationProfile || 'runtime',
     });
     
     // Profile-specific messaging
-    if (opts.profile && !opts.json) {
-      if (opts.profile === 'ai-friendly' || opts.profile === 'strict') {
-        console.log(chalk.cyan(`\n${icons.info} AI-Enhanced Validation: Profile '${opts.profile}'`));
+    if (opts.validationProfile && !opts.json) {
+      if (opts.validationProfile === 'ai-friendly' || opts.validationProfile === 'strict') {
+        console.log(chalk.cyan(`\n${icons.info} AI-Enhanced Validation: Profile '${opts.validationProfile}'`));
         console.log(chalk.dim('   Checks include: LLM connections, streaming mode, tool configs, memory limits'));
         console.log(chalk.dim('   AI nodes validated: AI Agent, Chat Trigger, Basic LLM Chain, 12 AI tool types\n'));
-      } else if (opts.profile === 'minimal') {
+      } else if (opts.validationProfile === 'minimal') {
         console.log(chalk.dim(`\n${icons.info} Minimal profile: Structure checks only (AI validation skipped)\n`));
       }
     }
@@ -174,8 +174,8 @@ export async function workflowsValidateCommand(idOrFile: string | undefined, opt
         // Enhanced validation metadata
         ...(useEnhanced && {
           validation: {
-            mode: opts.mode || 'operation',
-            profile: opts.profile || 'runtime',
+            mode: opts.validationMode || 'operation',
+            profile: opts.validationProfile || 'runtime',
             enhanced: true,
           },
         }),

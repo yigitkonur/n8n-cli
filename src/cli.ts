@@ -331,8 +331,8 @@ nodesCmd
   .command('validate <nodeType>')
   .description('Validate node configuration')
   .option('-c, --config <json>', 'Node config as JSON string', '{}')
-  .option('--profile <profile>', 'Validation profile: minimal, runtime, ai-friendly, strict', 'runtime')
-  .option('--mode <mode>', 'Validation mode: minimal, operation, full', 'operation')
+  .option('-P, --validation-profile <profile>', 'Validation profile: minimal, runtime, ai-friendly, strict', 'runtime')
+  .option('-M, --validation-mode <mode>', 'Validation mode: minimal, operation, full', 'operation')
   .option('--json', 'Output as JSON')
   .addHelpText('after', `
 Validation Profiles:
@@ -348,8 +348,8 @@ Validation Modes:
 
 Examples:
   n8n nodes validate n8n-nodes-base.webhook --config '{"path":"/test"}'  
-  n8n nodes validate n8n-nodes-base.httpRequest --profile strict --mode full
-  n8n nodes validate n8n-nodes-base.slack --config '{"resource":"message","operation":"send"}' --profile ai-friendly
+  n8n nodes validate n8n-nodes-base.httpRequest --validation-profile strict --validation-mode full
+  n8n nodes validate n8n-nodes-base.slack --config '{"resource":"message","operation":"send"}' -P ai-friendly
 
 💡 Get valid config options: n8n nodes show <nodeType> --schema
 `)
