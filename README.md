@@ -838,7 +838,7 @@ n8n nodes search <query> [options]
 
 #### `nodes show`
 
-Show node details with schema.
+Show node details with configurable detail level and specialized modes.
 
 ```bash
 n8n nodes show <nodeType> [options]
@@ -846,15 +846,50 @@ n8n nodes show <nodeType> [options]
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `--schema` | Show full property schema | - |
-| `--minimal` | Show operations only | - |
-| `--examples` | Show usage examples | - |
-| `-m, --mode <mode>` | Output mode: `info`, `docs`, `versions`, `breaking` | `info` |
-| `-d, --detail <level>` | Detail level: `minimal`, `standard`, `full` | `standard` |
-| `--from <version>` | Source version (for `--mode breaking`) | `1.0` |
-| `--to <version>` | Target version (for `--mode breaking`) | Latest |
+| `-d, --detail <level>` | Detail level: `minimal` (~200 tokens), `standard` (~1-2K), `full` (~3-8K) | `standard` |
+| `-m, --mode <mode>` | Operation mode: `info`, `docs`, `search-properties`, `versions`, `compare`, `breaking`, `migrations` | `info` |
+| `--query <term>` | Property search term (for `search-properties` mode) | - |
+| `--from <version>` | Source version (for `compare`, `breaking`, `migrations`) | - |
+| `--to <version>` | Target version (for `compare`, `migrations`) | Latest |
+| `--max-results <n>` | Max property search results | `20` |
+| `--include-type-info` | Include type structure metadata | - |
+| `--include-examples` | Include real-world configuration examples | - |
+| `--schema` | Legacy: equivalent to `--detail full` | - |
+| `--minimal` | Legacy: equivalent to `--detail minimal` | - |
+| `--examples` | Legacy: equivalent to `--include-examples` | - |
 | `-s, --save <path>` | Save to JSON file | - |
 | `--json` | Output as JSON | - |
+
+**Detail Levels:**
+
+| Level | Token Count | Use Case |
+|-------|-------------|----------|
+| `minimal` | ~200 tokens | Quick lookups, AI agent token optimization |
+| `standard` | ~1-2K tokens | Essential properties + operations (default) |
+| `full` | ~3-8K tokens | Complete schema with all properties |
+
+**Operation Modes:**
+
+| Mode | Description |
+|------|-------------|
+| `info` | Node configuration schema (default) |
+| `docs` | Markdown documentation |
+| `search-properties` | Find properties by query (requires `--query`) |
+| `versions` | Version history with breaking changes |
+| `compare` | Property diff between versions (requires `--from`) |
+| `breaking` | Breaking changes between versions |
+| `migrations` | Auto-migratable changes (requires `--from`, `--to`) |
+
+```bash
+# Quick lookup (~200 tokens)
+n8n nodes show httpRequest --detail minimal --json
+
+# Search for auth-related properties
+n8n nodes show httpRequest --mode search-properties --query "auth"
+
+# Version comparison
+n8n nodes show httpRequest --mode breaking --from 1.0 --to 4.2
+```
 
 #### `nodes get`
 
