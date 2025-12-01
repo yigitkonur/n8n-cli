@@ -824,16 +824,171 @@ src/utils/
 | `src/core/validation/node-specific.ts` | Node-specific validators | 500 |
 | `src/core/validation/fixed-collection.ts` | FixedCollectionValidator | 200 |
 | `src/core/validation/property-visibility.ts` | displayOptions logic | 100 |
+| `src/core/validation/type-structure.ts` | **NEW:** TypeStructureService | 200 |
 
-### Files to Modify
+---
 
-| File | Changes | Lines Changed |
-|------|---------|---------------|
-| `src/commands/workflows/validate.ts` | Add `--mode` option, wire enhanced validator | +30 |
-| `src/commands/nodes/validate.ts` | Replace basic validation with enhanced | +50 |
-| `src/core/validator.ts` | Import and call EnhancedConfigValidator | +40 |
-| `src/core/types.ts` | Add ValidationProfile, EnhancedValidationResult | +50 |
-| `src/core/formatters/json.ts` | Handle enhanced validation output | +20 |
+## Type Structure Service (GAP)
+
+### Purpose
+
+Provides validation and example generation for 22 complex NodePropertyTypes (filter, resourceMapper, assignmentCollection, etc.). Critical for validating complex node configurations.
+
+### MCP Source: `n8n-mcp/src/services/type-structure-service.ts` (428 lines)
+
+### Key Types
+
+```typescript
+// Complex type categories
+type ComplexPropertyType = 
+  | 'filter'              // Filter conditions with combinator
+  | 'resourceMapper'      // Dynamic resource mapping
+  | 'assignmentCollection'// Key-value assignments
+  | 'resourceLocator'     // ID/URL/expression locator
+  | 'collection'          // Nested property groups
+  | 'fixedCollection';    // Fixed schema collections
+
+interface TypeStructure {
+  type: NodePropertyTypes;
+  category: 'primitive' | 'object' | 'collection' | 'special';
+  jsType: string;
+  description: string;
+  example: any;
+  validation: {
+    required?: string[];
+    structure?: Record<string, any>;
+  };
+}
+
+interface TypeValidationResult {
+  valid: boolean;
+  errors: string[];
+  warnings: string[];
+}
+```
+
+### Complex Type Examples (from MCP)
+
+```typescript
+// Filter type example (n8n-mcp/src/constants/type-structures.ts)
+const FILTER_EXAMPLE = {
+  combinator: 'and',
+  conditions: [
+    {
+      leftValue: '={{ $json.status }}',
+      rightValue: 'active',
+      operator: { type: 'string', operation: 'equals' }
+    }
+  ],
+  options: {
+    caseSensitive: true,
+    leftValue: '',
+    typeValidation: 'strict',
+    version: 2
+  }
+};
+
+// ResourceMapper type example
+const RESOURCE_MAPPER_EXAMPLE = {
+  mappingMode: 'defineBelow',
+  value: {
+    name: '={{ $json.name }}',
+    email: '={{ $json.email }}'
+  }
+};
+
+// ResourceLocator type example
+const RESOURCE_LOCATOR_EXAMPLE = {
+  __rl: true,
+  value: '={{ $json.sheetId }}',
+  mode: 'expression'
+};
+
+// AssignmentCollection type example
+const ASSIGNMENT_COLLECTION_EXAMPLE = {
+  assignments: [
+    { id: 'field1', name: 'Field 1', type: 'string', value: 'value1' }
+  ]
+};
+```
+
+### Service Methods
+
+```typescript
+// src/core/validation/type-structure.ts
+export class TypeStructureService {
+  /**
+   * Get structure definition for a property type
+   */
+  static getStructure(type: NodePropertyTypes): TypeStructure | null;
+  
+  /**
+   * Get all structure definitions
+   */
+  static getAllStructures(): Record<NodePropertyTypes, TypeStructure>;
+  
+  /**
+   * Get example value for a property type
+   */
+  static getExample(type: NodePropertyTypes): any;
+  
+  /**
+   * Validate a value against its expected type structure
+   */
+  static validateType(
+    value: any, 
+    type: NodePropertyTypes
+  ): TypeValidationResult;
+  
+  /**
+   * Check if a type is complex (needs special handling)
+   */
+  static isComplexType(type: NodePropertyTypes): boolean;
+  
+  /**
+   * Check if a type is primitive
+   */
+  static isPrimitiveType(type: NodePropertyTypes): boolean;
+}
+```
+
+### Integration with EnhancedConfigValidator
+
+```typescript
+// src/core/validation/enhanced-validator.ts
+import { TypeStructureService } from './type-structure.js';
+
+// When validating properties:
+private validatePropertyValue(
+  property: PropertyDefinition,
+  value: any,
+  config: Record<string, any>
+): ValidationError[] {
+  const errors: ValidationError[] = [];
+  
+  // For complex types, use TypeStructureService
+  if (TypeStructureService.isComplexType(property.type)) {
+    const result = TypeStructureService.validateType(value, property.type);
+    if (!result.valid) {
+      errors.push({
+        type: 'invalid_type_structure',
+        property: property.name,
+        message: result.errors.join('; '),
+        fix: `See example: ${JSON.stringify(TypeStructureService.getExample(property.type))}`
+      });
+    }
+  }
+  
+  return errors;
+}
+```
+
+### Additional Files (Type Structure)
+
+| File | Purpose | Lines (Est.) |
+|------|---------|--------------|
+| `src/core/validation/type-structure.ts` | TypeStructureService | 200 |
+| `src/core/validation/type-examples.ts` | Complex type examples | 150 |
 
 ### Adding a New Validation Profile
 

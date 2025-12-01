@@ -10,7 +10,7 @@ import chalk from 'chalk';
 import { formatHeader, formatDivider } from '../../core/formatters/header.js';
 import { formatNextActions } from '../../core/formatters/next-actions.js';
 import { saveToJson, outputJson } from '../../core/formatters/json.js';
-import { theme, icons } from '../../core/formatters/theme.js';
+import { icons } from '../../core/formatters/theme.js';
 import {
   BreakingChangeDetector,
   NodeVersionService,

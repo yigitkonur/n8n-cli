@@ -658,8 +658,334 @@ describe('workflows validate with similarity', () => {
 
 ---
 
+## Operation Similarity Service (GAP)
+
+### Purpose
+
+Provides suggestions when users specify invalid operation names within nodes (e.g., `sendMessage` instead of `send` for Slack).
+
+### MCP Source: `n8n-mcp/src/services/operation-similarity-service.ts`
+
+```typescript
+// Key types
+export interface OperationSuggestion {
+  value: string;           // Correct operation name
+  confidence: number;      // 0.0-1.0
+  reason: string;          // Human explanation
+  resource?: string;       // Context resource
+  description?: string;    // Operation description
+}
+
+// Confidence thresholds
+EXACT: 1.0
+VERY_HIGH: 0.95
+HIGH: 0.8
+MEDIUM: 0.6
+MIN_SUBSTRING: 0.7
+```
+
+### Common Operation Patterns
+
+| Node Type | Invalid Pattern | Suggestion | Confidence | Reason |
+|-----------|-----------------|------------|------------|--------|
+| **Google Drive** | `listFiles` | `search` | 0.85 | Use "search" with resource "fileFolder" |
+| **Google Drive** | `uploadFile` | `upload` | 0.95 | Use "upload" instead |
+| **Google Drive** | `downloadFile` | `download` | 0.95 | Use "download" instead |
+| **Slack** | `sendMessage` | `send` | 0.95 | Use "send" instead |
+| **Slack** | `postMessage` | `send` | 0.90 | Use "send" to post |
+| **Slack** | `getMessage` | `get` | 0.90 | Use "get" to retrieve |
+| **Slack** | `createChannel` | `create` | 0.90 | Use "create" with resource "channel" |
+| **Database** | `selectData` | `select` | 0.95 | Use "select" instead |
+| **Database** | `insertData` | `insert` | 0.95 | Use "insert" instead |
+| **Database** | `updateData` | `update` | 0.95 | Use "update" instead |
+| **Database** | `deleteData` | `delete` | 0.95 | Use "delete" instead |
+
+### CLI Integration
+
+```typescript
+// src/core/similarity/operation-similarity.ts
+export class OperationSimilarityService {
+  private repository: NodeRepository;
+  private commonPatterns: Map<string, OperationPattern[]>;
+  
+  constructor(repository: NodeRepository) {
+    this.repository = repository;
+    this.commonPatterns = this.initializeCommonPatterns();
+  }
+  
+  async findSimilarOperations(
+    nodeType: string, 
+    invalidOperation: string, 
+    resource?: string,
+    limit: number = 5
+  ): Promise<OperationSuggestion[]> {
+    // 1. Check common patterns first
+    // 2. Get valid operations for node+resource
+    // 3. Score by Levenshtein + substring match
+    // 4. Return sorted suggestions
+  }
+}
+```
+
+### Files to Create
+
+| File | LOC | Purpose |
+|------|-----|---------|
+| `src/core/similarity/operation-similarity.ts` | ~200 | Port from MCP |
+| `src/core/similarity/operation-patterns.ts` | ~100 | Common patterns |
+
+---
+
+## Resource Similarity Service (GAP)
+
+### Purpose
+
+Provides suggestions when users specify invalid resource names within nodes (e.g., `messages` instead of `message` for Slack).
+
+### MCP Source: `n8n-mcp/src/services/resource-similarity-service.ts`
+
+```typescript
+// Key types
+export interface ResourceSuggestion {
+  value: string;              // Correct resource name
+  confidence: number;         // 0.0-1.0
+  reason: string;             // Human explanation
+  availableOperations?: string[];  // Valid operations for resource
+}
+```
+
+### Common Resource Patterns
+
+| Node Type | Invalid Pattern | Suggestion | Confidence | Reason |
+|-----------|-----------------|------------|------------|--------|
+| **Google Drive** | `files` | `file` | 0.95 | Use singular "file" |
+| **Google Drive** | `folders` | `folder` | 0.95 | Use singular "folder" |
+| **Google Drive** | `fileAndFolder` | `fileFolder` | 0.90 | Use "fileFolder" |
+| **Slack** | `messages` | `message` | 0.95 | Use singular "message" |
+| **Slack** | `channels` | `channel` | 0.95 | Use singular "channel" |
+| **Slack** | `users` | `user` | 0.95 | Use singular "user" |
+| **Slack** | `msg` | `message` | 0.85 | Use full "message" |
+| **Slack** | `dm` | `message` | 0.70 | Use "message" for DMs |
+| **Database** | `tables` | `table` | 0.95 | Use singular "table" |
+| **Database** | `collections` | `collection` | 0.95 | Use singular |
+| **Database** | `documents` | `document` | 0.95 | Use singular |
+
+### CLI Integration
+
+```typescript
+// src/core/similarity/resource-similarity.ts
+export class ResourceSimilarityService {
+  private repository: NodeRepository;
+  private commonPatterns: Map<string, ResourcePattern[]>;
+  
+  async findSimilarResources(
+    nodeType: string, 
+    invalidResource: string,
+    limit: number = 5
+  ): Promise<ResourceSuggestion[]> {
+    // 1. Check common patterns first
+    // 2. Get valid resources for node
+    // 3. Score by Levenshtein + substring match
+    // 4. Include available operations in suggestion
+  }
+}
+```
+
+### Files to Create
+
+| File | LOC | Purpose |
+|------|-----|---------|
+| `src/core/similarity/resource-similarity.ts` | ~200 | Port from MCP |
+| `src/core/similarity/resource-patterns.ts` | ~100 | Common patterns |
+
+---
+
+## Enhanced Validator Integration
+
+### Unified Suggestion System
+
+Integrate all three similarity services into the validator:
+
+```typescript
+// src/core/validator.ts
+import { 
+  NodeSimilarityService, 
+  OperationSimilarityService, 
+  ResourceSimilarityService 
+} from './similarity/index.js';
+
+async function validateNodeConfiguration(
+  node: WorkflowNode, 
+  nodeInfo: NodeInfo
+): Promise<ValidationIssue[]> {
+  const issues: ValidationIssue[] = [];
+  const repo = await getNodeRepository();
+  
+  // 1. Validate node type
+  if (!nodeInfo) {
+    const nodeSuggestions = await new NodeSimilarityService(repo)
+      .findSimilarNodes(node.type);
+    issues.push({ code: 'UNKNOWN_NODE_TYPE', suggestions: nodeSuggestions });
+  }
+  
+  // 2. Validate resource (if node uses resources)
+  const resource = node.parameters?.resource;
+  if (resource && !isValidResource(nodeInfo, resource)) {
+    const resourceSuggestions = await new ResourceSimilarityService(repo)
+      .findSimilarResources(node.type, resource);
+    issues.push({ code: 'INVALID_RESOURCE', suggestions: resourceSuggestions });
+  }
+  
+  // 3. Validate operation
+  const operation = node.parameters?.operation;
+  if (operation && !isValidOperation(nodeInfo, resource, operation)) {
+    const opSuggestions = await new OperationSimilarityService(repo)
+      .findSimilarOperations(node.type, operation, resource);
+    issues.push({ code: 'INVALID_OPERATION', suggestions: opSuggestions });
+  }
+  
+  return issues;
+}
+```
+
+### Enhanced JSON Output
+
+```json
+{
+  "valid": false,
+  "errors": [
+    {
+      "code": "INVALID_RESOURCE",
+      "nodeName": "Slack",
+      "path": "nodes[0].parameters.resource",
+      "context": {
+        "value": "messages",
+        "expected": "message"
+      },
+      "suggestions": [
+        { "value": "message", "confidence": 0.95, "reason": "Use singular form", "autoFixable": true },
+        { "value": "channel", "confidence": 0.50, "reason": "Alternative resource" }
+      ],
+      "hint": "Did you mean: message? (95% match)"
+    },
+    {
+      "code": "INVALID_OPERATION",
+      "nodeName": "Slack",
+      "path": "nodes[0].parameters.operation",
+      "context": {
+        "value": "sendMessage",
+        "expected": "send"
+      },
+      "suggestions": [
+        { "value": "send", "confidence": 0.95, "reason": "Use \"send\" instead", "autoFixable": true }
+      ]
+    }
+  ]
+}
+```
+
+---
+
+## Complete Files Summary
+
+### Files to Create
+
+| File | LOC | Purpose | MCP Source |
+|------|-----|---------|------------|
+| `src/core/similarity/types.ts` | ~60 | All interface definitions | Combined |
+| `src/core/similarity/node-similarity.ts` | ~200 | Node type suggestions | `node-similarity-service.ts` |
+| `src/core/similarity/operation-similarity.ts` | ~200 | Operation suggestions | `operation-similarity-service.ts` |
+| `src/core/similarity/resource-similarity.ts` | ~200 | Resource suggestions | `resource-similarity-service.ts` |
+| `src/core/similarity/common-patterns.ts` | ~150 | All common patterns | Combined |
+| `src/core/similarity/index.ts` | ~15 | Re-exports | N/A |
+| **Total** | **~825** | | |
+
+### Files to Modify
+
+| File | Change | LOC Added |
+|------|--------|-----------|
+| `src/core/validator.ts` | Integrate all 3 services | ~50 |
+| `src/core/fixer.ts` | Add `resource-correction`, `operation-correction` fixes | ~60 |
+| `src/core/types.ts` | Add suggestion types | ~20 |
+| `src/commands/workflows/validate.ts` | Display all suggestions | ~30 |
+
+---
+
+## Autofix Integration
+
+### New Fix Types
+
+```typescript
+// src/core/autofix/types.ts
+export type FixType =
+  | 'expression-format'
+  | 'node-type-correction'      // Existing
+  | 'resource-correction'       // NEW
+  | 'operation-correction'      // NEW
+  | 'webhook-missing-path'
+  | 'switch-options'
+  | 'typeversion-correction'
+  | 'error-output-config'
+  | 'typeversion-upgrade'
+  | 'version-migration';
+```
+
+### Example Autofix Output
+
+```bash
+n8n workflows autofix workflow.json --apply --json
+```
+
+```json
+{
+  "fixes": [
+    { 
+      "type": "node-type-correction", 
+      "node": "My Slack", 
+      "field": "type",
+      "before": "n8n-nodes-base.slak", 
+      "after": "n8n-nodes-base.slack", 
+      "confidence": "high" 
+    },
+    { 
+      "type": "resource-correction", 
+      "node": "My Slack", 
+      "field": "parameters.resource",
+      "before": "messages", 
+      "after": "message", 
+      "confidence": "high" 
+    },
+    { 
+      "type": "operation-correction", 
+      "node": "My Slack", 
+      "field": "parameters.operation",
+      "before": "sendMessage", 
+      "after": "send", 
+      "confidence": "high" 
+    }
+  ]
+}
+```
+
+---
+
+## Updated Estimated Effort
+
+| Component | LOC | Time |
+|-----------|-----|------|
+| **Node Similarity** (existing doc scope) | 330 | 1 day |
+| **Operation Similarity** (NEW) | 350 | 0.5 day |
+| **Resource Similarity** (NEW) | 350 | 0.5 day |
+| **Validator Integration** | 100 | 0.5 day |
+| **Autofix Integration** | 60 | 0.5 day |
+| **Testing** | 200 | 0.5 day |
+| **Total** | **~1,390** | **3.5 days** |
+
+---
+
 ## Related Planning Documents
 
-- **04-P0-workflow-autofix-engine.md** - Uses this for `node-type-correction` fix type
+- **04-P0-advanced-autofix.md** - Uses this for `node-type-correction`, `resource-correction`, `operation-correction` fix types
 - **08-P1-node-version-service.md** - Node version handling (complementary)
 - **09-P1-breaking-change-detector.md** - Uses node database patterns
+- **14-P2-enhanced-config-validator.md** - Uses similarity for validation suggestions
