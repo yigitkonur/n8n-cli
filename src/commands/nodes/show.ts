@@ -1,7 +1,7 @@
 /**
  * Nodes Show Command
  * Show detailed information about a specific n8n node
- * Enhanced version of 'get' with schema, minimal, and examples modes
+ * Enhanced version with detail levels, modes, and property search
  */
 
 import chalk from 'chalk';
@@ -14,19 +14,17 @@ import { formatNextActions } from '../../core/formatters/next-actions.js';
 import { formatExportFooter } from '../../core/formatters/jq-recipes.js';
 import { saveToJson, outputJson } from '../../core/formatters/json.js';
 import { theme, icons, formatBoolean } from '../../core/formatters/theme.js';
-import { BreakingChangeDetector, type DetectedChange, type Severity, getTrackedVersionsForNode, getLatestRegistryVersion } from '../../core/versioning/index.js';
+import { PropertyFilter, type SimplifiedProperty } from '../../core/services/property-filter.js';
+import type { 
+  ShowOptions, 
+  DetailLevel, 
+  NodeShowMode,
+  NodeMinimalInfo,
+  NodeStandardInfo 
+} from '../../types/node-detail.js';
 
-interface ShowOptions {
-  schema?: boolean;
-  minimal?: boolean;
-  examples?: boolean;
-  mode?: string;
-  detail?: string;
-  from?: string;
-  to?: string;
-  save?: string;
-  json?: boolean;
-}
+// Re-export ShowOptions for cli.ts
+export type { ShowOptions };
 
 export async function nodesShowCommand(nodeType: string, opts: ShowOptions): Promise<void> {
   try {
@@ -56,48 +54,275 @@ export async function nodesShowCommand(nodeType: string, opts: ShowOptions): Pro
       return;
     }
     
-    // JSON output mode
-    if (opts.json) {
-      outputJson({
-        ...node,
-        fullType: NodeRepository.formatNodeType(node.nodeType),
-      });
-      return;
-    }
+    // Normalize legacy flags to new options (backwards compatibility)
+    const detail: DetailLevel = opts.schema ? 'full' 
+      : opts.minimal ? 'minimal' 
+      : (opts.detail as DetailLevel) || 'standard';
+    const mode: NodeShowMode = (opts.mode as NodeShowMode) || 'info';
+    const includeExamples = opts.examples || opts.includeExamples;
     
-    // Save to file if requested
+    // Save to file if requested (before any output)
     if (opts.save) {
       await saveToJson(node, { path: opts.save });
     }
     
-    // Determine output mode
-    if (opts.schema) {
-      outputSchema(node);
-    } else if (opts.minimal) {
-      outputMinimal(node);
-    } else if (opts.examples) {
-      outputExamples(node);
-    } else {
-      // Default or based on --mode
-      switch (opts.mode) {
-        case 'docs':
-          outputDocs(node);
-          break;
-        case 'versions':
-          outputVersions(node);
-          break;
-        case 'breaking':
-          outputBreaking(node, opts.from, opts.to);
-          break;
-        default:
-          outputInfo(node, opts.detail || 'standard');
-      }
+    // Route by mode
+    switch (mode) {
+      case 'info':
+        await handleInfoMode(node, detail, opts.includeTypeInfo, includeExamples, opts);
+        break;
+      case 'docs':
+        outputDocs(node);
+        break;
+      case 'search-properties':
+        if (!opts.query) {
+          console.error(chalk.red(`\n${icons.error} --query required for search-properties mode`));
+          console.log(chalk.dim('  Example: n8n nodes show httpRequest --mode search-properties --query "auth"'));
+          process.exitCode = 1;
+          return;
+        }
+        handlePropertySearch(node, opts.query, opts.maxResults || 20, opts);
+        break;
+      case 'versions':
+        outputVersions(node);
+        break;
+      case 'compare':
+        if (!opts.from) {
+          console.error(chalk.red(`\n${icons.error} --from required for compare mode`));
+          console.log(chalk.dim('  Example: n8n nodes show httpRequest --mode compare --from 3 --to 4'));
+          process.exitCode = 1;
+          return;
+        }
+        outputVersionStub(node, 'compare', opts.from, opts.to);
+        break;
+      case 'breaking':
+        if (!opts.from) {
+          console.error(chalk.red(`\n${icons.error} --from required for breaking mode`));
+          console.log(chalk.dim('  Example: n8n nodes show httpRequest --mode breaking --from 3'));
+          process.exitCode = 1;
+          return;
+        }
+        outputVersionStub(node, 'breaking', opts.from, opts.to);
+        break;
+      case 'migrations':
+        if (!opts.from || !opts.to) {
+          console.error(chalk.red(`\n${icons.error} --from and --to required for migrations mode`));
+          console.log(chalk.dim('  Example: n8n nodes show httpRequest --mode migrations --from 3 --to 4'));
+          process.exitCode = 1;
+          return;
+        }
+        outputVersionStub(node, 'migrations', opts.from, opts.to);
+        break;
+      default:
+        console.error(chalk.red(`\n${icons.error} Unknown mode: ${mode}`));
+        console.log(chalk.dim('  Valid modes: info, docs, search-properties, versions, compare, breaking, migrations'));
+        process.exitCode = 1;
     }
     
   } catch (error: any) {
     console.error(chalk.red(`\n${icons.error} Error: ${error.message}`));
     process.exitCode = 1;
   }
+}
+
+/**
+ * Handle info mode with detail levels
+ */
+async function handleInfoMode(
+  node: NodeInfo,
+  detail: DetailLevel,
+  includeTypeInfo?: boolean,
+  includeExamples?: boolean,
+  opts?: ShowOptions
+): Promise<void> {
+  const fullType = NodeRepository.formatNodeType(node.nodeType);
+  
+  switch (detail) {
+    case 'minimal':
+      // ~200 tokens: basic metadata only
+      const minimalOutput: NodeMinimalInfo = {
+        nodeType: node.nodeType,
+        workflowNodeType: fullType,
+        displayName: node.displayName,
+        description: node.description,
+        category: node.category,
+        package: node.package,
+        isAITool: node.isAITool,
+        isTrigger: node.isTrigger,
+        isWebhook: node.isWebhook
+      };
+      
+      if (opts?.json) {
+        outputJson(minimalOutput);
+        return;
+      }
+      
+      // Human-readable minimal output
+      console.log(chalk.bold.cyan(`\n${node.displayName}`) + chalk.dim(` (${fullType})`));
+      console.log(chalk.dim(`  ${node.description || 'No description'}`));
+      console.log('');
+      console.log(`  Category: ${chalk.yellow(node.category)}  Package: ${chalk.yellow(node.package)}`);
+      console.log(`  ${formatBoolean(node.isTrigger)} Trigger   ${formatBoolean(node.isWebhook)} Webhook   ${formatBoolean(node.isAITool)} AI Tool`);
+      console.log('');
+      break;
+      
+    case 'standard':
+      // ~1-2K tokens: essential properties + operations
+      const essentials = PropertyFilter.getEssentials(node.properties, node.nodeType);
+      const operations = extractOperations(node);
+      
+      const standardOutput: NodeStandardInfo = {
+        nodeType: node.nodeType,
+        workflowNodeType: fullType,
+        displayName: node.displayName,
+        description: node.description,
+        category: node.category,
+        package: node.package,
+        isAITool: node.isAITool,
+        isTrigger: node.isTrigger,
+        isWebhook: node.isWebhook,
+        requiredProperties: essentials.required,
+        commonProperties: essentials.common,
+        operations,
+        credentials: node.credentials || [],
+        versionInfo: {
+          currentVersion: node.version || '1',
+          totalVersions: 0,
+          hasVersionHistory: false
+        }
+      };
+      
+      if (opts?.json) {
+        outputJson(standardOutput);
+        return;
+      }
+      
+      // Human-readable standard output
+      outputInfo(node, 'standard');
+      
+      // Show essential properties
+      if (essentials.required.length > 0 || essentials.common.length > 0) {
+        console.log(formatDivider('Essential Properties'));
+        
+        if (essentials.required.length > 0) {
+          console.log(chalk.bold('  Required:'));
+          essentials.required.forEach(prop => {
+            console.log(`    ${chalk.cyan(prop.name)} ${chalk.dim(`(${prop.type})`)} - ${chalk.dim(prop.description.slice(0, 50))}`);
+          });
+        }
+        
+        if (essentials.common.length > 0) {
+          console.log(chalk.bold('  Common:'));
+          essentials.common.forEach(prop => {
+            console.log(`    ${chalk.cyan(prop.name)} ${chalk.dim(`(${prop.type})`)} - ${chalk.dim(prop.description.slice(0, 50))}`);
+          });
+        }
+        console.log('');
+      }
+      break;
+      
+    case 'full':
+      // ~3-8K tokens: everything
+      if (opts?.json) {
+        outputJson({
+          ...node,
+          fullType,
+          versionInfo: {
+            currentVersion: node.version || '1',
+            totalVersions: 0,
+            hasVersionHistory: false
+          }
+        });
+        return;
+      }
+      
+      outputSchema(node);
+      break;
+  }
+}
+
+/**
+ * Handle property search mode
+ */
+function handlePropertySearch(
+  node: NodeInfo,
+  query: string,
+  maxResults: number,
+  opts: ShowOptions
+): void {
+  const matches = PropertyFilter.searchProperties(node.properties || [], query, maxResults);
+  
+  if (opts.json) {
+    outputJson({
+      nodeType: node.nodeType,
+      query,
+      matches,
+      totalMatches: matches.length
+    });
+    return;
+  }
+  
+  console.log(formatHeader({
+    title: `Property Search: "${query}" in ${node.displayName}`,
+    icon: '🔍',
+    context: { 'Results': `${matches.length} found` }
+  }));
+  
+  console.log('');
+  
+  if (matches.length === 0) {
+    console.log(chalk.yellow('  No properties found matching your query.'));
+    console.log(chalk.dim('  Try a different search term or use --mode info to see all properties.'));
+    return;
+  }
+  
+  matches.forEach((match, i) => {
+    const prop = match as SimplifiedProperty & { path?: string };
+    console.log(`  ${i + 1}. ${chalk.cyan(prop.path || prop.name)}`);
+    console.log(`     Type: ${chalk.yellow(prop.type)}`);
+    if (prop.description) {
+      console.log(`     ${chalk.dim(prop.description.slice(0, 80))}`);
+    }
+    if (prop.showWhen) {
+      console.log(`     Shows when: ${chalk.dim(JSON.stringify(prop.showWhen))}`);
+    }
+    if (prop.options && prop.options.length > 0) {
+      const optValues = prop.options.slice(0, 5).map(o => o.value).join(', ');
+      console.log(`     Options: ${chalk.dim(optValues)}${prop.options.length > 5 ? '...' : ''}`);
+    }
+    console.log('');
+  });
+}
+
+/**
+ * Output stub for version modes (requires P1-08 implementation)
+ */
+function outputVersionStub(
+  node: NodeInfo,
+  mode: 'compare' | 'breaking' | 'migrations',
+  from: string,
+  to?: string
+): void {
+  console.log(formatHeader({
+    title: `${node.displayName} - Version ${mode.charAt(0).toUpperCase() + mode.slice(1)}`,
+    icon: '📦',
+    context: { 
+      'From': from, 
+      'To': to || 'latest',
+      'Status': 'Pending'
+    },
+  }));
+  
+  console.log('');
+  console.log(chalk.yellow('  ⚠️  Version data not yet available.'));
+  console.log(chalk.dim(''));
+  console.log(chalk.dim('  Version comparison features require the node_versions database table'));
+  console.log(chalk.dim('  which will be implemented in P1-08 (Node Version Service).'));
+  console.log('');
+  console.log(chalk.dim('  For now, you can:'));
+  console.log(chalk.dim('  • Use --mode info to see current node configuration'));
+  console.log(chalk.dim('  • Check n8n documentation for version history'));
+  console.log('');
 }
 
 /**

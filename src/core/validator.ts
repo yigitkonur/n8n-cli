@@ -442,7 +442,7 @@ export function validateWorkflowStructure(data: unknown, options?: ValidateOptio
               const enhancedResult = EnhancedConfigValidator.validateWithMode(
                 nodeType,
                 node.parameters,
-                nodeTypeDescription.properties,
+                nodeTypeDescription.properties as any[], // Cast to any[] for compatibility with n8n's INodeProperties
                 mode,
                 profile
               );

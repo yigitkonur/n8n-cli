@@ -565,6 +565,9 @@ n8n workflows autofix workflow.json --save fixed.json
 
 # Apply with JSON output for scripting
 n8n workflows autofix abc123 --apply --force --json
+
+# Apply fixes without guidance display
+n8n workflows autofix abc123 --apply --no-guidance
 ```
 
 #### `workflows versions`
