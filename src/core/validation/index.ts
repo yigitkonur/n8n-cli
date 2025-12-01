@@ -80,3 +80,12 @@ export {
   extractExpressionContent,
   hasMixedContent,
 } from './expression-utils.js';
+
+// ========== Pre-API Validation ==========
+export {
+  validateBeforeApi,
+  displayValidationErrors,
+  hasStructuralErrors,
+  type PreValidationOptions,
+  type PreValidationResult,
+} from './pre-api-validator.js';

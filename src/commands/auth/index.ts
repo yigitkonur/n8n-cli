@@ -5,7 +5,7 @@
 
 import chalk from 'chalk';
 import { formatHeader } from '../../core/formatters/header.js';
-import { theme, icons } from '../../core/formatters/theme.js';
+import { icons } from '../../core/formatters/theme.js';
 
 // Re-export command handlers for CLI registration
 export { authLoginCommand, type LoginOptions } from './login.js';

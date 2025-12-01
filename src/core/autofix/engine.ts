@@ -9,30 +9,25 @@
  */
 
 import crypto from 'crypto';
-import type { Workflow, WorkflowNode, ValidationResult, ValidationIssue } from '../types.js';
-import type {
-  FixOperation,
-  FixType,
-  FixConfidenceLevel,
-  AutoFixConfig,
-  AutoFixResult,
-  FixStats,
-  ExpressionFormatIssue,
-  NodeSuggestion,
-} from './types.js';
-import { 
-  DEFAULT_AUTOFIX_CONFIG, 
-  createEmptyStats, 
-  CONFIDENCE_ORDER,
+import type { Workflow, WorkflowNode, ValidationResult } from '../types.js';
+import {
+  type FixOperation,
+  type FixConfidenceLevel,
+  type AutoFixConfig,
+  type AutoFixResult,
+  type FixStats,
+  type AppliedMigrationInfo,
+  DEFAULT_AUTOFIX_CONFIG,
+  createEmptyStats,
   getConfidenceIndex,
 } from './types.js';
 import { ExpressionValidator } from './expression-validator.js';
 import { NodeSimilarityService } from './node-similarity.js';
-import { 
-  getBreakingChangesForNode, 
-  hasBreakingChanges,
-  getMigrationHints,
-} from './breaking-changes-registry.js';
+import {
+  NodeVersionService,
+  NodeMigrationService,
+  BreakingChangeDetector,
+} from '../versioning/index.js';
 import type { NodeRepository } from '../db/nodes.js';
 
 /**
@@ -43,12 +38,19 @@ import type { NodeRepository } from '../db/nodes.js';
 export class WorkflowAutoFixer {
   private similarityService: NodeSimilarityService | null = null;
   private repository: NodeRepository | null = null;
+  private versionService: NodeVersionService;
+  private migrationService: NodeMigrationService;
+  private breakingChangeDetector: BreakingChangeDetector;
 
   constructor(repository?: NodeRepository) {
     if (repository) {
       this.repository = repository;
       this.similarityService = new NodeSimilarityService(repository);
     }
+    // Initialize versioning services
+    this.breakingChangeDetector = new BreakingChangeDetector();
+    this.versionService = new NodeVersionService(this.breakingChangeDetector);
+    this.migrationService = new NodeMigrationService(this.versionService, this.breakingChangeDetector);
   }
 
   /**
@@ -66,8 +68,8 @@ export class WorkflowAutoFixer {
     const nodeMap = new Map<string, WorkflowNode>();
     if (workflow.nodes) {
       for (const node of workflow.nodes) {
-        if (node.name) nodeMap.set(node.name, node);
-        if (node.id) nodeMap.set(node.id, node);
+        if (node.name) {nodeMap.set(node.name, node);}
+        if (node.id) {nodeMap.set(node.id, node);}
       }
     }
 
@@ -141,10 +143,10 @@ export class WorkflowAutoFixer {
    * Process expression format fixes (missing = prefix)
    */
   private processExpressionFormatFixes(workflow: Workflow, fixes: FixOperation[]): void {
-    if (!workflow.nodes) return;
+    if (!workflow.nodes) {return;}
 
     for (const node of workflow.nodes) {
-      if (!node.parameters) continue;
+      if (!node.parameters) {continue;}
 
       const context = {
         nodeType: node.type,
@@ -175,7 +177,7 @@ export class WorkflowAutoFixer {
    * Process Switch/If node options fixes (existing CLI fixes)
    */
   private processSwitchOptionsFixes(workflow: Workflow, fixes: FixOperation[]): void {
-    if (!workflow.nodes) return;
+    if (!workflow.nodes) {return;}
 
     for (const node of workflow.nodes) {
       // Fix empty options on If/Switch nodes
@@ -269,10 +271,10 @@ export class WorkflowAutoFixer {
         if (issue.message.toLowerCase().includes('webhook path') ||
             (issue.code === 'MISSING_PROPERTY' && issue.location?.path?.includes('path'))) {
           const nodeName = issue.location?.nodeName || issue.location?.nodeId;
-          if (!nodeName) continue;
+          if (!nodeName) {continue;}
 
           const node = nodeMap.get(nodeName);
-          if (!node || !node.type?.includes('webhook')) continue;
+          if (!node || !node.type?.includes('webhook')) {continue;}
 
           const webhookId = crypto.randomUUID();
           const currentVersion = node.typeVersion || 1;
@@ -297,7 +299,7 @@ export class WorkflowAutoFixer {
     // Also check for webhooks without paths directly
     if (workflow.nodes) {
       for (const node of workflow.nodes) {
-        if (!node.type?.includes('webhook')) continue;
+        if (!node.type?.includes('webhook')) {continue;}
         
         const params = node.parameters as Record<string, unknown> | undefined;
         if (!params?.path && !fixes.some(f => f.node === node.name && f.type === 'webhook-missing-path')) {
@@ -326,7 +328,7 @@ export class WorkflowAutoFixer {
     validationResult: ValidationResult | undefined,
     fixes: FixOperation[]
   ): Promise<void> {
-    if (!this.similarityService || !workflow.nodes) return;
+    if (!this.similarityService || !workflow.nodes) {return;}
 
     // Check validation errors for unknown node types
     if (validationResult?.issues) {
@@ -336,8 +338,9 @@ export class WorkflowAutoFixer {
           const nodeName = issue.location?.nodeName;
           const nodeType = issue.location?.nodeType || issue.context?.value as string;
           
-          if (!nodeName || !nodeType) continue;
+          if (!nodeName || !nodeType) {continue;}
 
+           
           const suggestions = await this.similarityService.findSimilarNodes(nodeType, 3);
           const autoFixable = suggestions.find(s => this.similarityService!.isAutoFixable(s));
 
@@ -366,7 +369,7 @@ export class WorkflowAutoFixer {
     nodeMap: Map<string, WorkflowNode>,
     fixes: FixOperation[]
   ): void {
-    if (!validationResult?.issues) return;
+    if (!validationResult?.issues) {return;}
 
     for (const issue of validationResult.issues) {
       if (issue.message.includes('typeVersion') && 
@@ -377,7 +380,7 @@ export class WorkflowAutoFixer {
           const maxVersion = parseFloat(versionMatch[2]);
           const nodeName = issue.location?.nodeName || issue.location?.nodeId;
 
-          if (!nodeName) continue;
+          if (!nodeName) {continue;}
 
           fixes.push({
             node: nodeName,
@@ -403,13 +406,13 @@ export class WorkflowAutoFixer {
     workflow: Workflow,
     fixes: FixOperation[]
   ): void {
-    if (!validationResult?.issues) return;
+    if (!validationResult?.issues) {return;}
 
     for (const issue of validationResult.issues) {
       if (issue.message.includes("onError: 'continueErrorOutput'") &&
           issue.message.includes('no error output')) {
         const nodeName = issue.location?.nodeName || issue.location?.nodeId;
-        if (!nodeName) continue;
+        if (!nodeName) {continue;}
 
         fixes.push({
           node: nodeName,
@@ -426,65 +429,132 @@ export class WorkflowAutoFixer {
   }
 
   /**
-   * Process version upgrade suggestions
+   * Process version upgrade suggestions with actual migration
+   * Uses NodeVersionService and NodeMigrationService from versioning module
    */
   private processVersionUpgradeFixes(workflow: Workflow, fixes: FixOperation[]): void {
-    if (!this.repository || !workflow.nodes) return;
+    if (!workflow.nodes) {return;}
 
     for (const node of workflow.nodes) {
-      if (!node.type || !node.typeVersion) continue;
+      if (!node.type || node.typeVersion === undefined) {continue;}
 
-      // Get node info from repository to check latest version
-      const nodeInfo = this.repository.getNode(node.type);
-      if (!nodeInfo?.version) continue;
+      // Skip community nodes (not in our registry)
+      if (!node.type.startsWith('n8n-nodes-base.') && !node.type.startsWith('@n8n/')) {continue;}
 
-      const currentVersion = node.typeVersion.toString();
-      const latestVersion = nodeInfo.version;
+      // Check if this node type is tracked in our registry
+      if (!this.versionService.isNodeTracked(node.type)) {continue;}
 
-      // Compare versions
-      if (this.compareVersions(currentVersion, latestVersion) < 0) {
-        const hasBreaking = hasBreakingChanges(node.type, currentVersion, latestVersion);
+      const currentVersion = String(node.typeVersion);
 
-        fixes.push({
-          node: node.name || 'unnamed',
-          field: 'typeVersion',
-          type: 'typeversion-upgrade',
-          before: currentVersion,
-          after: latestVersion,
-          confidence: hasBreaking ? 'medium' : 'high',
-          description: hasBreaking
-            ? `Upgrade available: v${currentVersion} → v${latestVersion} (has breaking changes)`
-            : `Upgrade available: v${currentVersion} → v${latestVersion}`,
-          nodeId: node.id,
-        });
+      // Analyze if upgrade is needed
+      const analysis = this.versionService.analyzeVersion(node.type, currentVersion);
+      if (!analysis.isOutdated || !analysis.recommendUpgrade) {continue;}
+
+      // Clone node to safely test migration
+      const clonedNode = structuredClone(node) as Record<string, unknown>;
+
+      // Apply migration to the clone
+      const migrationResult = this.migrationService.migrateNode(clonedNode);
+
+      // Convert AppliedMigration[] to AppliedMigrationInfo[]
+      const appliedMigrations: AppliedMigrationInfo[] = migrationResult.appliedMigrations.map(m => ({
+        propertyName: m.propertyName,
+        action: m.action,
+        oldValue: m.oldValue,
+        newValue: m.newValue,
+      }));
+
+      // Determine confidence based on migration result
+      let confidence: FixConfidenceLevel = 'high';
+      if (migrationResult.remainingIssues.length > 0) {
+        confidence = migrationResult.remainingIssues.length > 2 ? 'low' : 'medium';
+      } else if (analysis.hasBreakingChanges) {
+        confidence = 'medium';
       }
+
+      // Build description
+      const migrationsApplied = appliedMigrations.length > 0
+        ? ` (${appliedMigrations.length} auto-migration${appliedMigrations.length === 1 ? '' : 's'} applied)`
+        : '';
+      const manualRequired = migrationResult.remainingIssues.length > 0
+        ? ` [${migrationResult.remainingIssues.length} manual action${migrationResult.remainingIssues.length === 1 ? '' : 's'} required]`
+        : '';
+
+      fixes.push({
+        node: node.name || 'unnamed',
+        field: 'typeVersion',
+        type: 'typeversion-upgrade',
+        before: currentVersion,
+        after: migrationResult.toVersion,
+        confidence,
+        description: `Upgrade: v${currentVersion} → v${migrationResult.toVersion}${migrationsApplied}${manualRequired}`,
+        nodeId: node.id,
+        appliedMigrations: appliedMigrations.length > 0 ? appliedMigrations : undefined,
+        remainingIssues: migrationResult.remainingIssues.length > 0 ? migrationResult.remainingIssues : undefined,
+        newTypeVersion: this.parseVersion(migrationResult.toVersion),
+      });
     }
   }
 
   /**
-   * Process version migration information (informational)
+   * Parse version string to number for typeVersion field
+   */
+  private parseVersion(version: string): number {
+    const parts = version.split('.').map(Number);
+    if (parts.length === 1) {return parts[0];}
+    if (parts.length === 2) {return parts[0] + parts[1] / 10;}
+    return parts[0];
+  }
+
+  /**
+   * Process version migration information with detailed breaking change analysis
+   * Uses BreakingChangeDetector from versioning module for comprehensive analysis
    */
   private processVersionMigrationFixes(workflow: Workflow, fixes: FixOperation[]): void {
-    if (!workflow.nodes) return;
+    if (!workflow.nodes) {return;}
 
     for (const node of workflow.nodes) {
-      if (!node.type || !node.typeVersion) continue;
+      if (!node.type || node.typeVersion === undefined) {continue;}
 
-      const currentVersion = node.typeVersion.toString();
-      const hints = getMigrationHints(node.type, currentVersion, '99.0'); // Get all future hints
+      // Skip community nodes
+      if (!node.type.startsWith('n8n-nodes-base.') && !node.type.startsWith('@n8n/')) {continue;}
 
-      if (hints.length > 0) {
-        fixes.push({
-          node: node.name || 'unnamed',
-          field: 'typeVersion',
-          type: 'version-migration',
-          before: currentVersion,
-          after: 'latest',
-          confidence: 'low',
-          description: `Migration info: ${hints.slice(0, 2).join('; ')}${hints.length > 2 ? '...' : ''}`,
-          nodeId: node.id,
-        });
-      }
+      // Skip if not tracked
+      if (!this.versionService.isNodeTracked(node.type)) {continue;}
+
+      const currentVersion = String(node.typeVersion);
+      const latestVersion = this.versionService.getLatestVersion(node.type);
+      
+      if (!latestVersion) {continue;}
+
+      // Get detailed breaking change analysis
+      const analysis = this.breakingChangeDetector.analyzeVersionUpgrade(
+        node.type,
+        currentVersion,
+        latestVersion
+      );
+
+      // Only add if there are relevant changes to report
+      if (analysis.changes.length === 0) {continue;}
+
+      // Build comprehensive description from recommendations
+      const description = analysis.recommendations.length > 0
+        ? analysis.recommendations.slice(0, 2).join(' ')
+        : `Version analysis: ${analysis.autoMigratableCount} auto-migratable, ${analysis.manualRequiredCount} manual`;
+
+      fixes.push({
+        node: node.name || 'unnamed',
+        field: 'typeVersion',
+        type: 'version-migration',
+        before: currentVersion,
+        after: latestVersion,
+        confidence: analysis.overallSeverity === 'HIGH' ? 'low' : 'medium',
+        description,
+        nodeId: node.id,
+        remainingIssues: analysis.changes
+          .filter(c => !c.autoMigratable)
+          .map(c => c.migrationHint),
+      });
     }
   }
 
@@ -495,7 +565,7 @@ export class WorkflowAutoFixer {
     fixes: FixOperation[],
     threshold?: FixConfidenceLevel
   ): FixOperation[] {
-    if (!threshold) return fixes;
+    if (!threshold) {return fixes;}
 
     const thresholdIndex = getConfidenceIndex(threshold);
 
@@ -584,7 +654,7 @@ export class WorkflowAutoFixer {
     // Apply fixes to each node
     for (const node of modified.nodes || []) {
       const nodeFixes = fixesByNode.get(node.name || '') || fixesByNode.get(node.id || '');
-      if (!nodeFixes) continue;
+      if (!nodeFixes) {continue;}
 
       for (const fix of nodeFixes) {
         this.applyFixToNode(node, fix);
@@ -598,6 +668,11 @@ export class WorkflowAutoFixer {
    * Apply a single fix to a node
    */
   private applyFixToNode(node: WorkflowNode, fix: FixOperation): void {
+    // Skip informational-only fix types (these don't actually change anything)
+    if (fix.type === 'version-migration') {
+      return;
+    }
+
     const pathParts = fix.field.split('.');
     let current: any = node;
 
@@ -608,11 +683,11 @@ export class WorkflowAutoFixer {
 
       if (arrayMatch) {
         const [, key, index] = arrayMatch;
-        if (!current[key]) current[key] = [];
-        if (!current[key][parseInt(index)]) current[key][parseInt(index)] = {};
-        current = current[key][parseInt(index)];
+        if (!current[key]) {current[key] = [];}
+        if (!current[key][parseInt(index, 10)]) {current[key][parseInt(index, 10)] = {};}
+        current = current[key][parseInt(index, 10)];
       } else {
-        if (!current[part]) current[part] = {};
+        if (!current[part]) {current[part] = {};}
         current = current[part];
       }
     }
@@ -624,18 +699,16 @@ export class WorkflowAutoFixer {
     if (arrayMatch) {
       const [, key, index] = arrayMatch;
       if (fix.after === undefined) {
-        delete current[key][parseInt(index)];
+        delete current[key][parseInt(index, 10)];
       } else {
-        if (!current[key]) current[key] = [];
-        current[key][parseInt(index)] = fix.after;
+        if (!current[key]) {current[key] = [];}
+        current[key][parseInt(index, 10)] = fix.after;
       }
-    } else {
-      if (fix.after === undefined) {
+    } else if (fix.after === undefined) {
         delete current[lastPart];
       } else {
         current[lastPart] = fix.after;
       }
-    }
 
     // Special handling for specific fix types
     if (fix.type === 'webhook-missing-path') {
@@ -652,10 +725,54 @@ export class WorkflowAutoFixer {
       const params = node.parameters as Record<string, unknown>;
       const rules = params?.rules as Record<string, unknown>;
       if (rules && 'fallbackOutput' in rules) {
-        if (!params.options) params.options = {};
+        if (!params.options) {params.options = {};}
         (params.options as Record<string, unknown>).fallbackOutput = rules.fallbackOutput;
         delete rules.fallbackOutput;
       }
+    }
+
+    // Handle typeversion-upgrade: apply migrations from the cloned node
+    if (fix.type === 'typeversion-upgrade') {
+      // Update typeVersion to the new version
+      if (fix.newTypeVersion !== undefined) {
+        node.typeVersion = fix.newTypeVersion;
+      }
+
+      // Apply each migration (parameter changes)
+      if (fix.appliedMigrations && fix.appliedMigrations.length > 0) {
+        for (const migration of fix.appliedMigrations) {
+          this.applyMigrationToNode(node, migration);
+        }
+      }
+    }
+  }
+
+  /**
+   * Apply a single migration to a node's parameters
+   */
+  private applyMigrationToNode(node: WorkflowNode, migration: AppliedMigrationInfo): void {
+    const propertyPath = migration.propertyName;
+    
+    // Handle nested paths like "parameters.inputFieldMapping"
+    const parts = propertyPath.split('.');
+    let target: Record<string, unknown> = node as unknown as Record<string, unknown>;
+
+    // Navigate to parent of target property
+    for (let i = 0; i < parts.length - 1; i++) {
+      const part = parts[i];
+      if (!target[part] || typeof target[part] !== 'object') {
+        target[part] = {};
+      }
+      target = target[part] as Record<string, unknown>;
+    }
+
+    const finalKey = parts[parts.length - 1];
+
+    // Apply based on action
+    if (migration.action === 'Removed property') {
+      delete target[finalKey];
+    } else if (migration.newValue !== undefined) {
+      target[finalKey] = migration.newValue;
     }
   }
 
@@ -669,8 +786,8 @@ export class WorkflowAutoFixer {
     for (let i = 0; i < Math.max(parts1.length, parts2.length); i++) {
       const p1 = parts1[i] || 0;
       const p2 = parts2[i] || 0;
-      if (p1 < p2) return -1;
-      if (p1 > p2) return 1;
+      if (p1 < p2) {return -1;}
+      if (p1 > p2) {return 1;}
     }
 
     return 0;

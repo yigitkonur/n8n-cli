@@ -43,7 +43,7 @@ export async function variablesListCommand(opts: ListOptions): Promise<void> {
       outputJson({
         data: variables,
         total: variables.length,
-        hasMore: !!response.nextCursor,
+        hasMore: Boolean(response.nextCursor),
         nextCursor: response.nextCursor,
       });
       return;
@@ -80,7 +80,7 @@ export async function variablesListCommand(opts: ListOptions): Promise<void> {
     const tableData = variables.map((v: any) => ({
       id: v.id,
       key: v.key,
-      value: v.value.length > 40 ? v.value.substring(0, 37) + '...' : v.value,
+      value: v.value.length > 40 ? `${v.value.substring(0, 37)  }...` : v.value,
       type: v.type || 'string',
     }));
     
@@ -104,10 +104,10 @@ export async function variablesListCommand(opts: ListOptions): Promise<void> {
     
     // Summary
     const durationMs = Date.now() - startTime;
-    console.log('\n' + formatSummary({
+    console.log(`\n${  formatSummary({
       total: variables.length,
       durationMs,
-    }));
+    })}`);
     
     // Next actions
     if (variables.length > 0) {

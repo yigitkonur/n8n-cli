@@ -238,8 +238,8 @@ export function compareVersions(v1: string, v2: string): number {
     const p1 = parts1[i] || 0;
     const p2 = parts2[i] || 0;
 
-    if (p1 < p2) return -1;
-    if (p1 > p2) return 1;
+    if (p1 < p2) {return -1;}
+    if (p1 > p2) {return 1;}
   }
 
   return 0;
@@ -361,6 +361,6 @@ export function getTrackedVersionsForNode(nodeType: string): string[] {
  */
 export function getLatestRegistryVersion(nodeType: string): string | null {
   const versions = getTrackedVersionsForNode(nodeType);
-  if (versions.length === 0) return null;
+  if (versions.length === 0) {return null;}
   return versions[versions.length - 1];
 }

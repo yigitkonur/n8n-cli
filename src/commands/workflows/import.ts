@@ -14,13 +14,14 @@ import { outputJson } from '../../core/formatters/json.js';
 import { icons } from '../../core/formatters/theme.js';
 import { printError, N8nApiError } from '../../utils/errors.js';
 import { stripReadOnlyProperties } from '../../core/sanitizer.js';
-import { validateWorkflowStructure } from '../../core/validator.js';
+import { validateBeforeApi, displayValidationErrors } from '../../core/validation/index.js';
 import type { GlobalOptions } from '../../types/global-options.js';
 
 interface ImportOptions extends GlobalOptions {
   name?: string;
   dryRun?: boolean;
   activate?: boolean;
+  skipValidation?: boolean;
   json?: boolean;
 }
 
@@ -66,10 +67,15 @@ export async function workflowsImportCommand(filePath: string, opts: ImportOptio
     // Strip read-only properties
     const cleanedWorkflow = stripReadOnlyProperties(workflow);
     
+    // Validate workflow before API call
+    const validation = validateBeforeApi(cleanedWorkflow, {
+      rawSource: content,
+      skipValidation: opts.skipValidation,
+      json: opts.json,
+    });
+    
     // Dry-run mode: validate and preview without creating
     if (opts.dryRun) {
-      const validation = validateWorkflowStructure(cleanedWorkflow);
-      
       if (opts.json) {
         outputJson({
           dryRun: true,
@@ -125,6 +131,17 @@ export async function workflowsImportCommand(filePath: string, opts: ImportOptio
       
       process.exitCode = validation.valid ? 0 : 1;
       return;
+    }
+    
+    // Block on validation errors (unless --skip-validation)
+    if (!validation.shouldProceed) {
+      displayValidationErrors(validation, { json: opts.json, context: 'import' });
+      return;
+    }
+    
+    // Show warnings but proceed
+    if (validation.warnings.length > 0 && !opts.json) {
+      console.log(chalk.yellow(`  ⚠️  ${validation.warnings.length} validation warning(s) - proceeding anyway`));
     }
     
     // Create the workflow

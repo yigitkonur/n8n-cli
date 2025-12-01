@@ -42,8 +42,8 @@ interface VersionsOptions extends GlobalOptions {
  * Format bytes to human-readable string
  */
 function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  if (bytes < 1024) {return `${bytes} B`;}
+  if (bytes < 1024 * 1024) {return `${(bytes / 1024).toFixed(1)} KB`;}
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
@@ -187,7 +187,7 @@ export async function workflowsVersionsCommand(
         return;
       }
 
-      const targetVersion = opts.toVersion ? parseInt(opts.toVersion) : undefined;
+      const targetVersion = opts.toVersion ? parseInt(opts.toVersion, 10) : undefined;
       const targetLabel = targetVersion ? `version ${targetVersion}` : 'latest backup';
 
       if (!forceFlag) {
@@ -243,7 +243,7 @@ export async function workflowsVersionsCommand(
 
     // Handle --compare
     if (opts.compare) {
-      const parts = opts.compare.split(',').map(v => parseInt(v.trim()));
+      const parts = opts.compare.split(',').map(v => parseInt(v.trim(), 10));
       if (parts.length !== 2 || isNaN(parts[0]) || isNaN(parts[1])) {
         if (opts.json) {
           outputJson({ 
@@ -281,7 +281,7 @@ export async function workflowsVersionsCommand(
           
           const settingKeys = Object.keys(diff.settingChanges);
           if (settingKeys.length > 0) {
-            console.log(`    Settings:       ${chalk.yellow(settingKeys.length + ' changed')}`);
+            console.log(`    Settings:       ${chalk.yellow(`${settingKeys.length  } changed`)}`);
             settingKeys.slice(0, 3).forEach(key => {
               console.log(chalk.dim(`      - ${key}`));
             });
@@ -301,7 +301,7 @@ export async function workflowsVersionsCommand(
 
     // Handle --prune
     if (opts.prune) {
-      const keepCount = parseInt(opts.keep || '5');
+      const keepCount = parseInt(opts.keep || '5', 10);
       
       if (!forceFlag) {
         const confirmed = await confirmAction(
@@ -318,19 +318,17 @@ export async function workflowsVersionsCommand(
       
       if (opts.json) {
         outputJson({ success: true, data: result });
-      } else {
-        if (result.pruned > 0) {
+      } else if (result.pruned > 0) {
           console.log(chalk.green(`${icons.success} Pruned ${result.pruned} old version(s), ${result.remaining} remaining`));
         } else {
           console.log(chalk.dim(`${icons.info} No versions to prune (${result.remaining} total)`));
         }
-      }
       return;
     }
 
     // Handle --delete
     if (opts.delete) {
-      const versionId = parseInt(opts.delete);
+      const versionId = parseInt(opts.delete, 10);
       if (isNaN(versionId)) {
         if (opts.json) {
           outputJson({ success: false, error: { code: 'INVALID_VERSION_ID', message: 'Invalid version ID' } });
@@ -387,7 +385,7 @@ export async function workflowsVersionsCommand(
 
     // Handle --get
     if (opts.get) {
-      const versionId = parseInt(opts.get);
+      const versionId = parseInt(opts.get, 10);
       if (isNaN(versionId)) {
         if (opts.json) {
           outputJson({ success: false, error: { code: 'INVALID_VERSION_ID', message: 'Invalid version ID' } });
@@ -451,7 +449,7 @@ export async function workflowsVersionsCommand(
     }
 
     // Default: list versions
-    const limit = parseInt(opts.limit || '10');
+    const limit = parseInt(opts.limit || '10', 10);
     const versions = await service.getVersionHistory(workflowId, limit);
 
     if (opts.json) {
@@ -520,8 +518,7 @@ export async function workflowsVersionsCommand(
       printError(error);
     } else if ((error as Error).message?.includes('non-interactive')) {
       console.error(chalk.red(`\n${icons.error} ${(error as Error).message}`));
-    } else {
-      if (opts.json) {
+    } else if (opts.json) {
         outputJson({ 
           success: false, 
           error: { 
@@ -532,7 +529,6 @@ export async function workflowsVersionsCommand(
       } else {
         console.error(chalk.red(`${icons.error} ${error instanceof Error ? error.message : 'Unknown error'}`));
       }
-    }
     process.exitCode = ExitCode.GENERAL;
   }
 }

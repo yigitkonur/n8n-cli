@@ -61,7 +61,7 @@ export async function variablesCreateCommand(opts: CreateOptions): Promise<void>
     if (opts.json) {
       outputJson({
         success: true,
-        variable: variable,
+        variable,
       });
       return;
     }

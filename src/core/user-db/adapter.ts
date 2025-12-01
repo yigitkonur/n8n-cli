@@ -65,7 +65,6 @@ async function initializeDatabase(db: any): Promise<void> {
     currentVersion = row?.version || 0;
   } catch {
     // Table doesn't exist yet, will be created by schema
-    currentVersion = 0;
   }
   
   if (currentVersion < CURRENT_SCHEMA_VERSION) {
@@ -148,11 +147,31 @@ export async function createUserDatabaseAdapter(): Promise<UserDatabaseAdapter> 
  * Adapter implementation for better-sqlite3 (writable)
  */
 class BetterSQLiteUserAdapter implements UserDatabaseAdapter {
+  private _hasFTS5Tables: boolean | null = null;
+  
   constructor(private db: any) {
     // Register cleanup on process exit
     process.on('SIGINT', () => this.close());
     process.on('SIGTERM', () => this.close());
     process.on('beforeExit', () => this.close());
+  }
+  
+  get hasFTS5Tables(): boolean {
+    if (this._hasFTS5Tables === null) {
+      this._hasFTS5Tables = this.detectFTS5Tables();
+    }
+    return this._hasFTS5Tables;
+  }
+  
+  private detectFTS5Tables(): boolean {
+    try {
+      const result = this.db.prepare(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='nodes_fts'"
+      ).get();
+      return result !== undefined;
+    } catch {
+      return false;
+    }
   }
   
   prepare(sql: string): PreparedStatement {

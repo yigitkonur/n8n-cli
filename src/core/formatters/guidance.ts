@@ -6,7 +6,7 @@
  */
 
 import chalk from 'chalk';
-import { icons, theme } from './theme.js';
+import { icons } from './theme.js';
 import type {
   PostUpdateGuidance,
   MigrationStatus,
@@ -50,9 +50,10 @@ function formatConfidence(confidence: GuidanceConfidence): string {
  */
 function padLine(content: string, width: number): string {
   // Strip ANSI codes for length calculation
+  // eslint-disable-next-line no-control-regex -- ANSI escape code matching is intentional
   const stripped = content.replace(/\x1b\[[0-9;]*m/g, '');
   if (stripped.length > width) {
-    return content.slice(0, width - 3) + '...';
+    return `${content.slice(0, width - 3)  }...`;
   }
   const padding = width - stripped.length;
   return content + ' '.repeat(padding);
@@ -66,23 +67,23 @@ function formatSingleGuidance(guidance: PostUpdateGuidance, boxWidth: number = 7
   const innerWidth = boxWidth - 4; // Account for box borders and padding
   
   // Box top
-  lines.push(chalk.cyan('╔' + '═'.repeat(boxWidth - 2) + '╗'));
+  lines.push(chalk.cyan(`╔${  '═'.repeat(boxWidth - 2)  }╗`));
   
   // Title
   const title = `${icons.info} Post-Update Guidance`;
   lines.push(chalk.cyan('║ ') + chalk.bold(padLine(title, innerWidth)) + chalk.cyan(' ║'));
   
   // Separator
-  lines.push(chalk.cyan('╠' + '═'.repeat(boxWidth - 2) + '╣'));
+  lines.push(chalk.cyan(`╠${  '═'.repeat(boxWidth - 2)  }╣`));
   
   // Node info
-  const nodeIdShort = guidance.nodeId.length > 8 ? guidance.nodeId.slice(0, 8) + '...' : guidance.nodeId;
+  const nodeIdShort = guidance.nodeId.length > 8 ? `${guidance.nodeId.slice(0, 8)  }...` : guidance.nodeId;
   lines.push(chalk.cyan('║ ') + padLine(`Node: ${guidance.nodeName} (${nodeIdShort})`, innerWidth) + chalk.cyan(' ║'));
   lines.push(chalk.cyan('║ ') + padLine(`Type: ${guidance.nodeType}`, innerWidth) + chalk.cyan(' ║'));
   lines.push(chalk.cyan('║ ') + padLine(`Version: v${guidance.oldVersion} → v${guidance.newVersion}`, innerWidth) + chalk.cyan(' ║'));
   
   // Separator
-  lines.push(chalk.cyan('╟' + '─'.repeat(boxWidth - 2) + '╢'));
+  lines.push(chalk.cyan(`╟${  '─'.repeat(boxWidth - 2)  }╢`));
   
   // Status info
   lines.push(chalk.cyan('║ ') + padLine(`Status: ${formatStatus(guidance.migrationStatus)}`, innerWidth) + chalk.cyan(' ║'));
@@ -91,7 +92,7 @@ function formatSingleGuidance(guidance: PostUpdateGuidance, boxWidth: number = 7
   
   // Required actions
   if (guidance.requiredActions.length > 0) {
-    lines.push(chalk.cyan('╟' + '─'.repeat(boxWidth - 2) + '╢'));
+    lines.push(chalk.cyan(`╟${  '─'.repeat(boxWidth - 2)  }╢`));
     lines.push(chalk.cyan('║ ') + chalk.yellow(padLine(`${icons.warning} Required Actions (${guidance.requiredActions.length}):`, innerWidth)) + chalk.cyan(' ║'));
     
     for (const action of guidance.requiredActions.slice(0, 5)) {
@@ -114,7 +115,7 @@ function formatSingleGuidance(guidance: PostUpdateGuidance, boxWidth: number = 7
   
   // Behavior changes
   if (guidance.behaviorChanges.length > 0) {
-    lines.push(chalk.cyan('╟' + '─'.repeat(boxWidth - 2) + '╢'));
+    lines.push(chalk.cyan(`╟${  '─'.repeat(boxWidth - 2)  }╢`));
     lines.push(chalk.cyan('║ ') + chalk.blue(padLine(`${icons.info} Behavior Changes (${guidance.behaviorChanges.length}):`, innerWidth)) + chalk.cyan(' ║'));
     
     for (const change of guidance.behaviorChanges.slice(0, 3)) {
@@ -132,7 +133,7 @@ function formatSingleGuidance(guidance: PostUpdateGuidance, boxWidth: number = 7
   
   // Migration steps (abbreviated)
   if (guidance.migrationSteps.length > 0) {
-    lines.push(chalk.cyan('╟' + '─'.repeat(boxWidth - 2) + '╢'));
+    lines.push(chalk.cyan(`╟${  '─'.repeat(boxWidth - 2)  }╢`));
     lines.push(chalk.cyan('║ ') + chalk.green(padLine(`${icons.check} Migration Steps:`, innerWidth)) + chalk.cyan(' ║'));
     
     // Show just the main steps (lines starting with "Step")
@@ -147,7 +148,7 @@ function formatSingleGuidance(guidance: PostUpdateGuidance, boxWidth: number = 7
   }
   
   // Box bottom
-  lines.push(chalk.cyan('╚' + '═'.repeat(boxWidth - 2) + '╝'));
+  lines.push(chalk.cyan(`╚${  '═'.repeat(boxWidth - 2)  }╝`));
   
   return lines.join('\n');
 }
@@ -208,9 +209,9 @@ export function formatGuidanceSummary(guidanceList: PostUpdateGuidance[]): strin
   
   parts.push(`${icons.info} Post-Update Guidance: ${guidanceList.length} node(s)`);
   
-  if (complete > 0) parts.push(chalk.green(`  ✓ ${complete} complete`));
-  if (partial > 0) parts.push(chalk.yellow(`  ◐ ${partial} partial`));
-  if (manual > 0) parts.push(chalk.red(`  ✋ ${manual} manual required`));
+  if (complete > 0) {parts.push(chalk.green(`  ✓ ${complete} complete`));}
+  if (partial > 0) {parts.push(chalk.yellow(`  ◐ ${partial} partial`));}
+  if (manual > 0) {parts.push(chalk.red(`  ✋ ${manual} manual required`));}
   
   if (totalActions > 0) {
     parts.push(chalk.dim(`  ${totalActions} action(s) recommended`));

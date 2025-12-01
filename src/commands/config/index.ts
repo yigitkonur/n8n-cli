@@ -92,11 +92,11 @@ export async function configShowCommand(opts: ConfigShowOptions): Promise<void> 
   
   // Environment overrides info
   const envOverrides: string[] = [];
-  if (process.env.N8N_HOST) envOverrides.push('N8N_HOST');
-  if (process.env.N8N_API_KEY) envOverrides.push('N8N_API_KEY');
-  if (process.env.N8N_TIMEOUT) envOverrides.push('N8N_TIMEOUT');
-  if (process.env.N8N_DEBUG) envOverrides.push('N8N_DEBUG');
-  if (process.env.N8N_PROFILE) envOverrides.push('N8N_PROFILE');
+  if (process.env.N8N_HOST) {envOverrides.push('N8N_HOST');}
+  if (process.env.N8N_API_KEY) {envOverrides.push('N8N_API_KEY');}
+  if (process.env.N8N_TIMEOUT) {envOverrides.push('N8N_TIMEOUT');}
+  if (process.env.N8N_DEBUG) {envOverrides.push('N8N_DEBUG');}
+  if (process.env.N8N_PROFILE) {envOverrides.push('N8N_PROFILE');}
   
   if (envOverrides.length > 0) {
     console.log('');

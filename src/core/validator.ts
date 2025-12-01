@@ -1,7 +1,7 @@
 import type { Workflow, ValidationResult, ValidationIssue, IssueSeverity, VersionIssue, ValidationMode, ValidationProfile } from './types.js';
 import { createSourceMap, findSourceLocation, extractSnippet, type SourceMap } from './source-location.js';
 import { validateNodeWithN8n } from './n8n-native-validator.js';
-import { NodeVersionService, type VersionComparison } from './versioning/index.js';
+import { NodeVersionService } from './versioning/index.js';
 import { hasAINodes, validateAISpecificNodes } from './validation/ai-nodes.js';
 import { ExpressionFormatValidator, EnhancedConfigValidator, type EnhancedValidationResult } from './validation/index.js';
 import { nodeRegistry } from './n8n-loader.js';
@@ -376,8 +376,8 @@ export function validateWorkflowStructure(data: unknown, options?: ValidateOptio
         // Expression format validation (enabled by default)
         if (options?.validateExpressions !== false) {
           const exprContext = {
-            nodeType: nodeType,
-            nodeName: nodeName,
+            nodeType,
+            nodeName,
             nodeId: node.id,
           };
 
@@ -536,11 +536,11 @@ export function validateWorkflowStructure(data: unknown, options?: ValidateOptio
       // Check target nodes in connection outputs
       if (outputs && typeof outputs === 'object') {
         for (const [outputType, branches] of Object.entries(outputs as Record<string, unknown>)) {
-          if (!Array.isArray(branches)) continue;
+          if (!Array.isArray(branches)) {continue;}
           
           for (let branchIdx = 0; branchIdx < branches.length; branchIdx++) {
             const branch = branches[branchIdx];
-            if (!Array.isArray(branch)) continue;
+            if (!Array.isArray(branch)) {continue;}
             
             for (let connIdx = 0; connIdx < branch.length; connIdx++) {
               const conn = branch[connIdx] as { node?: string } | undefined;
@@ -570,19 +570,19 @@ export function validateWorkflowStructure(data: unknown, options?: ValidateOptio
     const severity = options.versionSeverity || 'warning';
     
     for (const node of wf.nodes) {
-      if (!node || typeof node !== 'object') continue;
-      if (!node.type || typeof node.type !== 'string') continue;
+      if (!node || typeof node !== 'object') {continue;}
+      if (!node.type || typeof node.type !== 'string') {continue;}
       
       // Skip community nodes if requested
-      if (options.skipCommunityNodes && !node.type.startsWith('n8n-nodes-base.')) continue;
+      if (options.skipCommunityNodes && !node.type.startsWith('n8n-nodes-base.')) {continue;}
       
       // Skip nodes without typeVersion
-      if (node.typeVersion === undefined) continue;
+      if (node.typeVersion === undefined) {continue;}
       
       const currentVersion = String(node.typeVersion);
       
       // Check if node is tracked in registry
-      if (!versionService.isNodeTracked(node.type)) continue;
+      if (!versionService.isNodeTracked(node.type)) {continue;}
       
       // Analyze version
       const analysis = versionService.analyzeVersion(node.type, currentVersion);

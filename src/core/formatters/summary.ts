@@ -100,7 +100,7 @@ export function formatHealthIndicator(stats: { failed?: number; warnings?: numbe
     return chalk.red(`\n⚠️  Health: Critical - ${stats.failed} failures require attention`);
   } else if (failRate > 0 || warnRate > 20) {
     return chalk.yellow(`\n⚠️  Health: Warning - Review ${stats.failed || 0} failures, ${stats.warnings || 0} warnings`);
-  } else {
+  } 
     return chalk.green(`\n✅ Health: Good - All resources operating normally`);
-  }
+  
 }

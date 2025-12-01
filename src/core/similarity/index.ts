@@ -20,7 +20,6 @@ export {
 } from '../autofix/node-similarity.js';
 
 // Also export a convenience singleton getter
-import type { NodeRepository } from '../db/nodes.js';
 import { getNodeRepository } from '../db/nodes.js';
 import { NodeSimilarityService } from '../autofix/node-similarity.js';
 

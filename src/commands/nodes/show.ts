@@ -134,7 +134,7 @@ async function handleInfoMode(
   const fullType = NodeRepository.formatNodeType(node.nodeType);
   
   switch (detail) {
-    case 'minimal':
+    case 'minimal': {
       // ~200 tokens: basic metadata only
       const minimalOutput: NodeMinimalInfo = {
         nodeType: node.nodeType,
@@ -161,8 +161,9 @@ async function handleInfoMode(
       console.log(`  ${formatBoolean(node.isTrigger)} Trigger   ${formatBoolean(node.isWebhook)} Webhook   ${formatBoolean(node.isAITool)} AI Tool`);
       console.log('');
       break;
+    }
       
-    case 'standard':
+    case 'standard': {
       // ~1-2K tokens: essential properties + operations
       const essentials = PropertyFilter.getEssentials(node.properties, node.nodeType);
       const operations = extractOperations(node);
@@ -216,6 +217,7 @@ async function handleInfoMode(
         console.log('');
       }
       break;
+    }
       
     case 'full':
       // ~3-8K tokens: everything
@@ -233,6 +235,10 @@ async function handleInfoMode(
       }
       
       outputSchema(node);
+      break;
+    
+    default:
+      // Unknown detail level - show minimal
       break;
   }
 }
@@ -341,7 +347,7 @@ function outputInfo(node: NodeInfo, detail: string): void {
   
   // Description
   if (node.description) {
-    console.log(theme.dim('  ' + node.description));
+    console.log(theme.dim(`  ${  node.description}`));
     console.log('');
   }
   
@@ -502,7 +508,7 @@ function outputSchema(node: NodeInfo): void {
 /**
  * Output minimal operations-only view (--minimal flag)
  */
-function outputMinimal(node: NodeInfo): void {
+function _outputMinimal(node: NodeInfo): void {
   const fullType = NodeRepository.formatNodeType(node.nodeType);
   
   console.log(chalk.bold.cyan(`\n${node.displayName}`) + chalk.dim(` (${fullType})`));
@@ -525,7 +531,7 @@ function outputMinimal(node: NodeInfo): void {
 /**
  * Output usage examples (--examples flag)
  */
-function outputExamples(node: NodeInfo): void {
+function _outputExamples(node: NodeInfo): void {
   const fullType = NodeRepository.formatNodeType(node.nodeType);
   
   console.log(formatHeader({
@@ -618,14 +624,14 @@ function outputDocs(node: NodeInfo): void {
   console.log(chalk.dim(`Category: ${node.category}\n`));
   
   if (node.description) {
-    console.log(node.description + '\n');
+    console.log(`${node.description  }\n`);
   }
   
   // Features
   console.log(chalk.bold('## Features\n'));
-  if (node.isTrigger) console.log('- ⚡ Can trigger workflows');
-  if (node.isWebhook) console.log('- 🌐 Supports webhooks');
-  if (node.isAITool) console.log('- 🤖 Available as AI tool');
+  if (node.isTrigger) {console.log('- ⚡ Can trigger workflows');}
+  if (node.isWebhook) {console.log('- 🌐 Supports webhooks');}
+  if (node.isAITool) {console.log('- 🤖 Available as AI tool');}
   console.log('');
   
   // Operations
@@ -682,7 +688,7 @@ function outputVersions(node: NodeInfo): void {
   for (let i = 0; i < trackedVersions.length; i++) {
     const version = trackedVersions[i];
     const isLatest = version === latestVersion;
-    const nextVersion = trackedVersions[i + 1];
+    const _nextVersion = trackedVersions[i + 1];
     
     // Check for breaking changes TO this version
     let breakingChanges = 0;
@@ -721,7 +727,7 @@ function outputVersions(node: NodeInfo): void {
 function extractOperations(node: NodeInfo): Record<string, string[]> {
   const operations: Record<string, string[]> = {};
   
-  if (!node.properties) return operations;
+  if (!node.properties) {return operations;}
   
   // Find resource and operation properties
   const resourceProp = node.properties.find((p: any) => p.name === 'resource');
@@ -736,7 +742,7 @@ function extractOperations(node: NodeInfo): Record<string, string[]> {
       // Find operations for this resource
       for (const op of operationProp.options) {
         // Check if this operation applies to this resource
-        const displayOptions = op.displayOptions;
+        const {displayOptions} = op;
         if (displayOptions?.show?.resource?.includes(resourceName)) {
           operations[resourceName].push(op.value || op.name);
         } else if (!displayOptions) {
@@ -747,7 +753,7 @@ function extractOperations(node: NodeInfo): Record<string, string[]> {
     }
   } else if (operationProp?.options) {
     // Only operation, no resource
-    operations['operations'] = operationProp.options.map(
+    operations.operations = operationProp.options.map(
       (op: any) => op.value || op.name
     );
   }
@@ -756,11 +762,11 @@ function extractOperations(node: NodeInfo): Record<string, string[]> {
   if (node.operations && Array.isArray(node.operations)) {
     for (const op of node.operations) {
       const name = op.name || op.value || op;
-      if (!operations['other']) {
-        operations['other'] = [];
+      if (!operations.other) {
+        operations.other = [];
       }
-      if (!operations['other'].includes(name)) {
-        operations['other'].push(name);
+      if (!operations.other.includes(name)) {
+        operations.other.push(name);
       }
     }
   }
@@ -806,7 +812,7 @@ function outputPropertyDetail(prop: any): void {
  * Capitalize first letter
  */
 function capitalizeFirst(str: string): string {
-  if (!str) return str;
+  if (!str) {return str;}
   return str.charAt(0).toUpperCase() + str.slice(1);
 }
 
@@ -852,7 +858,7 @@ function outputBreaking(node: NodeInfo, fromVersion?: string, toVersion?: string
   };
   
   for (const [severity, changes] of Object.entries(bySeverity)) {
-    if (changes.length === 0) continue;
+    if (changes.length === 0) {continue;}
     
     const color = severity === 'HIGH' ? chalk.red : severity === 'MEDIUM' ? chalk.yellow : chalk.blue;
     console.log(formatDivider(`${severity} Severity (${changes.length})`));

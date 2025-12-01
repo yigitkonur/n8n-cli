@@ -48,7 +48,7 @@ function getSeverityDisplay(severity: Severity): { icon: string; color: typeof c
 /**
  * Format a single breaking change for display
  */
-function formatChange(change: DetectedChange, index: number): void {
+function _formatChange(change: DetectedChange, index: number): void {
   const { icon, color } = getSeverityDisplay(change.severity);
   
   console.log(color(`  ${index}. ${icon} ${change.propertyName}`));
@@ -76,12 +76,12 @@ function formatBreakingChangesBox(
   changes: DetectedChange[],
   overallSeverity: Severity
 ): void {
-  const { icon: severityIcon, color: severityColor } = getSeverityDisplay(overallSeverity);
+  const { icon: severityIcon, color: _severityColor } = getSeverityDisplay(overallSeverity);
   
   // Header box
   console.log('');
   console.log(chalk.bold('╔═══════════════════════════════════════════════════════════════════════════╗'));
-  console.log(chalk.bold(`║ ${severityIcon} Breaking Changes: ${nodeType} v${fromVersion} → v${toVersion}`.padEnd(76) + '║'));
+  console.log(chalk.bold(`${`║ ${severityIcon} Breaking Changes: ${nodeType} v${fromVersion} → v${toVersion}`.padEnd(76)  }║`));
   console.log(chalk.bold('╠═══════════════════════════════════════════════════════════════════════════╣'));
   console.log(chalk.bold('║                                                                           ║'));
   
@@ -93,21 +93,21 @@ function formatBreakingChangesBox(
   let changeIndex = 1;
   
   if (highChanges.length > 0) {
-    console.log(chalk.bold.red(`║ HIGH Severity (${highChanges.length}):`.padEnd(76) + '║'));
+    console.log(chalk.bold.red(`${`║ HIGH Severity (${highChanges.length}):`.padEnd(76)  }║`));
     console.log(chalk.bold('║ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━   ║'));
     
     for (const change of highChanges) {
-      console.log(chalk.bold(`║ ${changeIndex}. Property ${change.changeType === 'added' ? 'Added' : change.changeType === 'removed' ? 'Removed' : 'Changed'}: ${change.propertyName}`.padEnd(76) + '║'));
-      console.log(chalk.bold(`║    Change: ${change.changeType}`.padEnd(76) + '║'));
-      console.log(chalk.bold(`║    Migration: ${change.autoMigratable ? '✓ Auto-migratable' : '✗ Manual review required'}`.padEnd(76) + '║'));
+      console.log(chalk.bold(`${`║ ${changeIndex}. Property ${change.changeType === 'added' ? 'Added' : change.changeType === 'removed' ? 'Removed' : 'Changed'}: ${change.propertyName}`.padEnd(76)  }║`));
+      console.log(chalk.bold(`${`║    Change: ${change.changeType}`.padEnd(76)  }║`));
+      console.log(chalk.bold(`${`║    Migration: ${change.autoMigratable ? '✓ Auto-migratable' : '✗ Manual review required'}`.padEnd(76)  }║`));
       
       // Wrap hint lines
       const hintPrefix = '║    Hint: ';
       const maxLen = 76 - hintPrefix.length;
       const hintLines = change.migrationHint.match(new RegExp(`.{1,${maxLen}}`, 'g')) || [change.migrationHint];
-      console.log(chalk.bold(`${hintPrefix}${hintLines[0]}`.padEnd(76) + '║'));
+      console.log(chalk.bold(`${`${hintPrefix}${hintLines[0]}`.padEnd(76)  }║`));
       hintLines.slice(1).forEach(line => {
-        console.log(chalk.bold(`║          ${line}`.padEnd(76) + '║'));
+        console.log(chalk.bold(`${`║          ${line}`.padEnd(76)  }║`));
       });
       console.log(chalk.bold('║                                                                           ║'));
       changeIndex++;
@@ -115,23 +115,23 @@ function formatBreakingChangesBox(
   }
   
   if (mediumChanges.length > 0) {
-    console.log(chalk.bold.yellow(`║ MEDIUM Severity (${mediumChanges.length}):`.padEnd(76) + '║'));
+    console.log(chalk.bold.yellow(`${`║ MEDIUM Severity (${mediumChanges.length}):`.padEnd(76)  }║`));
     console.log(chalk.bold('║ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━   ║'));
     
     for (const change of mediumChanges) {
-      console.log(chalk.bold(`║ ${changeIndex}. ${change.changeType}: ${change.propertyName}`.padEnd(76) + '║'));
-      console.log(chalk.bold(`║    Migration: ${change.autoMigratable ? '✓ Auto-migratable' : '✗ Manual'}`.padEnd(76) + '║'));
+      console.log(chalk.bold(`${`║ ${changeIndex}. ${change.changeType}: ${change.propertyName}`.padEnd(76)  }║`));
+      console.log(chalk.bold(`${`║    Migration: ${change.autoMigratable ? '✓ Auto-migratable' : '✗ Manual'}`.padEnd(76)  }║`));
       console.log(chalk.bold('║                                                                           ║'));
       changeIndex++;
     }
   }
   
   if (lowChanges.length > 0) {
-    console.log(chalk.bold.blue(`║ LOW Severity (${lowChanges.length}):`.padEnd(76) + '║'));
+    console.log(chalk.bold.blue(`${`║ LOW Severity (${lowChanges.length}):`.padEnd(76)  }║`));
     console.log(chalk.bold('║ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━   ║'));
     
     for (const change of lowChanges) {
-      console.log(chalk.bold(`║ ${changeIndex}. ${change.changeType}: ${change.propertyName}`.padEnd(76) + '║'));
+      console.log(chalk.bold(`${`║ ${changeIndex}. ${change.changeType}: ${change.propertyName}`.padEnd(76)  }║`));
       changeIndex++;
     }
     console.log(chalk.bold('║                                                                           ║'));
@@ -143,10 +143,10 @@ function formatBreakingChangesBox(
   
   console.log(chalk.bold('╠═══════════════════════════════════════════════════════════════════════════╣'));
   console.log(chalk.bold('║ Summary:                                                                  ║'));
-  console.log(chalk.bold(`║   Total changes: ${changes.length}`.padEnd(76) + '║'));
-  console.log(chalk.bold(`║   Auto-migratable: ${autoMigratableCount}`.padEnd(76) + '║'));
-  console.log(chalk.bold(`║   Manual required: ${manualCount}`.padEnd(76) + '║'));
-  console.log(chalk.bold(`║   Overall severity: ${overallSeverity}`.padEnd(76) + '║'));
+  console.log(chalk.bold(`${`║   Total changes: ${changes.length}`.padEnd(76)  }║`));
+  console.log(chalk.bold(`${`║   Auto-migratable: ${autoMigratableCount}`.padEnd(76)  }║`));
+  console.log(chalk.bold(`${`║   Manual required: ${manualCount}`.padEnd(76)  }║`));
+  console.log(chalk.bold(`${`║   Overall severity: ${overallSeverity}`.padEnd(76)  }║`));
   console.log(chalk.bold('║                                                                           ║'));
   console.log(chalk.bold('╚═══════════════════════════════════════════════════════════════════════════╝'));
 }

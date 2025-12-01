@@ -3,8 +3,7 @@
  * Task 03: Backup Before Workflow Mutations
  */
 
-import { copyFile, mkdir, writeFile } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
+import { copyFile, mkdir, writeFile, chmod } from 'node:fs/promises';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
 import chalk from 'chalk';
@@ -23,12 +22,14 @@ function getTimestamp(): string {
 }
 
 /**
- * Ensure backup directory exists
+ * Ensure backup directory exists with secure permissions.
+ * Uses atomic mkdir (idempotent) and explicit chmod to avoid TOCTOU race.
  */
 async function ensureBackupDir(dir: string = BACKUP_DIR): Promise<void> {
-  if (!existsSync(dir)) {
-    await mkdir(dir, { recursive: true, mode: 0o700 });
-  }
+  // mkdir with recursive:true is idempotent - no existence check needed
+  await mkdir(dir, { recursive: true, mode: 0o700 });
+  // Ensure permissions are correct even if directory already existed
+  await chmod(dir, 0o700);
 }
 
 /**

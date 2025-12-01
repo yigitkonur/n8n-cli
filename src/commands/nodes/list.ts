@@ -7,7 +7,7 @@ import chalk from 'chalk';
 import { getNodeRepository, NodeRepository, type NodeSearchResult } from '../../core/db/nodes.js';
 import { formatHeader } from '../../core/formatters/header.js';
 import { formatTable, columnFormatters } from '../../core/formatters/table.js';
-import { formatAlphaTree, formatCategoryTree, formatCategoryStats, CATEGORY_META } from '../../core/formatters/tree.js';
+import { formatAlphaTree, formatCategoryTree, CATEGORY_META } from '../../core/formatters/tree.js';
 import { formatSummary } from '../../core/formatters/summary.js';
 import { formatNextActions } from '../../core/formatters/next-actions.js';
 import { formatExportFooter } from '../../core/formatters/jq-recipes.js';
@@ -32,7 +32,7 @@ export async function nodesListCommand(opts: ListOptions): Promise<void> {
     const repo = await getNodeRepository();
     let nodes: NodeSearchResult[];
     let title = 'Available Nodes';
-    let context: Record<string, string> = {};
+    const context: Record<string, string> = {};
 
     // Determine which nodes to show
     if (opts.category) {
@@ -40,12 +40,12 @@ export async function nodesListCommand(opts: ListOptions): Promise<void> {
       nodes = repo.getNodesByCategory(opts.category);
       const meta = CATEGORY_META[opts.category.toLowerCase()] || CATEGORY_META.default;
       title = `${meta.icon} ${capitalizeFirst(opts.category)} Nodes`;
-      context['Category'] = opts.category;
+      context.Category = opts.category;
     } else if (opts.search) {
       // Search with fuzzy fallback
       nodes = repo.searchNodes(opts.search, 'FUZZY', limit || 50);
       title = `Nodes matching "${opts.search}"`;
-      context['Search'] = opts.search;
+      context.Search = opts.search;
     } else {
       // All nodes
       nodes = repo.getAllNodes();
@@ -57,7 +57,7 @@ export async function nodesListCommand(opts: ListOptions): Promise<void> {
       nodes = nodes.slice(0, limit);
     }
 
-    context['Total'] = `${totalCount} nodes`;
+    context.Total = `${totalCount} nodes`;
 
     // JSON output mode
     if (opts.json) {
@@ -134,7 +134,7 @@ export async function nodesListCommand(opts: ListOptions): Promise<void> {
         limit: limit || 50,
         showIndex: true,
       });
-      console.log('\n' + tableOutput);
+      console.log(`\n${  tableOutput}`);
     } else {
       // Default: Alphabetical tree
       const treeItems = nodes.map(n => ({
@@ -147,11 +147,11 @@ export async function nodesListCommand(opts: ListOptions): Promise<void> {
 
     // Summary
     const durationMs = Date.now() - startTime;
-    console.log('\n' + formatSummary({
+    console.log(`\n${  formatSummary({
       total: totalCount,
       displayed: nodes.length,
       durationMs,
-    }));
+    })}`);
 
     // Next actions
     if (nodes.length > 0) {
@@ -190,6 +190,6 @@ export async function nodesListCommand(opts: ListOptions): Promise<void> {
  * Helper: Capitalize first letter
  */
 function capitalizeFirst(str: string): string {
-  if (!str) return str;
+  if (!str) {return str;}
   return str.charAt(0).toUpperCase() + str.slice(1);
 }

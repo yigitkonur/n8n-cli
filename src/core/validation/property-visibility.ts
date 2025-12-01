@@ -12,7 +12,7 @@ import type { OperationContext, NodeProperty } from './types.js';
  * Evaluates displayOptions.show and displayOptions.hide conditions
  */
 export function isPropertyVisible(prop: NodeProperty, config: Record<string, unknown>): boolean {
-  if (!prop.displayOptions) return true;
+  if (!prop.displayOptions) {return true;}
   
   // Check show conditions - ALL must match
   if (prop.displayOptions.show) {
@@ -62,7 +62,7 @@ export function isPropertyRelevantToOperation(
   
   // Check if property has operation-specific display options
   if (prop.displayOptions?.show) {
-    const show = prop.displayOptions.show;
+    const {show} = prop.displayOptions;
     
     // Check resource filter
     if (operation.resource && show.resource) {

@@ -51,7 +51,7 @@ export async function workflowsListCommand(opts: ListOptions): Promise<void> {
       outputJson({
         data: workflows,
         total: workflows.length,
-        hasMore: !!response.nextCursor,
+        hasMore: Boolean(response.nextCursor),
         nextCursor: response.nextCursor,
       });
       return;
@@ -138,12 +138,12 @@ export async function workflowsListCommand(opts: ListOptions): Promise<void> {
     const inactiveCount = workflows.length - activeCount;
     const durationMs = Date.now() - startTime;
     
-    console.log('\n' + formatSummary({ 
+    console.log(`\n${  formatSummary({ 
       total: workflows.length,
       active: activeCount,
       inactive: inactiveCount,
       durationMs,
-    }));
+    })}`);
     
     // Next actions
     if (workflows.length > 0) {
@@ -166,6 +166,6 @@ export async function workflowsListCommand(opts: ListOptions): Promise<void> {
     } else {
       console.error(chalk.red(`\n${icons.error} Error: ${(error as Error).message}`));
     }
-    process.exitCode = 1; return;
+    process.exitCode = 1; 
   }
 }

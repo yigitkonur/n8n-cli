@@ -124,9 +124,9 @@ export class NodeTypeNormalizer {
    */
   private static detectPackage(type: string): 'base' | 'langchain' | 'community' | 'unknown' {
     // Check both short and full forms
-    if (type.startsWith('nodes-base.') || type.startsWith('n8n-nodes-base.')) return 'base';
-    if (type.startsWith('nodes-langchain.') || type.startsWith('@n8n/n8n-nodes-langchain.') || type.startsWith('n8n-nodes-langchain.')) return 'langchain';
-    if (type.includes('.')) return 'community';
+    if (type.startsWith('nodes-base.') || type.startsWith('n8n-nodes-base.')) {return 'base';}
+    if (type.startsWith('nodes-langchain.') || type.startsWith('@n8n/n8n-nodes-langchain.') || type.startsWith('n8n-nodes-langchain.')) {return 'langchain';}
+    if (type.includes('.')) {return 'community';}
     return 'unknown';
   }
 

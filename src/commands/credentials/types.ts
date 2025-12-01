@@ -35,7 +35,7 @@ export async function credentialTypesCommand(opts: TypesOptions): Promise<void> 
     if (opts.search) {
       credentials = credentialRegistry.searchCredentialTypes(opts.search, limit || 50);
       title = `Credential types matching "${opts.search}"`;
-      context['Search'] = opts.search;
+      context.Search = opts.search;
     } else {
       credentials = credentialRegistry.getAllCredentialTypes();
     }
@@ -46,7 +46,7 @@ export async function credentialTypesCommand(opts: TypesOptions): Promise<void> 
       credentials = credentials.slice(0, limit);
     }
 
-    context['Total'] = `${totalCount} types`;
+    context.Total = `${totalCount} types`;
 
     // JSON output mode
     if (opts.json) {
@@ -144,16 +144,16 @@ export async function credentialTypesCommand(opts: TypesOptions): Promise<void> 
         limit: limit || 30,
         showIndex: true,
       });
-      console.log('\n' + tableOutput);
+      console.log(`\n${  tableOutput}`);
     }
 
     // Summary
     const durationMs = Date.now() - startTime;
-    console.log('\n' + formatSummary({
+    console.log(`\n${  formatSummary({
       total: totalCount,
       displayed: credentials.length,
       durationMs,
-    }));
+    })}`);
 
     // Next actions
     if (credentials.length > 0) {

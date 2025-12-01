@@ -13,6 +13,10 @@
   <strong>JSON output everywhere</strong> • <strong>Schema-aware validation</strong> • <strong>800+ nodes bundled offline</strong>
 </p>
 
+<p align="center">
+  <strong>15 command groups</strong> • <strong>70+ subcommands</strong> • <strong>300+ flags</strong>
+</p>
+
 ---
 
 ## Table of Contents
@@ -20,7 +24,9 @@
 - [Why Agent-First?](#why-agent-first)
 - [Installation](#installation)
 - [Quick Start](#quick-start)
+- [Cheat Sheet](#cheat-sheet)
 - [Configuration](#configuration)
+- [Quick Command Reference](#quick-command-reference)
 - [Commands](#commands)
   - [Global Options](#global-options)
   - [workflows](#workflows)
@@ -39,13 +45,47 @@
 - [Exit Codes](#exit-codes)
 - [Agent Integration](#agent-integration)
 - [Development](#development)
+- [See Also](#see-also)
 - [License](#license)
+
+---
+
+## Quick Command Reference
+
+| Command Group | Subcommands | Description |
+|---------------|-------------|-------------|
+| `auth` | `login`, `status` (whoami), `logout` | Manage CLI authentication |
+| `health` | - | Check n8n instance connectivity |
+| `nodes` | `list`, `show`, `get`, `search`, `categories`, `validate`, `breaking-changes` | Search and inspect 800+ bundled nodes (offline) |
+| `workflows` | `list`, `get`, `validate`, `create`, `import`, `export`, `update`, `autofix`, `diff`, `versions`, `deploy-template`, `activate`, `deactivate`, `delete`, `trigger`, `tags` | Full workflow lifecycle management |
+| `executions` | `list`, `get`, `retry`, `delete` | View and manage workflow executions |
+| `credentials` | `list`, `create`, `delete`, `schema`, `types`, `show-type` | Manage n8n credentials |
+| `variables` | `list`, `create`, `update`, `delete` | Manage environment variables (Enterprise) |
+| `tags` | `list`, `get`, `create`, `update`, `delete` | Organize workflows with tags |
+| `templates` | `search`, `get`, `list-tasks` | Search and deploy n8n.io templates |
+| `audit` | - | Generate security audit reports |
+| `config` | `show` | View CLI configuration |
+| `completion` | `<shell>` | Generate shell completions (bash/zsh/fish) |
+| `validate` | - | Legacy workflow validation command |
+
+**API vs Offline Commands:**
+
+| Offline (No API needed) | Requires n8n API |
+|-------------------------|------------------|
+| `nodes *` (all) | `workflows list/get/create/import/update/delete/activate/deactivate/trigger/tags` |
+| `workflows validate` | `executions *` (all) |
+| `workflows autofix` | `credentials list/create/delete/schema` |
+| `workflows versions` | `variables *` (all) |
+| `credentials types` | `tags *` (all) |
+| `templates search --local` | `templates search` (keyword), `templates get` |
+| `templates list-tasks` | `audit` |
+| `validate` (legacy) | `health` |
 
 ---
 
 ## Why Agent-First?
 
-This CLI is designed for **AI agents** that generate n8n workflows programmatically. Instead of streaming large JSON through MCP tool calls (which causes hallucinations), agents can:
+This CLI is designed for **AI agents** that generate n8n workflows programmatically. Instead of streaming large JSON through tool calls (which causes token limits and hallucinations), agents can:
 
 1. **Write** workflow JSON to a local file
 2. **Validate** with `n8n workflows validate workflow.json --json`
@@ -114,6 +154,126 @@ n8n workflows validate workflow.json --fix --save fixed.json
 
 # Deploy template from n8n.io in one command
 n8n workflows deploy-template 3121 --name "My Chatbot"
+```
+
+---
+
+## Cheat Sheet
+
+### Authentication
+```bash
+n8n auth login -H https://n8n.example.com -k YOUR_API_KEY  # Non-interactive
+n8n auth login --interactive                                # Guided setup
+n8n auth status                                             # Check connection
+n8n auth whoami                                             # Alias for status
+n8n health                                                  # Test connectivity
+```
+
+### Workflow Operations
+```bash
+# List & Get
+n8n workflows list                          # List all (limit 10)
+n8n workflows list -a -l 50                 # Active only, limit 50
+n8n workflows list -t production,api        # Filter by tags
+n8n workflows get abc123 --json             # Get by ID
+
+# Validate & Fix
+n8n workflows validate workflow.json        # Validate local file
+n8n workflows validate abc123               # Validate by ID
+n8n workflows validate workflow.json -P ai-friendly -M full  # Strict AI validation
+n8n workflows autofix workflow.json --preview    # Preview fixes
+n8n workflows autofix workflow.json --apply      # Apply fixes
+
+# Create & Import
+n8n workflows create -f workflow.json       # Create from file
+n8n workflows import workflow.json          # Import (alias)
+n8n workflows import workflow.json --activate   # Import and activate
+
+# Update & Modify
+n8n workflows update abc123 -f updated.json     # Replace workflow
+n8n workflows update abc123 --activate          # Activate
+n8n workflows update abc123 --deactivate        # Deactivate
+n8n workflows diff abc123 -o @changes.json      # Apply diff operations
+
+# Export & Backup
+n8n workflows export abc123 -o backup.json      # Export single
+n8n workflows export abc123 --full              # Include all fields
+
+# Bulk Operations
+n8n workflows activate --ids abc123,def456      # Activate multiple
+n8n workflows deactivate --all --force          # Deactivate all
+n8n workflows delete --ids abc123 --force       # Delete (creates backup)
+
+# Version History
+n8n workflows versions abc123                   # List versions
+n8n workflows versions abc123 --rollback        # Rollback to previous
+n8n workflows versions abc123 --compare 1,2     # Compare versions
+n8n workflows versions --stats                  # Storage statistics
+
+# Templates
+n8n workflows deploy-template 3121              # Deploy template
+n8n workflows deploy-template 3121 --dry-run    # Preview first
+```
+
+### Node Operations (Offline)
+```bash
+n8n nodes search "slack"                    # Search nodes
+n8n nodes search "http" --mode AND          # AND search
+n8n nodes search "slak" --mode FUZZY        # Fuzzy/typo-tolerant
+n8n nodes list --by-category                # List by category
+n8n nodes list -c "Marketing"               # Filter category
+n8n nodes show httpRequest                  # Node details
+n8n nodes show httpRequest --detail full    # Full schema
+n8n nodes show httpRequest --mode versions  # Version history
+n8n nodes breaking-changes switch --from 2.0  # Breaking changes
+n8n nodes validate slack -c '{"resource":"message"}'  # Validate config
+```
+
+### Credentials
+```bash
+n8n credentials list                        # List all
+n8n credentials types                       # Available types (offline)
+n8n credentials types --by-auth             # Group by auth method
+n8n credentials schema githubApi            # Get schema
+n8n credentials create -t githubApi -n "GitHub" -d @creds.json
+n8n credentials delete abc123 --force       # Delete
+```
+
+### Executions
+```bash
+n8n executions list                         # Recent executions
+n8n executions list -w abc123 --status error  # Failed for workflow
+n8n executions get 9361 -m summary          # Get summary
+n8n executions retry 9361                   # Retry failed
+n8n executions retry 9361 --load-latest     # Retry with latest workflow
+n8n executions delete 9361 --force          # Delete
+```
+
+### Templates
+```bash
+n8n templates search "openai"               # Search n8n.io
+n8n templates search --by-task ai_automation  # By task (local)
+n8n templates search --by-nodes slack       # By nodes (local)
+n8n templates search --complexity simple    # By metadata (local)
+n8n templates get 3121 -s template.json     # Download template
+n8n templates list-tasks                    # Available tasks
+```
+
+### Variables & Tags
+```bash
+n8n variables list                          # List variables
+n8n variables create -k API_KEY -v "xxx"    # Create
+n8n tags list                               # List tags
+n8n tags create -n "production"             # Create tag
+n8n workflows tags abc123 --set tag1,tag2   # Assign to workflow
+```
+
+### Audit & Config
+```bash
+n8n audit                                   # Full security audit
+n8n audit -c credentials,nodes              # Specific categories
+n8n audit --days-abandoned 90               # Find abandoned workflows
+n8n config show                             # Current configuration
 ```
 
 ---
@@ -206,7 +366,29 @@ These options work with all commands:
 
 ### workflows
 
-Manage n8n workflows.
+Manage n8n workflows - list, validate, create, update, import, export, and more.
+
+**Command Overview:**
+
+| Command | Description | Requires API |
+|---------|-------------|:------------:|
+| `list` | List all workflows | ✓ |
+| `get` | Get workflow by ID | ✓ |
+| `validate` | Validate workflow structure | - |
+| `create` | Create new workflow | ✓ |
+| `import` | Import from JSON file | ✓ |
+| `export` | Export to JSON file | ✓ |
+| `update` | Update existing workflow | ✓ |
+| `autofix` | Auto-fix validation issues | - |
+| `diff` | Apply incremental changes | ✓ |
+| `versions` | Manage version history | - |
+| `deploy-template` | Deploy n8n.io template | ✓ |
+| `activate` / `deactivate` | Bulk activation | ✓ |
+| `delete` | Delete workflows | ✓ |
+| `trigger` | Trigger via webhook | ✓ |
+| `tags` | Manage workflow tags | ✓ |
+
+---
 
 #### `workflows list`
 
@@ -252,10 +434,13 @@ n8n workflows validate [idOrFile] [options]
 | `-f, --file <path>` | Path to workflow JSON file | - |
 | `-P, --validation-profile <profile>` | Validation profile: `minimal`, `runtime`, `ai-friendly`, `strict` | `runtime` |
 | `-M, --validation-mode <mode>` | Validation mode: `minimal`, `operation`, `full` | `operation` |
-| `--repair` | Attempt to repair malformed JSON | - |
+| `--repair` | Attempt to repair malformed JSON (trailing commas, unquoted keys, etc.) | - |
 | `--fix` | Auto-fix known issues | - |
 | `--check-upgrades` | Check for node version upgrades and breaking changes | - |
 | `--upgrade-severity <level>` | Minimum severity for upgrade warnings: `LOW`, `MEDIUM`, `HIGH` | - |
+| `--check-versions` | Check for outdated node typeVersions | - |
+| `--version-severity <level>` | Version issue severity: `info`, `warning`, `error` | `warning` |
+| `--skip-community-nodes` | Skip version checks for community nodes | - |
 | `--validate-expressions` | Enable expression format validation | `true` |
 | `--no-validate-expressions` | Skip expression format validation | - |
 | `-s, --save <path>` | Save fixed workflow | - |
@@ -302,6 +487,21 @@ n8n workflows validate workflow.json --check-upgrades --json
 
 # Only show high severity breaking changes
 n8n workflows validate workflow.json --check-upgrades --upgrade-severity HIGH
+```
+
+**Node Version Checking:**
+
+Use `--check-versions` to check for outdated node `typeVersion` values:
+
+```bash
+# Check for outdated node versions
+n8n workflows validate workflow.json --check-versions
+
+# Set severity level for version issues
+n8n workflows validate workflow.json --check-versions --version-severity error
+
+# Skip community nodes (only check n8n-nodes-base)
+n8n workflows validate workflow.json --check-versions --skip-community-nodes
 ```
 
 **Expression Format Validation:**
@@ -427,6 +627,7 @@ n8n workflows create [options]
 | `-f, --file <path>` | Path to workflow JSON file |
 | `-n, --name <name>` | Workflow name |
 | `--dry-run` | Preview without creating |
+| `--skip-validation` | Skip pre-API validation (not recommended) |
 | `--json` | Output as JSON |
 
 #### `workflows import`
@@ -442,6 +643,7 @@ n8n workflows import <file> [options]
 | `-n, --name <name>` | Override workflow name |
 | `--dry-run` | Preview without creating |
 | `--activate` | Activate after import |
+| `--skip-validation` | Skip pre-API validation (not recommended) |
 | `--json` | Output as JSON |
 
 #### `workflows export`
@@ -473,6 +675,7 @@ n8n workflows update <id> [options]
 | `-n, --name <name>` | New workflow name |
 | `--activate` | Activate the workflow |
 | `--deactivate` | Deactivate the workflow |
+| `--skip-validation` | Skip pre-API validation (not recommended) |
 | `--force, --yes` | Skip confirmation prompts |
 | `--no-backup` | Skip creating backup before changes |
 | `--json` | Output as JSON |
@@ -644,6 +847,7 @@ n8n workflows versions [id] [options]
 | `--stats` | Show storage statistics (no ID required) | - |
 | `--truncate-all` | Delete ALL versions for ALL workflows | - |
 | `--force, --yes` | Skip confirmation prompts | - |
+| `--no-backup` | Skip creating backup before rollback | - |
 | `-s, --save <path>` | Save version snapshot to JSON file | - |
 | `--json` | Output as JSON | - |
 
@@ -690,6 +894,7 @@ n8n workflows diff <id> [options]
 | `-f, --file <path>` | Path to operations JSON file | - |
 | `--dry-run` | Validate without applying changes | `false` |
 | `--continue-on-error` | Apply valid operations, report failures | `false` |
+| `--skip-validation` | Skip pre-API validation (not recommended) | - |
 | `--force, --yes` | Skip confirmation prompts | - |
 | `--no-backup` | Skip creating backup before changes | - |
 | `-s, --save <path>` | Save result workflow to file | - |
@@ -736,6 +941,23 @@ n8n workflows diff abc123 --operations @diff.json --force --json
 }
 ```
 
+**Detailed Operation Examples:**
+
+| Operation | Example | Description |
+|-----------|---------|-------------|
+| `addNode` | `{"type":"addNode","node":{"name":"HTTP","type":"n8n-nodes-base.httpRequest","position":[400,300]}}` | Add new node |
+| `removeNode` | `{"type":"removeNode","nodeName":"Unused Node"}` | Remove node and its connections |
+| `updateNode` | `{"type":"updateNode","nodeName":"Slack","updates":{"parameters.channel":"#alerts"}}` | Update node parameters |
+| `moveNode` | `{"type":"moveNode","nodeName":"HTTP","position":[500,400]}` | Move node position |
+| `enableNode` | `{"type":"enableNode","nodeName":"Debug"}` | Enable disabled node |
+| `disableNode` | `{"type":"disableNode","nodeName":"Debug"}` | Disable node |
+| `addConnection` | `{"type":"addConnection","source":"IF","target":"Success","branch":"true"}` | Add connection |
+| `removeConnection` | `{"type":"removeConnection","source":"IF","target":"Success"}` | Remove connection |
+| `updateName` | `{"type":"updateName","name":"New Workflow Name"}` | Rename workflow |
+| `addTag` | `{"type":"addTag","tagId":"BCM4YL05avZ5KuP2"}` | Add tag to workflow |
+| `activateWorkflow` | `{"type":"activateWorkflow"}` | Activate workflow |
+| `deactivateWorkflow` | `{"type":"deactivateWorkflow"}` | Deactivate workflow |
+
 #### `workflows deploy-template`
 
 Deploy a workflow template from n8n.io directly to your n8n instance.
@@ -750,6 +972,7 @@ n8n workflows deploy-template <templateId> [options]
 | `--no-autofix` | Skip auto-fix of common issues | `false` (autofix enabled) |
 | `--keep-credentials` | Preserve credential references | `false` (strip credentials) |
 | `--dry-run` | Preview without creating | - |
+| `--skip-validation` | Skip pre-API validation (not recommended) | - |
 | `-s, --save <path>` | Save workflow JSON locally | - |
 | `--json` | Output as JSON | - |
 
@@ -796,7 +1019,22 @@ n8n templates get 3121                      # View template details
 
 ### nodes
 
-Search, list, and inspect n8n nodes. **Offline - 800+ nodes bundled.**
+Search, list, and inspect n8n nodes. **Offline - 800+ nodes bundled in local SQLite database.**
+
+**Command Overview:**
+
+| Command | Description |
+|---------|-------------|
+| `list` | List all available nodes |
+| `search` | Search nodes by keyword (FTS5/fuzzy) |
+| `show` / `get` | Show node details and schema |
+| `categories` | List node categories |
+| `validate` | Validate node configuration |
+| `breaking-changes` | Analyze version breaking changes |
+
+> **Note:** All nodes commands work offline - no n8n API connection required.
+
+---
 
 #### `nodes list`
 
@@ -836,7 +1074,25 @@ n8n nodes search <query> [options]
 - `AND`: Match all terms
 - `FUZZY`: Typo-tolerant (e.g., "gogle" finds "google")
 
-#### `nodes show`
+**FTS5 Full-Text Search:**
+
+When an FTS5 index (`nodes_fts` table) exists in the bundled database, the CLI automatically uses BM25-ranked full-text search for faster, more relevant results:
+
+| Feature | Description |
+|---------|-------------|
+| Auto-detection | FTS5 tables detected lazily on first search |
+| BM25 ranking | Results sorted by relevance score |
+| Phrase matching | Use quotes: `"http request"` |
+| Graceful fallback | Falls back to LIKE search on FTS5 syntax errors |
+| FUZZY mode | Always uses Levenshtein distance (no FTS5) |
+
+```bash
+n8n nodes search "slack message"           # OR mode with FTS5
+n8n nodes search "http request" --mode AND # AND mode with FTS5
+n8n nodes search "slak" --mode FUZZY       # Levenshtein fallback
+```
+
+#### `nodes show` (Alias: `get`)
 
 Show node details with configurable detail level and specialized modes.
 
@@ -893,7 +1149,7 @@ n8n nodes show httpRequest --mode breaking --from 1.0 --to 4.2
 
 #### `nodes get`
 
-Get node schema. This is a lightweight alias for `show` with fewer options.
+Alias for `nodes show`. Get node schema with fewer options.
 
 ```bash
 n8n nodes get <nodeType> [options]
@@ -954,7 +1210,7 @@ n8n nodes categories [options]
 
 | Option | Description |
 |--------|-------------|
-| `--detailed` | Show category descriptions |
+| `--detailed` | Show descriptions and examples |
 | `-s, --save <path>` | Save to JSON file |
 | `--json` | Output as JSON |
 
@@ -989,19 +1245,55 @@ n8n nodes validate webhook --config '{"path":"test"}' --json
 **Node-Specific Validation:**
 
 The enhanced validator includes operation-aware validation for common nodes:
-- **Slack**: Channel/message validation, API rate limit warnings
-- **HTTP Request**: URL/method validation, authentication warnings
-- **Webhook**: Path validation, error handling recommendations
-- **Code**: JS/Python syntax checks, return statement validation
-- **Database** (Postgres, MySQL, MongoDB): SQL injection detection, query validation
-- **OpenAI**: Model selection, token limit warnings
-- **Google Sheets**: Range format validation, operation checks
+
+| Node | Validations |
+|------|-------------|
+| **Slack** | Channel required, message content required, 40K char limit, thread reply ts, @mention handling |
+| **HTTP Request** | URL/method validation, authentication warnings, SSL options |
+| **Webhook** | Path validation, UUID generation, error handling recommendations |
+| **Code** | JS/Python syntax checks, return statement validation, async handling |
+| **Database** (Postgres, MySQL, MongoDB) | SQL injection detection, parameterized query suggestions |
+| **OpenAI** | Model selection, token limit warnings, temperature bounds |
+| **Google Sheets** | Range format (A1:B10), spreadsheet ID validation, operation checks |
+
+**Slack Validation Details:**
+```bash
+# Validates channel, message content, thread replies, mentions
+n8n nodes validate n8n-nodes-base.slack --config '{
+  "resource": "message",
+  "operation": "send",
+  "channel": "#general",
+  "text": "Hello @team"
+}' --json
+```
+
+**HTTP Request Validation:**
+```bash
+# Validates URL, method, authentication
+n8n nodes validate httpRequest --config '{
+  "url": "https://api.example.com",
+  "method": "POST",
+  "authentication": "genericCredentialType"
+}' -P strict
+```
 
 ---
 
 ### credentials
 
 Manage n8n credentials.
+
+**Command Overview:**
+
+| Command | Description | Requires API |
+|---------|-------------|:------------:|
+| `list` | List all credentials | ✓ |
+| `create` | Create new credential | ✓ |
+| `delete` | Delete credential | ✓ |
+| `schema` / `show-type` | Get credential type schema | ✓ |
+| `types` | List available credential types | - (offline) |
+
+---
 
 #### `credentials list`
 
@@ -1035,6 +1327,28 @@ n8n credentials create [options]
 
 **Security tip:** Use `--data @file.json` to avoid secrets in shell history.
 
+**Security Best Practices:**
+```bash
+# 1. Create credential data file
+echo '{"accessToken":"ghp_xxx"}' > github-creds.json
+chmod 600 github-creds.json
+
+# 2. Create credential using file
+n8n credentials create --type githubApi --name "GitHub" --data @github-creds.json
+
+# 3. Clean up
+rm github-creds.json
+```
+
+**Workflow:**
+```bash
+# See required fields for a credential type
+n8n credentials schema githubApi
+
+# Create credential
+n8n credentials create --type githubApi --name "GitHub" --data @creds.json
+```
+
 #### `credentials delete`
 
 Delete a credential.
@@ -1048,7 +1362,7 @@ n8n credentials delete <id> [options]
 | `--force, --yes` | Skip confirmation |
 | `--json` | Output as JSON |
 
-#### `credentials schema`
+#### `credentials schema` (Alias: `show-type`)
 
 Get credential type schema from n8n API.
 
@@ -1079,14 +1393,14 @@ n8n credentials types [options]
 
 #### `credentials show-type`
 
-Show credential type schema.
+Alias for `credentials schema`. Show credential type schema.
 
 ```bash
 n8n credentials show-type <typeName> [options]
 ```
 
 | Option | Description |
-|--------|-------------|
+|--------|--------------|
 | `-s, --save <path>` | Save to JSON file |
 | `--json` | Output as JSON |
 
@@ -1095,6 +1409,17 @@ n8n credentials show-type <typeName> [options]
 ### executions
 
 View and manage workflow executions.
+
+**Command Overview:**
+
+| Command | Description |
+|---------|-------------|
+| `list` | List recent executions |
+| `get` | Get execution details |
+| `retry` | Retry failed execution |
+| `delete` | Delete execution |
+
+---
 
 #### `executions list`
 
@@ -1107,11 +1432,35 @@ n8n executions list [options]
 | Option | Description | Default |
 |--------|-------------|---------|
 | `-w, --workflow-id <id>` | Filter by workflow ID | - |
-| `--status <status>` | Filter by status: `success`, `error`, `waiting` | - |
+| `--status <status>` | Filter by status: `success`, `error`, `waiting`, `running` | - |
 | `-l, --limit <n>` | Limit results | `10` |
 | `--cursor <cursor>` | Pagination cursor | - |
 | `-s, --save <path>` | Save to JSON file | - |
 | `--json` | Output as JSON | - |
+
+**Status Values:**
+- `success` - Completed successfully
+- `error` - Failed with error
+- `waiting` - Waiting for manual trigger/approval
+- `running` - Currently executing (rare in list)
+
+**Examples:**
+```bash
+# List failed executions
+n8n executions list --status error --limit 20
+
+# List executions for specific workflow
+n8n executions list --workflow-id abc123 --save execs.json
+
+# List all successful executions
+n8n executions list --status success --limit 0
+```
+
+**jq Examples:**
+```bash
+jq '.data[] | {id, status, workflowName}' executions.json
+jq '.data[] | select(.status=="error") | .id' executions.json
+```
 
 #### `executions get`
 
@@ -1127,6 +1476,19 @@ n8n executions get <id> [options]
 | `-s, --save <path>` | Save to JSON file | - |
 | `--json` | Output as JSON | - |
 
+**Output Modes:**
+- `preview` - Quick overview (status, timing, error if any)
+- `summary` - Default: status + node execution summary
+- `filtered` - Summary without large data payloads
+- `full` - Complete execution data (may be very large!)
+
+> **Note:** Full mode can return megabytes of data for complex workflows. Use `--save` for large executions.
+
+**Example - Get error details:**
+```bash
+n8n executions get 9361 --json | jq '.data.error'
+```
+
 #### `executions retry`
 
 Retry a failed execution.
@@ -1139,6 +1501,17 @@ n8n executions retry <id> [options]
 |--------|-------------|
 | `--load-latest` | Use latest workflow version (not execution snapshot) |
 | `--json` | Output as JSON |
+
+**Retry Behavior:**
+- Default: Retries using the SAME workflow version that was executed
+- `--load-latest`: Uses the CURRENT workflow version (if workflow was updated)
+
+**When to Use `--load-latest`:**
+- Workflow was fixed after the failure
+- You want to test new logic against old input data
+- Credentials or settings were updated
+
+> **Note:** Only failed executions can be retried. The retry creates a NEW execution.
 
 #### `executions delete`
 
@@ -1158,6 +1531,25 @@ n8n executions delete <id> [options]
 ### variables
 
 Manage n8n environment variables. **Requires n8n Enterprise/Pro license.**
+
+**Command Overview:**
+
+| Command | Description |
+|---------|-------------|
+| `list` | List all variables |
+| `create` | Create new variable |
+| `update` | Update variable |
+| `delete` | Delete variable |
+
+**Usage in Workflows:**
+Variables are accessed via expressions: `{{ $vars.VARIABLE_KEY }}`
+They provide instance-wide environment configuration shared across all workflows.
+
+**Key Format Requirements:**
+- Must start with a letter or underscore
+- Can contain only letters, numbers, underscores
+- Case-sensitive (`MY_VAR` ≠ `my_var`)
+- Examples: `API_KEY`, `database_url`, `Config_Value_1`
 
 #### `variables list`
 
@@ -1207,11 +1599,33 @@ n8n variables delete <id> [options]
 | `--force, --yes` | Skip confirmation |
 | `--json` | Output as JSON |
 
+**Examples:**
+```bash
+# Create a variable
+n8n variables create --key API_KEY --value "sk-xxx"
+
+# Use in workflows: {{ $vars.API_KEY }}
+```
+
+> **Warning:** Deleting a variable will cause workflows using `{{ $vars.VARIABLE_KEY }}` to fail!
+
 ---
 
 ### tags
 
-Manage n8n tags.
+Manage n8n tags for organizing workflows.
+
+**Command Overview:**
+
+| Command | Description |
+|---------|-------------|
+| `list` | List all tags |
+| `get` | Get tag by ID |
+| `create` | Create new tag |
+| `update` | Rename tag |
+| `delete` | Delete tag |
+
+---
 
 #### `tags list`
 
@@ -1276,6 +1690,16 @@ n8n tags delete <id> [options]
 
 Search and download workflow templates from n8n.io or local database.
 
+**Command Overview:**
+
+| Command | Description | Source |
+|---------|-------------|--------|
+| `search` | Search templates by keyword/nodes/task | API or local |
+| `get` | Download template by ID | n8n.io API |
+| `list-tasks` | List available task types | Local |
+
+---
+
 #### `templates search`
 
 Search templates by keyword, nodes, task, or metadata.
@@ -1301,9 +1725,18 @@ n8n templates search [query] [options]
 **Search Modes:**
 
 - **Keyword** (default): Text search via n8n.io API (requires internet)
-- **By Nodes**: Find templates using specific node types (local)
-- **By Task**: Curated templates for common automation tasks (local)
-- **By Metadata**: Filter by complexity, setup time, services (local)
+- **By Nodes**: Find templates using specific node types (local database)
+- **By Task**: Curated templates for common automation tasks (local database)
+- **By Metadata**: Filter by complexity, setup time, services (local database)
+- **Local Keyword**: Force local database search with `--local` flag
+
+**Local vs API Search:**
+
+| Mode | Source | Speed | Accuracy |
+|------|--------|-------|----------|
+| Keyword (default) | n8n.io API | Slower | Most accurate |
+| `--local` | Bundled database | Fast | Limited to indexed templates |
+| `--by-nodes/--by-task` | Bundled database | Fast | Curated matches |
 
 **Available Tasks:**
 `ai_automation`, `data_sync`, `webhook_processing`, `email_automation`, `slack_integration`, `data_transformation`, `file_processing`, `scheduling`, `api_integration`, `database_operations`
@@ -1366,6 +1799,36 @@ n8n audit [options]
 | `-s, --save <path>` | Save report to JSON file |
 | `--json` | Output as JSON |
 
+**Audit Categories:**
+
+| Category | Description |
+|----------|-------------|
+| `credentials` | Unused or insecure credentials, missing OAuth tokens |
+| `database` | Database connection security, SQL injection risks |
+| `nodes` | Risky nodes (Code, Execute Command, filesystem access) |
+| `filesystem` | Read/write to filesystem, path traversal risks |
+| `instance` | Instance configuration, exposed endpoints, CORS settings |
+
+**Examples:**
+```bash
+# Full audit
+n8n audit
+
+# Specific categories
+n8n audit --categories credentials,nodes
+
+# Find abandoned workflows (>90 days)
+n8n audit --days-abandoned 90 --save audit.json
+```
+
+**jq Examples:**
+```bash
+jq '.sections[] | {title, riskScore}' audit.json
+jq '.sections[].issues[] | select(.severity=="high")' audit.json
+```
+
+> **Note:** Some audit checks may require admin privileges on the n8n instance.
+
 ---
 
 ### auth
@@ -1387,9 +1850,27 @@ n8n auth login [options]
 | `-i, --interactive` | Interactive setup with prompts |
 | `--json` | Output as JSON |
 
-#### `auth status` / `auth whoami`
+**Interactive Mode:**
+```bash
+n8n auth login --interactive
+# Prompts for:
+#   Host URL: https://your-n8n.com
+#   API Key: ********
+#   Test connection? [Y/n]
+```
 
-Show current authentication status.
+**Environment Variables (alternative to config file):**
+```bash
+# Use env vars without saving to config
+N8N_API_KEY=xxx n8n workflows list
+
+# Get API key from n8n UI:
+# Settings → API → Create API Key
+```
+
+#### `auth status` (Alias: `whoami`)
+
+Show current authentication status and connectivity.
 
 ```bash
 n8n auth status [options]
@@ -1429,9 +1910,24 @@ n8n health [options]
 **Checks performed:**
 - DNS resolution and network connectivity
 - HTTPS/TLS certificate validity
-- API endpoint responds
+- API endpoint responds (GET /api/v1)
 - API key authentication works
-- Response time (latency)
+- Response time (latency measurement)
+
+**Common Issues:**
+
+| Error | Cause | Solution |
+|-------|-------|----------|
+| "Connection refused" | Wrong host/port | Check host URL and port |
+| "Certificate error" | Self-signed cert | Use `NODE_TLS_REJECT_UNAUTHORIZED=0` |
+| "401 Unauthorized" | Invalid API key | Run `n8n auth login` |
+| "Timeout" | Network/firewall | Check connectivity |
+
+**Examples:**
+```bash
+n8n health              # Human-readable output
+n8n health --json       # For scripting/monitoring
+```
 
 ---
 
@@ -1485,11 +1981,28 @@ n8n validate [file] [options]
 ```
 
 | Option | Description |
-|--------|-------------|
-| `--repair` | Attempt to repair malformed JSON |
+|--------|-----------|
+| `--repair` | Attempt to repair malformed JSON (trailing commas, unquoted keys, etc.) |
 | `--fix` | Auto-fix known issues |
 | `-s, --save <path>` | Save fixed workflow |
 | `--json` | Output as JSON |
+
+**JSON Repair Mode:**
+
+The `--repair` flag attempts to fix common JSON syntax errors:
+- Trailing commas: `{"key": "value",}` → `{"key": "value"}`
+- Unquoted keys: `{key: "value"}` → `{"key": "value"}`
+- Single quotes: `{'key': 'value'}` → `{"key": "value"}`
+- JavaScript-style objects: `{name: value}` → `{"name": "value"}`
+- Missing commas between properties
+
+```bash
+# Repair and validate malformed JSON
+n8n validate broken-workflow.json --repair
+
+# Repair, fix issues, and save
+n8n validate broken-workflow.json --repair --fix --save fixed.json
+```
 
 > **Note:** For validation profiles (`minimal`, `runtime`, `ai-friendly`, `strict`), use the full command:
 > `n8n workflows validate <file> --profile <profile>`
@@ -1556,14 +2069,15 @@ esac
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### Why Local Files Beat MCP Streaming
+### Advantages of File-Based Workflow
 
-| MCP Streaming | CLI + Local Files |
-|---------------|-------------------|
-| Large JSON causes LLM hallucinations | Agent controls file completely |
-| Token limits force chunking | Full workflow in one file |
-| Complex protocol errors | Simple exit codes |
+| Challenge | CLI Solution |
+|-----------|-------------|
+| Large JSON causes LLM hallucinations | Agent writes file, CLI validates |
+| Token limits force chunking | Full workflow in one local file |
+| Complex protocol errors | Simple POSIX exit codes |
 | Network latency per iteration | Local validation is instant |
+| Unpredictable output formats | Guaranteed JSON structure |
 
 ### JSON Output Guarantees
 
@@ -1604,6 +2118,13 @@ npm run typecheck
 # Run tests
 npm test
 ```
+
+---
+
+## See Also
+
+- **[cli-commands-reference.md](./cli-commands-reference.md)** - Complete programmatic extraction of all 70+ commands and 300+ flags
+- **[.n8nrc.example](./.n8nrc.example)** - Example configuration file
 
 ---
 

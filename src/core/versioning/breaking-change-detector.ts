@@ -80,8 +80,8 @@ export class BreakingChangeDetector {
    * Calculate overall severity of the upgrade
    */
   private calculateOverallSeverity(changes: DetectedChange[]): Severity {
-    if (changes.some(c => c.severity === 'HIGH')) return 'HIGH';
-    if (changes.some(c => c.severity === 'MEDIUM')) return 'MEDIUM';
+    if (changes.some(c => c.severity === 'HIGH')) {return 'HIGH';}
+    if (changes.some(c => c.severity === 'MEDIUM')) {return 'MEDIUM';}
     return 'LOW';
   }
 

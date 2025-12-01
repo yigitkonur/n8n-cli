@@ -80,7 +80,7 @@ export class WorkflowVersionRepository {
       SELECT * FROM workflow_versions WHERE id = ?
     `).get(versionId) as any;
 
-    if (!row) return null;
+    if (!row) {return null;}
     return this.parseWorkflowVersionRow(row);
   }
 
@@ -95,7 +95,7 @@ export class WorkflowVersionRepository {
       LIMIT 1
     `).get(workflowId) as any;
 
-    if (!row) return null;
+    if (!row) {return null;}
     return this.parseWorkflowVersionRow(row);
   }
 
@@ -230,7 +230,7 @@ export class WorkflowVersionRepository {
    * Safe JSON parse with fallback
    */
   private safeJsonParse(json: string | null, defaultValue: any): any {
-    if (!json) return defaultValue;
+    if (!json) {return defaultValue;}
     try {
       return JSON.parse(json);
     } catch {

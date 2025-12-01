@@ -29,6 +29,7 @@ import {
   type RequiredCredential,
 } from '../../core/credential-utils.js';
 import { ExitCode } from '../../utils/exit-codes.js';
+import { validateBeforeApi, displayValidationErrors } from '../../core/validation/index.js';
 import type { Workflow } from '../../core/types.js';
 
 const TEMPLATES_API = 'https://api.n8n.io/api/templates';
@@ -43,6 +44,8 @@ interface DeployTemplateOptions {
   autofix?: boolean;
   /** Preserve credential references (default: false) */
   keepCredentials?: boolean;
+  /** Skip validation before API call (default: false) */
+  skipValidation?: boolean;
   /** Preview without creating (default: false) */
   dryRun?: boolean;
   /** Save workflow JSON locally */
@@ -266,7 +269,23 @@ export async function workflowsDeployTemplateCommand(
       return;
     }
 
-    // Step 10: Create workflow via n8n API
+    // Step 10: Validate workflow before API call
+    const validation = validateBeforeApi(cleanedWorkflow, {
+      skipValidation: opts.skipValidation,
+      json: opts.json,
+    });
+    
+    if (!validation.shouldProceed) {
+      displayValidationErrors(validation, { json: opts.json, context: 'deploy-template' });
+      return;
+    }
+    
+    // Show warnings but proceed
+    if (validation.warnings.length > 0 && !opts.json) {
+      console.log(chalk.yellow(`  \u26a0\ufe0f  ${validation.warnings.length} validation warning(s) - proceeding anyway`));
+    }
+
+    // Step 11: Create workflow via n8n API
     const client = getApiClient();
     // Cast to Partial<Workflow> for API - createWorkflow handles missing id fields
     const created = await client.createWorkflow(cleanedWorkflow as any);

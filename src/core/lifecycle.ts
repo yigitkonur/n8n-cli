@@ -11,8 +11,15 @@ import { debug } from './debug.js';
 let isCleaningUp = false;
 let cleanupComplete = false;
 
-// Force exit timeout (5 seconds)
-const CLEANUP_TIMEOUT_MS = 5000;
+/**
+ * Cleanup timeout in milliseconds.
+ * Configurable via N8N_CLEANUP_TIMEOUT_MS environment variable.
+ * Default: 5000ms (5 seconds)
+ */
+const CLEANUP_TIMEOUT_MS = (() => {
+  const envValue = parseInt(process.env.N8N_CLEANUP_TIMEOUT_MS || '5000', 10);
+  return isNaN(envValue) || envValue < 0 ? 5000 : envValue;
+})();
 
 /**
  * Perform cleanup operations
@@ -35,8 +42,12 @@ async function performCleanup(signal?: string): Promise<void> {
   try {
     // Close database connection
     debug('lifecycle', 'Closing database connection');
-    closeDatabase();
-    debug('lifecycle', 'Database closed');
+    try {
+      closeDatabase();
+      debug('lifecycle', 'Database closed');
+    } catch (dbError) {
+      debug('lifecycle', `closeDatabase error (ignored): ${dbError instanceof Error ? dbError.message : String(dbError)}`);
+    }
     
     cleanupComplete = true;
     debug('lifecycle', 'Cleanup complete');
@@ -54,10 +65,11 @@ async function performCleanup(signal?: string): Promise<void> {
 function createSignalHandler(signal: string): () => void {
   return () => {
     debug('lifecycle', `Received ${signal}`);
-    performCleanup(signal).finally(() => {
-      // Explicit exit after cleanup - don't rely on event loop drain
-      process.exit(0);
-    });
+    // Use process.exitCode instead of process.exit() to allow event loop drain
+    // This ensures in-flight operations complete gracefully
+    // Timeout in performCleanup() acts as safety net for hung cleanup
+    process.exitCode = signal === 'SIGINT' ? 130 : signal === 'SIGTERM' ? 143 : 0;
+    performCleanup(signal);
   };
 }
 
@@ -66,20 +78,19 @@ function createSignalHandler(signal: string): () => void {
  * Call this early in CLI initialization
  */
 export function registerShutdownHandlers(): void {
+  // SIGPIPE: Ignore broken pipe (common in piped commands like `n8n list | head`)
+  process.on('SIGPIPE', () => {
+    debug('lifecycle', 'Ignoring SIGPIPE (broken pipe)');
+  });
+  
   // SIGINT: Ctrl+C
   process.on('SIGINT', createSignalHandler('SIGINT'));
   
   // SIGTERM: Docker/Kubernetes termination
   process.on('SIGTERM', createSignalHandler('SIGTERM'));
   
-  // beforeExit: Fallback for clean exit (only fires when event loop is empty)
-  process.on('beforeExit', () => {
-    if (!cleanupComplete) {
-      debug('lifecycle', 'beforeExit - performing cleanup');
-      // Synchronous close since we're exiting
-      closeDatabase();
-    }
-  });
+  // SIGHUP: Terminal disconnect (SSH timeout)
+  process.on('SIGHUP', createSignalHandler('SIGHUP'));
   
   // uncaughtException: Sync-only, fatal error
   process.on('uncaughtException', (err) => {

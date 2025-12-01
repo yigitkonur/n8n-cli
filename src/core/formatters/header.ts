@@ -38,14 +38,14 @@ export function formatHeader(options: HeaderOptions): string {
   
   // Add timestamp if enabled
   if (showTimestamp) {
-    const timestamp = new Date().toISOString().replace('T', ' ').slice(0, 19) + ' UTC';
-    output += chalk.cyan('│  ') + chalk.dim(`Fetched: ${timestamp}`) + '\n';
+    const timestamp = `${new Date().toISOString().replace('T', ' ').slice(0, 19)  } UTC`;
+    output += `${chalk.cyan('│  ') + chalk.dim(`Fetched: ${timestamp}`)  }\n`;
   }
   
   const contextEntries = Object.entries(context);
   if (contextEntries.length > 0) {
     for (const [key, value] of contextEntries) {
-      output += chalk.cyan('│  ') + chalk.dim(`${key}: `) + value + '\n';
+      output += `${chalk.cyan('│  ') + chalk.dim(`${key}: `) + value  }\n`;
     }
   }
   
@@ -61,7 +61,7 @@ export function formatDivider(title?: string): string {
   if (title) {
     return chalk.dim(`\n─── ${title} ${'─'.repeat(Math.max(0, 50 - title.length))}\n`);
   }
-  return chalk.dim('\n' + '─'.repeat(60) + '\n');
+  return chalk.dim(`\n${  '─'.repeat(60)  }\n`);
 }
 
 /**

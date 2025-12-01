@@ -178,6 +178,6 @@ export async function nodesValidateCommand(nodeType: string, opts: ValidateOptio
     
   } catch (error: any) {
     console.error(chalk.red(`\n${icons.error} Error: ${error.message}`));
-    process.exitCode = 1; return;
+    process.exitCode = 1; 
   }
 }

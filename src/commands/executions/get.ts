@@ -46,7 +46,7 @@ export async function executionsGetCommand(id: string, opts: GetOptions): Promis
     } else {
       console.error(chalk.red(`\n${icons.error} Error: ${(error as Error).message}`));
     }
-    process.exitCode = 1; return;
+    process.exitCode = 1; 
   }
 }
 
@@ -60,9 +60,9 @@ function outputExecution(execution: any, mode: string): void {
   let duration = '-';
   if (execution.startedAt && execution.stoppedAt) {
     const ms = new Date(execution.stoppedAt).getTime() - new Date(execution.startedAt).getTime();
-    if (ms < 1000) duration = `${ms}ms`;
-    else if (ms < 60000) duration = `${(ms / 1000).toFixed(1)}s`;
-    else duration = `${(ms / 60000).toFixed(1)}m`;
+    if (ms < 1000) {duration = `${ms}ms`;}
+    else if (ms < 60000) {duration = `${(ms / 1000).toFixed(1)}s`;}
+    else {duration = `${(ms / 60000).toFixed(1)}m`;}
   }
   
   // Header
@@ -89,14 +89,14 @@ function outputExecution(execution: any, mode: string): void {
     console.log(formatDivider('Error Details'));
     
     if (execution.data?.resultData?.error) {
-      const error = execution.data.resultData.error;
+      const {error} = execution.data.resultData;
       console.log(chalk.red(`  ${error.message || 'Unknown error'}`));
       if (error.node) {
         console.log(chalk.dim(`  Failed at node: ${error.node}`));
       }
       if (error.stack && mode === 'full') {
         console.log(chalk.dim('\n  Stack trace:'));
-        console.log(chalk.dim('  ' + error.stack.split('\n').slice(0, 5).join('\n  ')));
+        console.log(chalk.dim(`  ${  error.stack.split('\n').slice(0, 5).join('\n  ')}`));
       }
     } else {
       console.log(chalk.red('  Execution failed. Use --mode full for details.'));
@@ -108,7 +108,7 @@ function outputExecution(execution: any, mode: string): void {
   if (mode !== 'preview' && execution.data?.resultData?.runData) {
     console.log(formatDivider('Node Execution'));
     
-    const runData = execution.data.resultData.runData;
+    const {runData} = execution.data.resultData;
     const nodeNames = Object.keys(runData);
     
     for (const nodeName of nodeNames.slice(0, 10)) {

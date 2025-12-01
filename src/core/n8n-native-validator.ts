@@ -5,7 +5,7 @@ import { createRequire } from 'module';
 
 const require = createRequire(import.meta.url);
 // Load n8n-workflow via CommonJS entrypoint to avoid ESM logger-proxy resolution issues
-// eslint-disable-next-line @typescript-eslint/no-var-requires
+ 
 const n8nWorkflowCjs = require('n8n-workflow') as any;
 // Use a differently named runtime helper object to avoid clashing with type-only imports
 const { NodeHelpers: CjsNodeHelpers } = n8nWorkflowCjs;
@@ -114,7 +114,7 @@ export function validateNodeWithN8n(node: WorkflowNode): ValidationIssue[] {
   const parametersIssues = nodeIssues.parameters;
   if (parametersIssues && typeof parametersIssues === 'object') {
     for (const [paramName, messages] of Object.entries(parametersIssues)) {
-      if (!messages) continue;
+      if (!messages) {continue;}
 
       for (const msg of messages) {
         issues.push({

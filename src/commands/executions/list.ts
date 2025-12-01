@@ -52,7 +52,7 @@ export async function executionsListCommand(opts: ListOptions): Promise<void> {
       outputJson({
         data: executions,
         total: executions.length,
-        hasMore: !!response.nextCursor,
+        hasMore: Boolean(response.nextCursor),
         nextCursor: response.nextCursor,
       });
       return;
@@ -132,12 +132,12 @@ export async function executionsListCommand(opts: ListOptions): Promise<void> {
     const errorCount = executions.filter((e: any) => e.status === 'error').length;
     const durationMs = Date.now() - startTime;
     
-    console.log('\n' + formatSummary({
+    console.log(`\n${  formatSummary({
       total: executions.length,
       success: successCount,
       failed: errorCount,
       durationMs,
-    }));
+    })}`);
     
     // Health indicator for executions
     if (errorCount > 0) {
@@ -176,6 +176,6 @@ export async function executionsListCommand(opts: ListOptions): Promise<void> {
     } else {
       console.error(chalk.red(`\n${icons.error} Error: ${(error as Error).message}`));
     }
-    process.exitCode = 1; return;
+    process.exitCode = 1; 
   }
 }

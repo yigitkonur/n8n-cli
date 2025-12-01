@@ -36,7 +36,7 @@ export async function tagsUpdateCommand(id: string, opts: UpdateOptions): Promis
     if (opts.json) {
       outputJson({
         success: true,
-        tag: tag,
+        tag,
       });
       return;
     }

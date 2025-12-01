@@ -59,7 +59,7 @@ export class CredentialRegistry {
   private failedLoads: FailedLoad[] = [];
 
   init() {
-    if (this.initialized) return;
+    if (this.initialized) {return;}
 
     let credsRoot: string;
     try {
@@ -178,7 +178,7 @@ export class CredentialRegistry {
     this.init();
     
     const cred = this.credentialTypes.get(name);
-    if (!cred) return null;
+    if (!cred) {return null;}
 
     return {
       name: cred.name,
@@ -228,7 +228,7 @@ export class CredentialRegistry {
     
     for (const [name] of this.credentialTypes) {
       const info = this.getCredentialType(name);
-      if (!info) continue;
+      if (!info) {continue;}
       
       let score = 0;
       

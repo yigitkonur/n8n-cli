@@ -10,7 +10,7 @@ import { formatTable, columnFormatters } from '../../core/formatters/table.js';
 import { formatNextActions } from '../../core/formatters/next-actions.js';
 import { formatExportFooter } from '../../core/formatters/jq-recipes.js';
 import { saveToJson, outputJson } from '../../core/formatters/json.js';
-import { theme, icons, formatBoolean } from '../../core/formatters/theme.js';
+import { theme, icons } from '../../core/formatters/theme.js';
 import { printError, N8nApiError } from '../../utils/errors.js';
 
 interface GetOptions {
@@ -58,7 +58,7 @@ export async function workflowsGetCommand(id: string, opts: GetOptions): Promise
     } else {
       console.error(chalk.red(`\n${icons.error} Error: ${(error as Error).message}`));
     }
-    process.exitCode = 1; return;
+    process.exitCode = 1; 
   }
 }
 
@@ -129,7 +129,7 @@ function outputFull(workflow: any): void {
   
   // Description if present
   if (workflow.description) {
-    console.log(theme.dim('  ' + workflow.description));
+    console.log(theme.dim(`  ${  workflow.description}`));
     console.log('');
   }
   
@@ -194,10 +194,10 @@ function outputFull(workflow: any): void {
   // Settings
   if (workflow.settings) {
     console.log(formatDivider('Settings'));
-    const settings = workflow.settings;
-    if (settings.executionOrder) console.log(`  Execution Order: ${settings.executionOrder}`);
-    if (settings.timezone) console.log(`  Timezone: ${settings.timezone}`);
-    if (settings.errorWorkflow) console.log(`  Error Workflow: ${settings.errorWorkflow}`);
+    const {settings} = workflow;
+    if (settings.executionOrder) {console.log(`  Execution Order: ${settings.executionOrder}`);}
+    if (settings.timezone) {console.log(`  Timezone: ${settings.timezone}`);}
+    if (settings.errorWorkflow) {console.log(`  Error Workflow: ${settings.errorWorkflow}`);}
     console.log('');
   }
   

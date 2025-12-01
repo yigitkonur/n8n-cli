@@ -22,7 +22,7 @@ export async function workflowsTriggerCommand(webhookUrl: string, opts: TriggerO
     const client = getApiClient();
     
     // Parse data if provided
-    let data: any = undefined;
+    let data: any;
     if (opts.data) {
       try {
         data = JSON.parse(opts.data);
@@ -68,10 +68,10 @@ export async function workflowsTriggerCommand(webhookUrl: string, opts: TriggerO
       
       // Truncate if too long
       if (dataStr.length > 500) {
-        console.log(chalk.dim('  ' + dataStr.slice(0, 500) + '...'));
+        console.log(chalk.dim(`  ${  dataStr.slice(0, 500)  }...`));
         console.log(chalk.dim(`\n  (${dataStr.length} characters total, use --json for full response)`));
       } else {
-        console.log(chalk.dim('  ' + dataStr.split('\n').join('\n  ')));
+        console.log(chalk.dim(`  ${  dataStr.split('\n').join('\n  ')}`));
       }
     }
     
@@ -83,6 +83,6 @@ export async function workflowsTriggerCommand(webhookUrl: string, opts: TriggerO
     } else {
       console.error(chalk.red(`\n${icons.error} Error: ${(error as Error).message}`));
     }
-    process.exitCode = 1; return;
+    process.exitCode = 1; 
   }
 }

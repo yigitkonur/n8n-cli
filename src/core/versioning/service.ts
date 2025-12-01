@@ -39,6 +39,7 @@ export class WorkflowVersioningService {
    * Create backup before modification
    * Automatically prunes to 10 versions after backup creation
    */
+   
   async createBackup(
     workflowId: string,
     workflow: any,
@@ -79,6 +80,7 @@ export class WorkflowVersioningService {
   /**
    * Get version history for a workflow
    */
+   
   async getVersionHistory(workflowId: string, limit: number = 10): Promise<VersionInfo[]> {
     const versions = this.repository.getWorkflowVersions(workflowId, limit);
 
@@ -98,6 +100,7 @@ export class WorkflowVersioningService {
   /**
    * Get a specific workflow version
    */
+   
   async getVersion(versionId: number): Promise<WorkflowVersion | null> {
     return this.repository.getWorkflowVersion(versionId);
   }
@@ -122,7 +125,7 @@ export class WorkflowVersioningService {
     }
 
     // Get the version to restore
-    let versionToRestore: WorkflowVersion | null = null;
+    let versionToRestore: WorkflowVersion | null;
 
     if (versionId) {
       versionToRestore = this.repository.getWorkflowVersion(versionId);
@@ -223,6 +226,7 @@ export class WorkflowVersioningService {
   /**
    * Delete a specific version
    */
+   
   async deleteVersion(versionId: number): Promise<DeleteResult> {
     const version = this.repository.getWorkflowVersion(versionId);
 
@@ -244,6 +248,7 @@ export class WorkflowVersioningService {
   /**
    * Delete all versions for a workflow
    */
+   
   async deleteAllVersions(workflowId: string): Promise<DeleteResult> {
     const count = this.repository.getWorkflowVersionCount(workflowId);
 
@@ -265,6 +270,7 @@ export class WorkflowVersioningService {
   /**
    * Manually trigger pruning for a workflow
    */
+   
   async pruneVersions(
     workflowId: string,
     maxVersions: number = 10
@@ -279,6 +285,7 @@ export class WorkflowVersioningService {
    * Truncate entire workflow_versions table
    * Requires explicit confirmation
    */
+   
   async truncateAllVersions(confirm: boolean): Promise<DeleteResult> {
     if (!confirm) {
       return {
@@ -298,6 +305,7 @@ export class WorkflowVersioningService {
   /**
    * Get storage statistics
    */
+   
   async getStorageStats(): Promise<StorageStats> {
     const stats = this.repository.getVersionStorageStats();
 
@@ -319,6 +327,7 @@ export class WorkflowVersioningService {
   /**
    * Compare two versions
    */
+   
   async compareVersions(versionId1: number, versionId2: number): Promise<VersionDiff> {
     const v1 = this.repository.getWorkflowVersion(versionId1);
     const v2 = this.repository.getWorkflowVersion(versionId2);
@@ -377,13 +386,13 @@ export class WorkflowVersioningService {
    * Format bytes to human-readable string
    */
   private formatBytes(bytes: number): string {
-    if (bytes === 0) return '0 Bytes';
+    if (bytes === 0) {return '0 Bytes';}
 
     const k = 1024;
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
 
-    return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
+    return `${Math.round((bytes / k**i) * 100) / 100  } ${  sizes[i]}`;
   }
 
   /**

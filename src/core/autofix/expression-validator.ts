@@ -285,7 +285,7 @@ export class ExpressionValidator {
   static validateAndFix(
     value: unknown,
     fieldPath: string,
-    context: ValidationContext
+    _context: ValidationContext
   ): ExpressionFormatIssue | null {
     // Skip non-string values
     if (typeof value !== 'string') {
@@ -366,7 +366,7 @@ export class ExpressionValidator {
 
     // Handle circular references
     if (obj && typeof obj === 'object') {
-      if (visited.has(obj as object)) return;
+      if (visited.has(obj as object)) {return;}
       visited.add(obj as object);
     }
 
@@ -385,7 +385,7 @@ export class ExpressionValidator {
     } else if (obj && typeof obj === 'object') {
       // Skip special keys
       Object.entries(obj as Record<string, unknown>).forEach(([key, value]) => {
-        if (key.startsWith('__')) return;
+        if (key.startsWith('__')) {return;}
 
         const newPath = path ? `${path}.${key}` : key;
         this.validateRecursive(value, newPath, context, issues, visited, depth + 1);

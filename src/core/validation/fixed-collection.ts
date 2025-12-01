@@ -188,7 +188,7 @@ export class FixedCollectionValidator {
       visited.add(current);
 
       // Check if property exists
-      if (!Object.prototype.hasOwnProperty.call(current, part)) {
+      if (!Object.hasOwn(current, part)) {
         return false;
       }
 
@@ -247,11 +247,11 @@ export class FixedCollectionValidator {
 
     switch (pattern.nodeType) {
       case 'switch': {
-        const rules = config.rules;
+        const {rules} = config;
         if (this.isNodeConfig(rules)) {
-          const conditions = rules.conditions;
+          const {conditions} = rules;
           if (this.isNodeConfig(conditions) && 'values' in conditions) {
-            const values = conditions.values;
+            const {values} = conditions;
             fixedConfig.rules = {
               values: Array.isArray(values)
                 ? values.map((condition, index) => ({
@@ -262,7 +262,7 @@ export class FixedCollectionValidator {
             };
           } else if (conditions) {
             fixedConfig.rules = {
-              values: [{ conditions: conditions, outputKey: 'output1' }],
+              values: [{ conditions, outputKey: 'output1' }],
             };
           }
         }
@@ -271,9 +271,9 @@ export class FixedCollectionValidator {
 
       case 'if':
       case 'filter': {
-        const conditions = config.conditions;
+        const {conditions} = config;
         if (this.isNodeConfig(conditions) && 'values' in conditions) {
-          const values = conditions.values;
+          const {values} = conditions;
           if (values !== undefined && values !== null && (Array.isArray(values) || typeof values === 'object')) {
             return values as NodeConfig | NodeConfigValue[];
           }
@@ -282,9 +282,9 @@ export class FixedCollectionValidator {
       }
 
       case 'summarize': {
-        const fieldsToSummarize = config.fieldsToSummarize;
+        const {fieldsToSummarize} = config;
         if (this.isNodeConfig(fieldsToSummarize)) {
-          const values = fieldsToSummarize.values;
+          const {values} = fieldsToSummarize;
           if (this.isNodeConfig(values) && 'values' in values) {
             fixedConfig.fieldsToSummarize = { values: values.values };
           }
@@ -293,9 +293,9 @@ export class FixedCollectionValidator {
       }
 
       case 'comparedatasets': {
-        const mergeByFields = config.mergeByFields;
+        const {mergeByFields} = config;
         if (this.isNodeConfig(mergeByFields)) {
-          const values = mergeByFields.values;
+          const {values} = mergeByFields;
           if (this.isNodeConfig(values) && 'values' in values) {
             fixedConfig.mergeByFields = { values: values.values };
           }
@@ -304,9 +304,9 @@ export class FixedCollectionValidator {
       }
 
       case 'sort': {
-        const sortFieldsUi = config.sortFieldsUi;
+        const {sortFieldsUi} = config;
         if (this.isNodeConfig(sortFieldsUi)) {
-          const sortField = sortFieldsUi.sortField;
+          const {sortField} = sortFieldsUi;
           if (this.isNodeConfig(sortField) && 'values' in sortField) {
             fixedConfig.sortFieldsUi = { sortField: sortField.values };
           }
@@ -315,9 +315,9 @@ export class FixedCollectionValidator {
       }
 
       case 'aggregate': {
-        const fieldsToAggregate = config.fieldsToAggregate;
+        const {fieldsToAggregate} = config;
         if (this.isNodeConfig(fieldsToAggregate)) {
-          const fieldToAggregate = fieldsToAggregate.fieldToAggregate;
+          const {fieldToAggregate} = fieldsToAggregate;
           if (this.isNodeConfig(fieldToAggregate) && 'values' in fieldToAggregate) {
             fixedConfig.fieldsToAggregate = { fieldToAggregate: fieldToAggregate.values };
           }
@@ -326,9 +326,9 @@ export class FixedCollectionValidator {
       }
 
       case 'set': {
-        const fields = config.fields;
+        const {fields} = config;
         if (this.isNodeConfig(fields)) {
-          const values = fields.values;
+          const {values} = fields;
           if (this.isNodeConfig(values) && 'values' in values) {
             fixedConfig.fields = { values: values.values };
           }
@@ -337,9 +337,9 @@ export class FixedCollectionValidator {
       }
 
       case 'html': {
-        const extractionValues = config.extractionValues;
+        const {extractionValues} = config;
         if (this.isNodeConfig(extractionValues)) {
-          const values = extractionValues.values;
+          const {values} = extractionValues;
           if (this.isNodeConfig(values) && 'values' in values) {
             fixedConfig.extractionValues = { values: values.values };
           }
@@ -348,9 +348,9 @@ export class FixedCollectionValidator {
       }
 
       case 'httprequest': {
-        const body = config.body;
+        const {body} = config;
         if (this.isNodeConfig(body)) {
-          const parameters = body.parameters;
+          const {parameters} = body;
           if (this.isNodeConfig(parameters) && 'values' in parameters) {
             fixedConfig.body = { ...body, parameters: parameters.values };
           }
@@ -359,15 +359,18 @@ export class FixedCollectionValidator {
       }
 
       case 'airtable': {
-        const sort = config.sort;
+        const {sort} = config;
         if (this.isNodeConfig(sort)) {
-          const sortField = sort.sortField;
+          const {sortField} = sort;
           if (this.isNodeConfig(sortField) && 'values' in sortField) {
             fixedConfig.sort = { sortField: sortField.values };
           }
         }
         break;
       }
+      default:
+        // Unknown node type - no transformation needed
+        break;
     }
 
     return fixedConfig;

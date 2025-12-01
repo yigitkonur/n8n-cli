@@ -130,7 +130,7 @@ export class WorkflowDiffEngine {
           applied: appliedIndices,
           failed: failedIndices
         };
-      } else {
+      } 
         // Atomic mode: all operations must succeed
         // Pass 1: Validate and apply node operations first
         for (const { operation, index } of nodeOperations) {
@@ -225,7 +225,7 @@ export class WorkflowDiffEngine {
           shouldActivate: shouldActivate || undefined,
           shouldDeactivate: shouldDeactivate || undefined
         };
-      }
+      
     } catch (err) {
       debug('diff', `Failed to apply diff: ${err}`);
       return {
@@ -334,6 +334,9 @@ export class WorkflowDiffEngine {
       case 'replaceConnections':
         this.applyReplaceConnections(workflow, operation as ReplaceConnectionsOperation);
         break;
+      default:
+        // Unknown operation type - ignore
+        break;
     }
   }
 
@@ -430,8 +433,8 @@ export class WorkflowDiffEngine {
     const operationAny = operation as any;
     if (operationAny.sourceNodeId || operationAny.targetNodeId) {
       const wrongParams: string[] = [];
-      if (operationAny.sourceNodeId) wrongParams.push('sourceNodeId');
-      if (operationAny.targetNodeId) wrongParams.push('targetNodeId');
+      if (operationAny.sourceNodeId) {wrongParams.push('sourceNodeId');}
+      if (operationAny.targetNodeId) {wrongParams.push('targetNodeId');}
       return `Invalid parameter(s): ${wrongParams.join(', ')}. Use 'source' and 'target' instead. Example: {type: "addConnection", source: "Node Name", target: "Target Name"}`;
     }
 
@@ -601,7 +604,7 @@ export class WorkflowDiffEngine {
 
   private applyRemoveNode(workflow: Workflow, operation: RemoveNodeOperation): void {
     const node = this.findNode(workflow, operation.nodeId, operation.nodeName);
-    if (!node) return;
+    if (!node) {return;}
     
     // Remove node from array
     const index = workflow.nodes.findIndex(n => n.id === node.id);
@@ -633,7 +636,7 @@ export class WorkflowDiffEngine {
 
   private applyUpdateNode(workflow: Workflow, operation: UpdateNodeOperation): void {
     const node = this.findNode(workflow, operation.nodeId, operation.nodeName);
-    if (!node) return;
+    if (!node) {return;}
 
     // Track node renames for connection reference updates
     if (operation.updates.name && operation.updates.name !== node.name) {
@@ -655,19 +658,19 @@ export class WorkflowDiffEngine {
 
   private applyMoveNode(workflow: Workflow, operation: MoveNodeOperation): void {
     const node = this.findNode(workflow, operation.nodeId, operation.nodeName);
-    if (!node) return;
+    if (!node) {return;}
     node.position = operation.position;
   }
 
   private applyEnableNode(workflow: Workflow, operation: EnableNodeOperation): void {
     const node = this.findNode(workflow, operation.nodeId, operation.nodeName);
-    if (!node) return;
+    if (!node) {return;}
     node.disabled = false;
   }
 
   private applyDisableNode(workflow: Workflow, operation: DisableNodeOperation): void {
     const node = this.findNode(workflow, operation.nodeId, operation.nodeName);
-    if (!node) return;
+    if (!node) {return;}
     node.disabled = true;
   }
 
@@ -682,7 +685,7 @@ export class WorkflowDiffEngine {
   ): { sourceOutput: string; sourceIndex: number } {
     const sourceNode = this.findNode(workflow, operation.source, operation.source);
 
-    let sourceOutput = operation.sourceOutput ?? 'main';
+    const sourceOutput = operation.sourceOutput ?? 'main';
     let sourceIndex = operation.sourceIndex ?? 0;
 
     // Smart parameter: branch (for IF nodes)
@@ -718,7 +721,7 @@ export class WorkflowDiffEngine {
   private applyAddConnection(workflow: Workflow, operation: AddConnectionOperation): void {
     const sourceNode = this.findNode(workflow, operation.source, operation.source);
     const targetNode = this.findNode(workflow, operation.target, operation.target);
-    if (!sourceNode || !targetNode) return;
+    if (!sourceNode || !targetNode) {return;}
 
     const { sourceOutput, sourceIndex } = this.resolveSmartParameters(workflow, operation);
     const targetInput = operation.targetInput ?? 'main';
@@ -754,13 +757,13 @@ export class WorkflowDiffEngine {
     const sourceNode = this.findNode(workflow, operation.source, operation.source);
     const targetNode = this.findNode(workflow, operation.target, operation.target);
     if (!sourceNode || !targetNode) {
-      if (operation.ignoreErrors) return;
+      if (operation.ignoreErrors) {return;}
       return;
     }
     
     const sourceOutput = operation.sourceOutput || 'main';
     const connections = workflow.connections[sourceNode.name]?.[sourceOutput];
-    if (!connections) return;
+    if (!connections) {return;}
     
     workflow.connections[sourceNode.name][sourceOutput] = connections.map(conns =>
       conns.filter(conn => conn.node !== targetNode.name)
@@ -789,7 +792,7 @@ export class WorkflowDiffEngine {
       type: 'removeConnection',
       source: operation.source,
       target: operation.from,
-      sourceOutput: sourceOutput,
+      sourceOutput,
       targetInput: operation.targetInput
     });
 
@@ -798,9 +801,9 @@ export class WorkflowDiffEngine {
       type: 'addConnection',
       source: operation.source,
       target: operation.to,
-      sourceOutput: sourceOutput,
+      sourceOutput,
       targetInput: operation.targetInput,
-      sourceIndex: sourceIndex,
+      sourceIndex,
       targetIndex: 0
     });
   }
@@ -830,7 +833,7 @@ export class WorkflowDiffEngine {
   }
 
   private applyRemoveTag(workflow: Workflow, operation: RemoveTagOperation): void {
-    if (!workflow.tags) return;
+    if (!workflow.tags) {return;}
     const index = workflow.tags.indexOf(operation.tag);
     if (index !== -1) {
       workflow.tags.splice(index, 1);
@@ -926,7 +929,7 @@ export class WorkflowDiffEngine {
    * Update all connection references when nodes are renamed.
    */
   private updateConnectionReferences(workflow: Workflow): void {
-    if (this.renameMap.size === 0) return;
+    if (this.renameMap.size === 0) {return;}
 
     debug('diff', `Updating connection references for ${this.renameMap.size} renamed nodes`);
     const renames = new Map(this.renameMap);
@@ -975,7 +978,7 @@ export class WorkflowDiffEngine {
   private findNode(workflow: Workflow, nodeId?: string, nodeName?: string): WorkflowNode | null {
     if (nodeId) {
       const nodeById = workflow.nodes.find(n => n.id === nodeId);
-      if (nodeById) return nodeById;
+      if (nodeById) {return nodeById;}
     }
 
     if (nodeName) {
@@ -983,7 +986,7 @@ export class WorkflowDiffEngine {
       const nodeByName = workflow.nodes.find(n =>
         this.normalizeNodeName(n.name) === normalizedSearch
       );
-      if (nodeByName) return nodeByName;
+      if (nodeByName) {return nodeByName;}
     }
 
     // Fallback: If nodeId provided but not found, try treating it as a name
@@ -992,7 +995,7 @@ export class WorkflowDiffEngine {
       const nodeByName = workflow.nodes.find(n =>
         this.normalizeNodeName(n.name) === normalizedSearch
       );
-      if (nodeByName) return nodeByName;
+      if (nodeByName) {return nodeByName;}
     }
 
     return null;

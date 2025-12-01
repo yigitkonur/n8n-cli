@@ -275,14 +275,14 @@ export class PropertyFilter {
       
       if (prop.type === 'collection' && prop.options) {
         const found = this.findPropertyByName(prop.options, name);
-        if (found) return found;
+        if (found) {return found;}
       }
       
       if (prop.type === 'fixedCollection' && prop.options) {
         for (const option of prop.options) {
           if (option.values) {
             const found = this.findPropertyByName(option.values, name);
-            if (found) return found;
+            if (found) {return found;}
           }
         }
       }
@@ -388,7 +388,7 @@ export class PropertyFilter {
    */
   private static generateDescription(prop: any): string {
     const name = prop.name.toLowerCase();
-    const type = prop.type;
+    const {type} = prop;
     
     const commonDescriptions: Record<string, string> = {
       'url': 'The URL to make the request to',
@@ -528,7 +528,7 @@ export class PropertyFilter {
     path: string = ''
   ): void {
     for (const prop of properties) {
-      if (!prop || !prop.name) continue;
+      if (!prop || !prop.name) {continue;}
       
       const currentPath = path ? `${path}.${prop.name}` : prop.name;
       let score = 0;

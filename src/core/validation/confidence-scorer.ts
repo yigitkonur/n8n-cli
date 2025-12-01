@@ -187,9 +187,9 @@ export class ConfidenceScorer {
    * Get confidence level as a string
    */
   static getConfidenceLevel(score: number): 'high' | 'medium' | 'low' | 'very-low' {
-    if (score >= 0.8) return 'high';
-    if (score >= 0.5) return 'medium';
-    if (score >= 0.3) return 'low';
+    if (score >= 0.8) {return 'high';}
+    if (score >= 0.5) {return 'medium';}
+    if (score >= 0.3) {return 'low';}
     return 'very-low';
   }
 

@@ -7,8 +7,7 @@
 
 import * as zlib from 'zlib';
 import type { DatabaseAdapter } from '../db/adapter.js';
-import type { StoredTemplate, MetadataFilters, TemplateTask } from '../../types/templates.js';
-import { TASK_NODE_MAP } from '../../types/templates.js';
+import { type StoredTemplate, type MetadataFilters, type TemplateTask, TASK_NODE_MAP } from '../../types/templates.js';
 import { resolveTemplateNodeTypes } from '../../utils/template-node-resolver.js';
 
 export class TemplateRepository {
@@ -132,7 +131,7 @@ export class TemplateRepository {
       SELECT * FROM templates WHERE id = ?
     `).get(templateId) as StoredTemplate | undefined;
     
-    if (!row) return null;
+    if (!row) {return null;}
     
     return this.decompressWorkflow(row);
   }

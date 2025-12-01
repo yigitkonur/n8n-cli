@@ -77,7 +77,7 @@ function sanitizeFilterBasedNode(
   // Handle Switch node
   if (nodeType === 'n8n-nodes-base.switch' && typeVersion >= 3.2) {
     if (sanitized.rules && typeof sanitized.rules === 'object') {
-      const rules = sanitized.rules;
+      const {rules} = sanitized;
       if (rules.rules && Array.isArray(rules.rules)) {
         rules.rules = rules.rules.map((rule: any) => ({
           ...rule,
@@ -264,7 +264,7 @@ export function validateNodeMetadata(node: WorkflowNode): string[] {
 
   // Check IF node
   if (node.type === 'n8n-nodes-base.if') {
-    const conditions = (node.parameters as any).conditions;
+    const {conditions} = (node.parameters as any);
     if (!conditions?.options) {
       issues.push('Missing conditions.options');
     } else {
@@ -288,7 +288,7 @@ export function validateNodeMetadata(node: WorkflowNode): string[] {
 
   // Check Switch node
   if (node.type === 'n8n-nodes-base.switch') {
-    const rules = (node.parameters as any).rules;
+    const {rules} = (node.parameters as any);
     if (rules?.rules && Array.isArray(rules.rules)) {
       for (let i = 0; i < rules.rules.length; i++) {
         const rule = rules.rules[i];
@@ -349,11 +349,9 @@ function validateOperator(operator: any, path: string): string[] {
       if (operator.singleValue !== true) {
         issues.push(`${path}: unary operator "${operator.operation}" requires singleValue: true`);
       }
-    } else {
+    } else if (operator.singleValue === true) {
       // Binary operators should NOT have singleValue
-      if (operator.singleValue === true) {
-        issues.push(`${path}: binary operator "${operator.operation}" should not have singleValue: true (only unary operators need this)`);
-      }
+      issues.push(`${path}: binary operator "${operator.operation}" should not have singleValue: true (only unary operators need this)`);
     }
   }
 

@@ -19,8 +19,7 @@ import { saveToJson, outputJson } from '../../core/formatters/json.js';
 import { icons } from '../../core/formatters/theme.js';
 import { getDatabase } from '../../core/db/adapter.js';
 import { TemplateService } from '../../core/templates/service.js';
-import type { TemplateInfo, PaginatedResponse, MetadataFilters } from '../../types/templates.js';
-import { TEMPLATE_TASKS } from '../../types/templates.js';
+import { type TemplateInfo, type PaginatedResponse, type MetadataFilters, TEMPLATE_TASKS } from '../../types/templates.js';
 
 export interface SearchOptions {
   // Existing options
@@ -52,8 +51,8 @@ const TEMPLATES_API = 'https://api.n8n.io/api/templates';
 type SearchMode = 'keyword' | 'by_nodes' | 'by_task' | 'by_metadata';
 
 function determineSearchMode(opts: SearchOptions): SearchMode {
-  if (opts.byNodes) return 'by_nodes';
-  if (opts.byTask) return 'by_task';
+  if (opts.byNodes) {return 'by_nodes';}
+  if (opts.byTask) {return 'by_task';}
   if (opts.complexity || opts.maxSetup || opts.minSetup || opts.service || opts.audience) {
     return 'by_metadata';
   }
@@ -65,13 +64,13 @@ function determineSearchMode(opts: SearchOptions): SearchMode {
  */
 function shouldUseLocalSearch(opts: SearchOptions): boolean {
   return opts.local || 
-    !!opts.byNodes || 
-    !!opts.byTask || 
-    !!opts.complexity || 
-    !!opts.maxSetup || 
-    !!opts.minSetup || 
-    !!opts.service || 
-    !!opts.audience;
+    Boolean(opts.byNodes) || 
+    Boolean(opts.byTask) || 
+    Boolean(opts.complexity) || 
+    Boolean(opts.maxSetup) || 
+    Boolean(opts.minSetup) || 
+    Boolean(opts.service) || 
+    Boolean(opts.audience);
 }
 
 export async function templatesSearchCommand(query: string | undefined, opts: SearchOptions): Promise<void> {
@@ -121,7 +120,7 @@ async function localTemplateSearch(query: string | undefined, opts: SearchOption
         const task = opts.byTask!;
         if (!TEMPLATE_TASKS.includes(task as any)) {
           console.error(chalk.red(`\n${icons.error} Unknown task: ${task}`));
-          console.log(chalk.dim('  Available tasks: ' + TEMPLATE_TASKS.join(', ')));
+          console.log(chalk.dim(`  Available tasks: ${  TEMPLATE_TASKS.join(', ')}`));
           console.log(chalk.dim('  Run: n8n templates list-tasks'));
           process.exitCode = 1;
           return;
@@ -143,10 +142,10 @@ async function localTemplateSearch(query: string | undefined, opts: SearchOption
         result = await service.searchTemplatesByMetadata(filters, limit);
         modeLabel = 'By Metadata';
         const filterParts: string[] = [];
-        if (opts.complexity) filterParts.push(`complexity=${opts.complexity}`);
-        if (opts.maxSetup) filterParts.push(`max-setup=${opts.maxSetup}min`);
-        if (opts.service) filterParts.push(`service=${opts.service}`);
-        if (opts.audience) filterParts.push(`audience=${opts.audience}`);
+        if (opts.complexity) {filterParts.push(`complexity=${opts.complexity}`);}
+        if (opts.maxSetup) {filterParts.push(`max-setup=${opts.maxSetup}min`);}
+        if (opts.service) {filterParts.push(`service=${opts.service}`);}
+        if (opts.audience) {filterParts.push(`audience=${opts.audience}`);}
         modeContext = { 'Filters': filterParts.join(', ') || 'none' };
         break;
       }
@@ -250,7 +249,7 @@ function formatLocalSearchOutput(
   console.log(tableOutput);
   
   // Summary
-  console.log('\n' + formatSummary({ total: result.total, showing: result.items.length }));
+  console.log(`\n${  formatSummary({ total: result.total, showing: result.items.length })}`);
   
   // Next actions
   if (result.items.length > 0) {
@@ -353,7 +352,7 @@ async function remoteTemplateSearch(query: string, opts: SearchOptions): Promise
     console.log(tableOutput);
     
     // Summary
-    console.log('\n' + formatSummary({ total: templates.length }));
+    console.log(`\n${  formatSummary({ total: templates.length })}`);
     
     // Next actions
     if (templates.length > 0) {
@@ -376,6 +375,6 @@ async function remoteTemplateSearch(query: string, opts: SearchOptions): Promise
     } else {
       console.error(chalk.red(`\n${icons.error} Error: ${error.message}`));
     }
-    process.exitCode = 1; return;
+    process.exitCode = 1; 
   }
 }

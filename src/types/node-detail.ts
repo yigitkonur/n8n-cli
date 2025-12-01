@@ -5,7 +5,7 @@
  * detail levels and operation modes.
  */
 
-import type { SimplifiedProperty, FilteredProperties } from '../core/services/property-filter.js';
+import type { SimplifiedProperty } from '../core/services/property-filter.js';
 
 /**
  * Detail levels for node information

@@ -166,7 +166,7 @@ class BetterSQLiteAdapter implements DatabaseAdapter {
         SELECT name FROM sqlite_master 
         WHERE type='table' AND name='nodes_fts'
       `).get();
-      return !!result;
+      return Boolean(result);
     } catch {
       return false;
     }

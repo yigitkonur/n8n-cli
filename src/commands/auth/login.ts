@@ -6,11 +6,9 @@
 import chalk from 'chalk';
 import axios from 'axios';
 import { 
-  getConfig, 
   saveConfig, 
   normalizeUrl, 
   maskApiKey,
-  getConfigFilePath,
 } from '../../core/config/loader.js';
 import { formatHeader } from '../../core/formatters/header.js';
 import { theme, icons } from '../../core/formatters/theme.js';
@@ -18,7 +16,6 @@ import {
   isNonInteractive, 
   isInteractive,
   promptInput, 
-  promptSecret,
   openBrowser,
 } from '../../utils/prompts.js';
 
@@ -64,9 +61,9 @@ async function verifyCredentials(host: string, apiKey: string): Promise<{ valid:
       return { valid: false, error: 'API key lacks required permissions' };
     } else if (response.status === 404) {
       return { valid: false, error: 'API endpoint not found - check n8n version' };
-    } else {
+    } 
       return { valid: false, error: `API returned status ${response.status}` };
-    }
+    
   } catch (error: any) {
     if (error.code === 'ECONNREFUSED') {
       return { valid: false, error: 'Connection refused - is n8n running at this host?' };
@@ -141,7 +138,7 @@ function showUsageInstructions(options: UsageOptions = {}): void {
 async function handleNonInteractiveLogin(opts: LoginOptions): Promise<LoginResult> {
   // Try to get credentials from options or environment
   let host = opts.host || process.env.N8N_HOST || process.env.N8N_URL;
-  let apiKey = opts.apiKey || process.env.N8N_API_KEY;
+  const apiKey = opts.apiKey || process.env.N8N_API_KEY;
   
   // Check if we have the required values
   if (!host || !apiKey) {

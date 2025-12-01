@@ -7,14 +7,14 @@
 
 import type { DatabaseAdapter } from '../db/adapter.js';
 import { TemplateRepository } from './repository.js';
-import type { 
-  TemplateInfo, 
-  PaginatedResponse, 
-  MetadataFilters,
-  StoredTemplate,
-  TemplateMetadata
+import {
+  type TemplateInfo,
+  type PaginatedResponse,
+  type MetadataFilters,
+  type StoredTemplate,
+  type TemplateMetadata,
+  TEMPLATE_TASKS,
 } from '../../types/templates.js';
-import { TEMPLATE_TASKS } from '../../types/templates.js';
 
 export class TemplateService {
   private repository: TemplateRepository;
@@ -96,7 +96,7 @@ export class TemplateService {
    */
   async getTemplate(templateId: number): Promise<TemplateInfo | null> {
     const template = this.repository.getTemplate(templateId);
-    if (!template) return null;
+    if (!template) {return null;}
     return this.formatTemplateInfo(template);
   }
   
@@ -183,7 +183,7 @@ export class TemplateService {
    * Parse JSON array string safely
    */
   private parseJsonArray(jsonStr: string | undefined): string[] {
-    if (!jsonStr) return [];
+    if (!jsonStr) {return [];}
     try {
       const parsed = JSON.parse(jsonStr);
       return Array.isArray(parsed) ? parsed : [];

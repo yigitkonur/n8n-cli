@@ -9,7 +9,6 @@ import {
   clearAuthConfig,
   isConfigured,
   getConfigFilePath,
-  maskApiKey,
 } from '../../core/config/loader.js';
 import { formatHeader } from '../../core/formatters/header.js';
 import { theme, icons } from '../../core/formatters/theme.js';

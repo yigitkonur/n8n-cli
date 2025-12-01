@@ -211,7 +211,7 @@ export function validateCodeTool(node: WorkflowNode): AIValidationIssue[] {
   }
 
   // 2. Check jsCode exists (REQUIRED)
-  const jsCode = params.jsCode;
+  const {jsCode} = params;
   if (!jsCode || (typeof jsCode === 'string' && jsCode.trim().length === 0)) {
     issues.push({
       severity: 'error',

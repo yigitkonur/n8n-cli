@@ -51,7 +51,7 @@ export async function healthCommand(opts: HealthOptions): Promise<void> {
     }
     
     // Try healthz endpoint first (no auth required)
-    const healthzUrl = config.host.replace(/\/api\/v\d+\/?$/, '').replace(/\/$/, '') + '/healthz';
+    const healthzUrl = `${config.host.replace(/\/api\/v\d+\/?$/, '').replace(/\/$/, '')  }/healthz`;
     
     try {
       const healthzResponse = await axios.get(healthzUrl, {
@@ -65,7 +65,7 @@ export async function healthCommand(opts: HealthOptions): Promise<void> {
           result.status = 'ok';
         }
       }
-    } catch (e) {
+    } catch {
       // healthz might not be available, try API endpoint
     }
     

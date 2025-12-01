@@ -88,7 +88,7 @@ export async function credentialsSchemaCommand(typeName: string, opts: SchemaOpt
     for (const field of Object.keys(schema.properties)) {
       example[field] = `<${schema.properties[field]?.type || 'value'}>`;
     }
-    console.log(chalk.cyan('    ' + JSON.stringify(example, null, 2).split('\n').join('\n    ')));
+    console.log(chalk.cyan(`    ${  JSON.stringify(example, null, 2).split('\n').join('\n    ')}`));
     
     console.log('');
     

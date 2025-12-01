@@ -13,7 +13,7 @@
  * normalizeNodeType('@n8n/n8n-nodes-langchain.openAi') // 'nodes-langchain.openAi'
  */
 export function normalizeNodeType(type: string): string {
-  if (!type) return type;
+  if (!type) {return type;}
 
   return type
     .replace(/^n8n-nodes-base\./, 'nodes-base.')

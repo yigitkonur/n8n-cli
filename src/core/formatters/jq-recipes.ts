@@ -178,6 +178,7 @@ export function getCommandRecipes(command: CommandType): JqRecipe[] {
     'credentials-list': [
       { filter: `.[] | {id, name, type}`, description: 'Extract key fields' },
       { filter: `group_by(.type) | map({type: .[0].type, count: length})`, description: 'Count by type' },
+      // eslint-disable-next-line no-useless-escape -- jq interpolation syntax requires \(
       { filter: `-r '.[] | "\(.id)\t\(.name)\t\(.type)"'`, description: 'TSV export' },
     ],
 
@@ -209,6 +210,7 @@ export function getCommandRecipes(command: CommandType): JqRecipe[] {
     // ═══════════════════════════════════════════════════════════════════════
     'variables-list': [
       { filter: `.[] | {key, value}`, description: 'Extract key-value pairs' },
+      // eslint-disable-next-line no-useless-escape -- jq interpolation syntax requires \(
       { filter: `-r '.[] | "\(.key)=\(.value)"'`, description: 'Export as env format' },
       { filter: `map({(.key): .value}) | add`, description: 'Convert to object' },
     ],
@@ -247,7 +249,7 @@ export function formatExportFooter(
   savedFile?: string
 ): string {
   const recipes = getCommandRecipes(command);
-  if (recipes.length === 0) return '';
+  if (recipes.length === 0) {return '';}
 
   const lines: string[] = [];
   const isListCommand = command.includes('list') || command.includes('search');
@@ -299,7 +301,7 @@ export function formatExportFooter(
     }
   }
   
-  return lines.join('\n') + '\n';
+  return `${lines.join('\n')  }\n`;
 }
 
 /**
@@ -307,7 +309,7 @@ export function formatExportFooter(
  */
 export function formatJqHint(command: CommandType, cliCommand: string): string {
   const recipes = getCommandRecipes(command);
-  if (recipes.length === 0) return '';
+  if (recipes.length === 0) {return '';}
   
   const isListCommand = command.includes('list') || command.includes('search');
   const filter = isListCommand ? '.data[]' : '.';
@@ -324,7 +326,7 @@ export function formatJqHint(command: CommandType, cliCommand: string): string {
  * @deprecated Use formatExportFooter instead
  */
 export function formatJqRecipes(recipes: JqRecipe[], filename: string): string {
-  if (recipes.length === 0) return '';
+  if (recipes.length === 0) {return '';}
   
   let output = chalk.yellow(`\n💡 jq recipes (with --save ${filename}):\n`);
   
@@ -332,8 +334,8 @@ export function formatJqRecipes(recipes: JqRecipe[], filename: string): string {
     const cmd = recipe.filter.startsWith('-r') 
       ? `jq ${recipe.filter} ${filename}`
       : `jq '${recipe.filter}' ${filename}`;
-    output += chalk.dim('   ') + chalk.green(cmd) + '\n';
-    output += chalk.dim(`      # ${recipe.description}`) + '\n';
+    output += `${chalk.dim('   ') + chalk.green(cmd)  }\n`;
+    output += `${chalk.dim(`      # ${recipe.description}`)  }\n`;
   }
   
   return output;
@@ -342,7 +344,7 @@ export function formatJqRecipes(recipes: JqRecipe[], filename: string): string {
 /**
  * @deprecated Use getCommandRecipes instead
  */
-export function getStandardRecipes(dataType: 'nodes' | 'workflows' | 'executions' | 'templates', filename: string): JqRecipe[] {
+export function getStandardRecipes(dataType: 'nodes' | 'workflows' | 'executions' | 'templates', _filename: string): JqRecipe[] {
   // Map old data types to new command types
   const mapping: Record<string, CommandType> = {
     nodes: 'nodes-search',

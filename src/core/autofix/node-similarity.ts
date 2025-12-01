@@ -270,6 +270,7 @@ export class NodeSimilarityService {
       reason,
       category: node.category,
       description: node.description,
+      autoFixable: confidence >= NodeSimilarityService.AUTO_FIX_CONFIDENCE,
     };
   }
 
@@ -287,8 +288,8 @@ export class NodeSimilarityService {
    * Calculate string similarity (0-1)
    */
   private getStringSimilarity(s1: string, s2: string): number {
-    if (s1 === s2) return 1;
-    if (!s1 || !s2) return 0;
+    if (s1 === s2) {return 1;}
+    if (!s1 || !s2) {return 0;}
 
     const distance = this.getEditDistance(s1, s2);
     const maxLen = Math.max(s1.length, s2.length);
@@ -300,17 +301,17 @@ export class NodeSimilarityService {
    * Calculate Levenshtein distance with optimizations
    */
   private getEditDistance(s1: string, s2: string, maxDistance: number = 5): number {
-    if (s1 === s2) return 0;
+    if (s1 === s2) {return 0;}
 
     const m = s1.length;
     const n = s2.length;
 
     // Fast path: length difference exceeds threshold
-    if (Math.abs(m - n) > maxDistance) return maxDistance + 1;
+    if (Math.abs(m - n) > maxDistance) {return maxDistance + 1;}
 
     // Fast path: empty strings
-    if (m === 0) return n;
-    if (n === 0) return m;
+    if (m === 0) {return n;}
+    if (n === 0) {return m;}
 
     // Space optimization: only need previous row
     let prev = Array.from({ length: n + 1 }, (_, i) => i);

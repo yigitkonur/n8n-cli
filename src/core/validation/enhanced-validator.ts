@@ -153,7 +153,7 @@ export class EnhancedConfigValidator {
     nodeType: string,
     config: Record<string, unknown>,
     properties: NodeProperty[],
-    userProvidedKeys: Set<string>
+    _userProvidedKeys: Set<string>
   ): EnhancedValidationResult {
     const errors: ValidationError[] = [];
     const warnings: ValidationWarning[] = [];
@@ -164,7 +164,7 @@ export class EnhancedConfigValidator {
 
     // Check required properties
     for (const prop of properties) {
-      if (!prop || !prop.name) continue;
+      if (!prop || !prop.name) {continue;}
 
       // Track visibility
       if (isPropertyVisible(prop, config)) {
@@ -206,10 +206,10 @@ export class EnhancedConfigValidator {
     // Validate property types
     for (const [key, value] of Object.entries(config)) {
       const prop = properties.find(p => p.name === key);
-      if (!prop) continue;
+      if (!prop) {continue;}
 
       // Skip expression values
-      if (shouldSkipLiteralValidation(value)) continue;
+      if (shouldSkipLiteralValidation(value)) {continue;}
 
       // Type validation
       if (prop.type === 'string' && typeof value !== 'string') {
@@ -373,6 +373,9 @@ export class EnhancedConfigValidator {
 
       case 'nodes-langchain.agent':
         NodeSpecificValidators.validateAIAgent(context);
+        break;
+      default:
+        // No specific validator for this node type
         break;
     }
 

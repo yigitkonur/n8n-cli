@@ -62,9 +62,9 @@ async function verifyCredentials(host: string, apiKey: string): Promise<{
       return { connected: true, apiKeyValid: false, latencyMs, error: 'Invalid API key' };
     } else if (response.status === 403) {
       return { connected: true, apiKeyValid: false, latencyMs, error: 'API key lacks permissions' };
-    } else {
+    } 
       return { connected: true, apiKeyValid: false, latencyMs, error: `API returned ${response.status}` };
-    }
+    
   } catch (error: any) {
     const latencyMs = Date.now() - startTime;
     if (error.code === 'ECONNREFUSED') {

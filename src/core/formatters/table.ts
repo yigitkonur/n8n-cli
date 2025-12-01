@@ -192,14 +192,14 @@ export const columnFormatters = {
   /** Format score (0-100) with color */
   score: (value: unknown): string => {
     const num = Number(value) || 0;
-    if (num >= 80) return chalk.green(num.toFixed(1));
-    if (num >= 50) return chalk.yellow(num.toFixed(1));
+    if (num >= 80) {return chalk.green(num.toFixed(1));}
+    if (num >= 50) {return chalk.yellow(num.toFixed(1));}
     return chalk.red(num.toFixed(1));
   },
   
   /** Format relative time */
   relativeTime: (value: unknown): string => {
-    if (!value) return chalk.dim('-');
+    if (!value) {return chalk.dim('-');}
     const date = new Date(String(value));
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
@@ -207,26 +207,26 @@ export const columnFormatters = {
     const diffHours = Math.floor(diffMs / 3600000);
     const diffDays = Math.floor(diffMs / 86400000);
     
-    if (diffMins < 1) return 'just now';
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays < 7) return `${diffDays}d ago`;
+    if (diffMins < 1) {return 'just now';}
+    if (diffMins < 60) {return `${diffMins}m ago`;}
+    if (diffHours < 24) {return `${diffHours}h ago`;}
+    if (diffDays < 7) {return `${diffDays}d ago`;}
     return date.toLocaleDateString();
   },
   
   /** Format duration in ms */
   duration: (value: unknown): string => {
     const ms = Number(value) || 0;
-    if (ms < 1000) return `${ms}ms`;
-    if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
+    if (ms < 1000) {return `${ms}ms`;}
+    if (ms < 60000) {return `${(ms / 1000).toFixed(1)}s`;}
     return `${(ms / 60000).toFixed(1)}m`;
   },
   
   /** Truncate long text */
   truncate: (maxLen: number) => (value: unknown): string => {
     const str = String(value ?? '');
-    if (str.length <= maxLen) return str;
-    return str.slice(0, maxLen - 1) + '…';
+    if (str.length <= maxLen) {return str;}
+    return `${str.slice(0, maxLen - 1)  }…`;
   },
   
   /** Format execution status */

@@ -5,7 +5,7 @@
  * Ported from n8n-mcp/src/services/workflow-auto-fixer.ts with CLI adaptations.
  */
 
-import type { Workflow, ValidationResult, ValidationIssue } from '../types.js';
+import type { Workflow } from '../types.js';
 
 /**
  * Confidence levels for fix operations
@@ -29,6 +29,20 @@ export type FixType =
   | 'version-migration';      // Handle breaking changes (LOW)
 
 /**
+ * Applied migration from version upgrade
+ */
+export interface AppliedMigrationInfo {
+  /** Property that was changed */
+  propertyName: string;
+  /** Action taken (e.g., 'Added property', 'Removed property') */
+  action: string;
+  /** Old value if applicable */
+  oldValue?: unknown;
+  /** New value if applicable */
+  newValue?: unknown;
+}
+
+/**
  * A single fix operation that can be applied to a workflow
  */
 export interface FixOperation {
@@ -48,6 +62,12 @@ export interface FixOperation {
   description: string;
   /** Optional: Node ID for reference */
   nodeId?: string;
+  /** For version-migration: list of parameter changes applied */
+  appliedMigrations?: AppliedMigrationInfo[];
+  /** For version-migration: list of issues requiring manual action */
+  remainingIssues?: string[];
+  /** For version-migration: the new typeVersion to apply */
+  newTypeVersion?: number;
 }
 
 /**
@@ -146,6 +166,8 @@ export interface NodeSuggestion {
   category?: string;
   /** Description of the node */
   description?: string;
+  /** Whether this can be auto-fixed (confidence >= 0.9) */
+  autoFixable?: boolean;
 }
 
 /**

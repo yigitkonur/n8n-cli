@@ -1,5 +1,4 @@
-import { parse as esprimaParse, Syntax } from 'esprima-next';
-import type { Node as SyntaxNode, ExpressionStatement } from 'esprima-next';
+import { parse as esprimaParse, Syntax, type Node as SyntaxNode, type ExpressionStatement } from 'esprima-next';
 import { jsonrepair } from 'jsonrepair';
 
 // Limits to prevent DoS attacks
@@ -58,14 +57,16 @@ export function jsonParse<T>(jsonString: string, options?: JSONParseOptions<T>):
       try {
         const jsonStringCleaned = parseJSObject(jsonString);
         return jsonStringCleaned as T;
-      } catch (e) {
+      } catch {
+        // JS object parsing failed, continue to next strategy
       }
     }
     if (options?.repairJSON) {
       try {
         const jsonStringCleaned = jsonrepair(jsonString);
         return JSON.parse(jsonStringCleaned) as T;
-      } catch (e) {
+      } catch {
+        // JSON repair failed, continue to fallback
       }
     }
     if (options?.fallbackValue !== undefined) {

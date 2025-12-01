@@ -7,7 +7,7 @@
  * node-specific resource locator detection on top.
  */
 
-import { UniversalExpressionValidator, UniversalValidationResult } from './universal-expression.js';
+import { UniversalExpressionValidator } from './universal-expression.js';
 import { ConfidenceScorer } from './confidence-scorer.js';
 
 export interface ExpressionFormatIssue {
@@ -188,7 +188,7 @@ export class ExpressionFormatValidator {
             severity: 'error',
             confidence: confidenceScore.value
           };
-        } else {
+        } 
           return {
             fieldPath,
             currentValue: value,
@@ -197,7 +197,7 @@ export class ExpressionFormatValidator {
             explanation: prefixIssue.explanation,
             severity: 'error'
           };
-        }
+        
       }
 
       // Report other validation issues
@@ -282,7 +282,7 @@ export class ExpressionFormatValidator {
 
     // Handle circular references
     if (obj && typeof obj === 'object') {
-      if (visited.has(obj)) return;
+      if (visited.has(obj)) {return;}
       visited.add(obj);
     }
 
@@ -306,7 +306,7 @@ export class ExpressionFormatValidator {
 
       Object.entries(obj).forEach(([key, value]) => {
         // Skip special keys
-        if (key.startsWith('__')) return;
+        if (key.startsWith('__')) {return;}
 
         const newPath = path ? `${path}.${key}` : key;
         this.validateRecursive(value, newPath, context, issues, visited, depth + 1);

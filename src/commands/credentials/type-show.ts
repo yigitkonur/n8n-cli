@@ -6,7 +6,6 @@
 import chalk from 'chalk';
 import { credentialRegistry, type CredentialTypeInfo, type CredentialProperty } from '../../core/credential-loader.js';
 import { formatHeader, formatDivider } from '../../core/formatters/header.js';
-import { formatTable } from '../../core/formatters/table.js';
 import { formatNextActions } from '../../core/formatters/next-actions.js';
 import { formatExportFooter } from '../../core/formatters/jq-recipes.js';
 import { saveToJson, outputJson } from '../../core/formatters/json.js';
@@ -133,7 +132,7 @@ function outputCredentialSchema(credType: CredentialTypeInfo): void {
   if (credType.properties.length > 8) {
     example['...'] = '(more fields)';
   }
-  console.log(chalk.cyan('  ' + JSON.stringify(example, null, 2).split('\n').join('\n  ')));
+  console.log(chalk.cyan(`  ${  JSON.stringify(example, null, 2).split('\n').join('\n  ')}`));
   console.log('');
 
   // Setup guide based on auth type
@@ -171,7 +170,7 @@ function outputPropertyDetail(prop: CredentialProperty, isRequired: boolean): vo
   
   if (prop.description) {
     const desc = prop.description.length > 60 
-      ? prop.description.slice(0, 57) + '...'
+      ? `${prop.description.slice(0, 57)  }...`
       : prop.description;
     console.log(`    ${chalk.dim(desc)}`);
   }

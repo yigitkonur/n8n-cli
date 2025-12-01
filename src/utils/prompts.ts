@@ -90,7 +90,7 @@ export function openBrowser(url: string): boolean {
  * @param message - Prompt message
  * @param defaultValue - Optional default value shown in brackets
  */
-export async function promptInput(
+export function promptInput(
   message: string,
   defaultValue?: string
 ): Promise<string> {
@@ -129,7 +129,7 @@ export async function promptInput(
  * Input is hidden from the terminal
  * @param message - Prompt message
  */
-export async function promptSecret(message: string): Promise<string> {
+export function promptSecret(message: string): Promise<string> {
   if (isNonInteractive()) {
     throw new Error(
       'Cannot prompt for secret input in non-interactive mode.\n' +
@@ -194,7 +194,7 @@ export async function promptSecret(message: string): Promise<string> {
  * - If not TTY and no --force, throws error (prevents accidental automation)
  * - In TTY mode, shows prompt and waits for y/n
  */
-export async function confirmAction(
+export function confirmAction(
   message: string, 
   options: ConfirmOptions = {}
 ): Promise<boolean> {
@@ -202,7 +202,7 @@ export async function confirmAction(
   
   // Skip prompt if force flag is set
   if (force) {
-    return true;
+    return Promise.resolve(true);
   }
   
   // Error in non-interactive mode without force
@@ -260,7 +260,7 @@ export async function confirmAction(
  * @param expectedText - The exact text the user must type
  * @returns Promise<boolean> - true if user typed correctly
  */
-export async function requireTypedConfirmation(
+export function requireTypedConfirmation(
   prompt: string,
   expectedText: string
 ): Promise<boolean> {

@@ -65,6 +65,31 @@ const RETRY_CONFIG = {
   maxDelayMs: 5000,
 };
 
+/**
+ * Parse Retry-After header value to milliseconds
+ * Supports both seconds (integer) and HTTP-date formats
+ */
+function parseRetryAfter(header: string | undefined): number | null {
+  if (!header) {return null;}
+  
+  // Try parsing as integer seconds first
+  const seconds = parseInt(header, 10);
+  if (!isNaN(seconds) && seconds > 0) {
+    return Math.min(seconds * 1000, RETRY_CONFIG.maxDelayMs);
+  }
+  
+  // Try parsing as HTTP-date
+  const date = Date.parse(header);
+  if (!isNaN(date)) {
+    const delayMs = date - Date.now();
+    if (delayMs > 0) {
+      return Math.min(delayMs, RETRY_CONFIG.maxDelayMs);
+    }
+  }
+  
+  return null;
+}
+
 // Extend axios config to track retry count
 interface RetryableRequestConfig extends InternalAxiosRequestConfig {
   _retryCount?: number;
@@ -106,29 +131,40 @@ export class N8nApiClient {
     this.client.interceptors.response.use(
       (response) => response,
       async (error: AxiosError) => {
-        const config = error.config as RetryableRequestConfig | undefined;
-        if (!config) {
+        const reqConfig = error.config as RetryableRequestConfig | undefined;
+        if (!reqConfig) {
           return Promise.reject(error);
         }
         
-        config._retryCount = config._retryCount || 0;
+        reqConfig._retryCount = reqConfig._retryCount || 0;
         
         // Check if we should retry
-        const shouldRetry = this.shouldRetryRequest(error, config._retryCount);
+        const shouldRetry = this.shouldRetryRequest(error, reqConfig._retryCount);
         
-        if (shouldRetry && config._retryCount < RETRY_CONFIG.maxRetries) {
-          config._retryCount++;
+        if (shouldRetry && reqConfig._retryCount < RETRY_CONFIG.maxRetries) {
+          reqConfig._retryCount++;
           
-          // Calculate delay with exponential backoff + jitter
-          const delay = Math.min(
-            RETRY_CONFIG.baseDelayMs * Math.pow(2, config._retryCount) + Math.random() * 100,
-            RETRY_CONFIG.maxDelayMs
-          );
+          // Calculate delay: use Retry-After header for 429, otherwise exponential backoff
+          let delay: number;
+          const status = error.response?.status;
+          const retryAfterHeader = error.response?.headers?.['retry-after'];
           
-          debug('api', `Retry ${config._retryCount}/${RETRY_CONFIG.maxRetries} after ${Math.round(delay)}ms: ${config.url}`);
+          if (status === 429 && retryAfterHeader) {
+            const retryAfterMs = parseRetryAfter(retryAfterHeader);
+            delay = retryAfterMs ?? RETRY_CONFIG.baseDelayMs * 2**reqConfig._retryCount;
+            debug('api', `Rate limit retry delay: ${delay}ms (from Retry-After: ${retryAfterHeader})`);
+          } else {
+            // Exponential backoff + jitter
+            delay = Math.min(
+              RETRY_CONFIG.baseDelayMs * 2**reqConfig._retryCount + Math.random() * 100,
+              RETRY_CONFIG.maxDelayMs
+            );
+          }
           
-          await new Promise(resolve => setTimeout(resolve, delay));
-          return this.client.request(config);
+          debug('api', `Retry ${reqConfig._retryCount}/${RETRY_CONFIG.maxRetries} after ${Math.round(delay)}ms: ${reqConfig.url}`);
+          
+          await new Promise<void>(resolve => { setTimeout(resolve, delay); });
+          return this.client.request(reqConfig);
         }
         
         return Promise.reject(error);
@@ -147,7 +183,7 @@ export class N8nApiClient {
     
     // Retry on network errors (no response)
     if (!error.response) {
-      const retryableCodes = ['ECONNRESET', 'ETIMEDOUT', 'ECONNABORTED', 'ENOTFOUND', 'ENETUNREACH'];
+      const retryableCodes = ['ECONNRESET', 'ETIMEDOUT', 'ECONNABORTED', 'ENOTFOUND', 'ENETUNREACH', 'ECONNREFUSED', 'EHOSTUNREACH'];
       if (error.code && retryableCodes.includes(error.code)) {
         debug('api', `Retryable network error: ${error.code}`);
         return true;
@@ -155,9 +191,15 @@ export class N8nApiClient {
       return false;
     }
     
-    const status = error.response.status;
+    const {status} = error.response;
     
-    // Don't retry client errors (4xx) - they won't succeed on retry
+    // Special case: 429 Too Many Requests is retryable with Retry-After
+    if (status === 429) {
+      debug('api', 'Rate limited (429), will retry with Retry-After header');
+      return true;
+    }
+    
+    // Don't retry other client errors (4xx) - they won't succeed on retry
     if (status >= 400 && status < 500) {
       return false;
     }
@@ -186,8 +228,8 @@ export class N8nApiClient {
       if (headers['X-N8N-API-KEY']) {
         headers['X-N8N-API-KEY'] = maskApiKey(String(headers['X-N8N-API-KEY']));
       }
-      if (headers['Authorization']) {
-        headers['Authorization'] = '[REDACTED]';
+      if (headers.Authorization) {
+        headers.Authorization = '[REDACTED]';
       }
     }
     
@@ -209,7 +251,7 @@ export class N8nApiClient {
   async healthCheck(): Promise<HealthCheckResponse> {
     try {
       const baseUrl = this.client.defaults.baseURL || '';
-      const healthzUrl = baseUrl.replace(/\/api\/v\d+\/?$/, '') + '/healthz';
+      const healthzUrl = `${baseUrl.replace(/\/api\/v\d+\/?$/, '')  }/healthz`;
       
       const response = await axios.get(healthzUrl, {
         timeout: 5000,
@@ -530,18 +572,22 @@ export class N8nApiClient {
       const url = new URL(webhookUrl);
       const webhookPath = url.pathname;
       
+      // Calculate timeout: 2 minutes for sync webhooks, 30s for fire-and-forget
+      const webhookTimeout = waitForResponse ? 120000 : 30000;
+      
       const config: AxiosRequestConfig = {
         method: httpMethod,
         url: webhookPath,
         headers: { ...headers },
         data: httpMethod !== 'GET' ? data : undefined,
         params: httpMethod === 'GET' ? data : undefined,
-        timeout: waitForResponse ? 120000 : 30000,
+        timeout: webhookTimeout,
       };
 
       const webhookClient = axios.create({
         baseURL: `${url.protocol}//${url.host}`,
         validateStatus: (status) => status < 500,
+        timeout: webhookTimeout, // Ensure timeout is also set on client
       });
 
       const response = await webhookClient.request(config);
@@ -580,26 +626,26 @@ export class N8nApiClient {
     // Strip all read-only properties that cause API rejection on create
     // These are server-generated or managed via separate endpoints (tags, sharing)
     const { 
-      id, 
-      createdAt, 
-      updatedAt, 
-      versionId, 
-      active,
+      id: _id, 
+      createdAt: _createdAt, 
+      updatedAt: _updatedAt, 
+      versionId: _versionId, 
+      active: _active,
       // Additional read-only properties from exported workflows
-      tags,
-      pinData,
-      meta,
-      staticData,
-      homeProject,
-      shared,
-      sharedWithProjects,
+      tags: _tags,
+      pinData: _pinData,
+      meta: _meta,
+      staticData: _staticData,
+      homeProject: _homeProject,
+      shared: _shared,
+      sharedWithProjects: _sharedWithProjects,
       ...rest 
     } = workflow as any;
     return rest;
   }
 
   private cleanWorkflowForUpdate(workflow: Workflow): Partial<Workflow> {
-    const { id, createdAt, updatedAt, versionId, description, ...rest } = workflow as any;
+    const { id: _id, createdAt: _createdAt, updatedAt: _updatedAt, versionId: _versionId, description: _description, ...rest } = workflow as any;
     return rest;
   }
 }

@@ -6,7 +6,7 @@ import { debug } from './debug.js';
 
 const require = createRequire(import.meta.url);
 // Load n8n-workflow via CommonJS entrypoint to avoid ESM logger-proxy resolution issues
-// eslint-disable-next-line @typescript-eslint/no-var-requires
+ 
 const n8nWorkflowCjs = require('n8n-workflow') as any;
 // Use a differently named runtime class to avoid clashing with the type-only VersionedNodeType
 const { VersionedNodeType: CjsVersionedNodeType } = n8nWorkflowCjs;
@@ -27,7 +27,7 @@ export class NodeRegistry {
   private failedLoads: FailedLoad[] = [];
 
   init() {
-    if (this.initialized) return;
+    if (this.initialized) {return;}
 
     let nodesBaseRoot: string;
     try {
@@ -59,7 +59,7 @@ export class NodeRegistry {
 
   private loadNodeFile(filePath: string) {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
+       
       const module = require(filePath);
       
       // Iterate exports to find INodeType classes
@@ -70,7 +70,7 @@ export class NodeRegistry {
           try {
             const instance = new ExportedClass();
             if (instance.description) {
-              const name = instance.description.name;
+              const {name} = instance.description;
               // Register with and without prefix to be safe
               this.nodeTypes.set(name, instance);
               this.nodeTypes.set(`n8n-nodes-base.${name}`, instance);

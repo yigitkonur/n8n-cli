@@ -57,7 +57,7 @@ export function offsetToLineColumn(source: string, offset: number): { line: numb
  */
 export function parseJsonPath(path: string): (string | number)[] {
   const segments: (string | number)[] = [];
-  const regex = /([^.\[\]]+)|\[(\d+)\]/g;
+  const regex = /([^.[\]]+)|\[(\d+)\]/g;
   let match;
   
   while ((match = regex.exec(path)) !== null) {
@@ -75,12 +75,12 @@ export function parseJsonPath(path: string): (string | number)[] {
  * Find the AST node at a given JSON path and return its source location.
  */
 export function findSourceLocation(sourceMap: SourceMap, path: string): SourceLocation | undefined {
-  if (!sourceMap.ast) return undefined;
+  if (!sourceMap.ast) {return undefined;}
   
   const segments = parseJsonPath(path);
   const node = findNodeAtLocation(sourceMap.ast, segments);
   
-  if (!node) return undefined;
+  if (!node) {return undefined;}
   
   const start = offsetToLineColumn(sourceMap.source, node.offset);
   const end = offsetToLineColumn(sourceMap.source, node.offset + node.length);
@@ -128,12 +128,12 @@ export function extractSnippet(
  * Get the raw source text for a given JSON path.
  */
 export function getSourceText(sourceMap: SourceMap, path: string): string | undefined {
-  if (!sourceMap.ast) return undefined;
+  if (!sourceMap.ast) {return undefined;}
   
   const segments = parseJsonPath(path);
   const node = findNodeAtLocation(sourceMap.ast, segments);
   
-  if (!node) return undefined;
+  if (!node) {return undefined;}
   
   return sourceMap.source.substring(node.offset, node.offset + node.length);
 }
@@ -143,18 +143,18 @@ export function getSourceText(sourceMap: SourceMap, path: string): string | unde
  */
 export function getFormattedValue(sourceMap: SourceMap, path: string, maxLength: number = 500): string | undefined {
   const text = getSourceText(sourceMap, path);
-  if (!text) return undefined;
+  if (!text) {return undefined;}
   
   // Try to parse and re-format for consistent display
   try {
     const parsed = JSON.parse(text);
     const formatted = JSON.stringify(parsed, null, 2);
     if (formatted.length > maxLength) {
-      return formatted.substring(0, maxLength) + '\n... (truncated)';
+      return `${formatted.substring(0, maxLength)  }\n... (truncated)`;
     }
     return formatted;
   } catch {
     // Return raw text if not valid JSON
-    return text.length > maxLength ? text.substring(0, maxLength) + '... (truncated)' : text;
+    return text.length > maxLength ? `${text.substring(0, maxLength)  }... (truncated)` : text;
   }
 }

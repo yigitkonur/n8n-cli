@@ -18,9 +18,12 @@ export type {
   ExpressionValidationResult,
   NodeSuggestion,
   CommonMistakePattern,
-  BreakingChange,
   ValidationContext,
+  AppliedMigrationInfo,
 } from './types.js';
+
+// Breaking change type (from versioning module)
+export type { BreakingChange } from '../versioning/index.js';
 
 export {
   DEFAULT_AUTOFIX_CONFIG,
@@ -36,7 +39,7 @@ export { ExpressionValidator } from './expression-validator.js';
 export { NodeSimilarityService } from './node-similarity.js';
 export type { SimilarityScore } from './node-similarity.js';
 
-// Breaking changes registry
+// Breaking changes registry (re-exported from versioning module)
 export {
   BREAKING_CHANGES_REGISTRY,
   getBreakingChangesForNode,
@@ -46,7 +49,16 @@ export {
   getMigrationHints,
   getNodesWithVersionMigrations,
   getTrackedVersionsForNode,
-} from './breaking-changes-registry.js';
+  compareVersions,
+  getLatestRegistryVersion,
+} from '../versioning/index.js';
+
+// Versioning services (re-exported for convenience)
+export {
+  NodeVersionService,
+  NodeMigrationService,
+  BreakingChangeDetector,
+} from '../versioning/index.js';
 
 // Guidance generator (Post-Update Validator)
 export {

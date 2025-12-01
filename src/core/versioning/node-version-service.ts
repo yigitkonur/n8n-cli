@@ -7,7 +7,7 @@
  * Adapted from n8n-mcp/src/services/node-version-service.ts
  */
 
-import type { VersionComparison, UpgradePath, UpgradeStep, NodeVersion } from './types.js';
+import type { VersionComparison, UpgradePath, UpgradeStep } from './types.js';
 import { BreakingChangeDetector } from './breaking-change-detector.js';
 import {
   compareVersions,
@@ -98,7 +98,7 @@ export class NodeVersionService {
     );
 
     // Determine upgrade recommendation and confidence
-    let recommendUpgrade = true;
+    const recommendUpgrade = true;
     let confidence: 'HIGH' | 'MEDIUM' | 'LOW' = 'HIGH';
     let reason = `Version ${latestVersion} available. `;
 
@@ -152,10 +152,10 @@ export class NodeVersionService {
   suggestUpgradePath(nodeType: string, currentVersion: string): UpgradePath | null {
     const latestVersion = this.getLatestVersion(nodeType);
 
-    if (!latestVersion) return null;
+    if (!latestVersion) {return null;}
 
     const comparison = this.compareVersions(currentVersion, latestVersion);
-    if (comparison >= 0) return null; // Already at latest or newer
+    if (comparison >= 0) {return null;} // Already at latest or newer
 
     // Get all available versions between current and latest
     const allVersions = this.getAvailableVersions(nodeType);

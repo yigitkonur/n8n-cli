@@ -48,7 +48,7 @@ export async function credentialsListCommand(opts: ListOptions): Promise<void> {
       outputJson({
         data: maskedCredentials,
         total: credentials.length,
-        hasMore: !!response.nextCursor,
+        hasMore: Boolean(response.nextCursor),
         nextCursor: response.nextCursor,
       });
       return;
@@ -114,10 +114,10 @@ export async function credentialsListCommand(opts: ListOptions): Promise<void> {
     
     // Summary
     const durationMs = Date.now() - startTime;
-    console.log('\n' + formatSummary({
+    console.log(`\n${  formatSummary({
       total: credentials.length,
       durationMs,
-    }));
+    })}`);
     
     // Next actions
     if (credentials.length > 0) {

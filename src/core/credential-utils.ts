@@ -7,7 +7,7 @@
  * 2. Strip credential references before deployment
  */
 
-import type { Workflow, WorkflowNode } from './types.js';
+import type { Workflow } from './types.js';
 
 /**
  * Represents a required credential for a workflow node
@@ -43,7 +43,7 @@ export function extractRequiredCredentials(workflow: Workflow): RequiredCredenti
   }
 
   for (const node of workflow.nodes) {
-    if (!node || typeof node !== 'object') continue;
+    if (!node || typeof node !== 'object') {continue;}
 
     // Check if node has credentials defined
     if (node.credentials && typeof node.credentials === 'object') {
@@ -79,7 +79,7 @@ export function stripCredentials(workflow: Workflow): Workflow {
   }
 
   for (const node of stripped.nodes) {
-    if (!node || typeof node !== 'object') continue;
+    if (!node || typeof node !== 'object') {continue;}
     // Remove credentials property entirely
     delete (node as Record<string, unknown>).credentials;
   }

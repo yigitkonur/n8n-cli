@@ -1,13 +1,11 @@
 import { existsSync, readFileSync, statSync, writeFileSync, chmodSync, mkdirSync } from 'node:fs';
-import { dirname } from 'node:path';
+import { dirname, join } from 'node:path';
 import { homedir } from 'node:os';
-import { join } from 'node:path';
 import chalk from 'chalk';
-import type { CliConfig, PartialCliConfig, ProfiledConfig } from '../../types/config.js';
-import { hasProfiles } from '../../types/config.js';
+import { type CliConfig, type PartialCliConfig, hasProfiles } from '../../types/config.js';
 
 // Re-export types for backward compatibility
-export type { CliConfig, PartialCliConfig, ProfiledConfig } from '../../types/config.js';
+export type { CliConfig, PartialCliConfig } from '../../types/config.js';
 
 /**
  * Partial config from file or env (legacy alias)
@@ -59,9 +57,11 @@ function checkFilePermissions(filePath: string): { secure: boolean; mode: string
   
   try {
     const stats = statSync(filePath);
-    const mode = stats.mode;
+    const {mode} = stats;
     // Check if group or world has any access (mode & 0o077)
+     
     const insecureBits = mode & 0o077;
+     
     const modeString = (mode & 0o777).toString(8).padStart(3, '0');
     
     return {
@@ -295,8 +295,8 @@ export function validateConfig(config: CliConfig): { valid: boolean; errors: str
  * Mask API key for display
  */
 export function maskApiKey(key: string): string {
-  if (!key || key.length < 8) return '***';
-  return key.slice(0, 4) + '...' + key.slice(-4);
+  if (!key || key.length < 8) {return '***';}
+  return `${key.slice(0, 4)  }...${  key.slice(-4)}`;
 }
 
 /**
@@ -320,7 +320,7 @@ export function normalizeUrl(input: string): string {
     }
     // Return origin (protocol + host + port if non-standard)
     return url.origin;
-  } catch (error) {
+  } catch {
     throw new Error(`Invalid URL: ${input}. Expected format: https://your-n8n-instance.com`);
   }
 }
@@ -425,7 +425,7 @@ export function isConfigured(): boolean {
 
 // Singleton config instance
 let _config: CliConfig | null = null;
-let _configProfile: string | undefined = undefined;
+let _configProfile: string | undefined;
 
 /**
  * Get config singleton

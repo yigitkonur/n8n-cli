@@ -1,6 +1,5 @@
 import type { Workflow } from './types.js';
 import type { FixDetail, PostUpdateGuidance, FixType, FixConfidenceLevel } from './autofix/types.js';
-import { ExpressionFormatValidator } from './validation/index.js';
 import { NodeSimilarityService } from './autofix/node-similarity.js';
 import { getNodeRepository, type NodeRepository } from './db/nodes.js';
 import { NodeMigrationService, NodeVersionService } from './versioning/index.js';
@@ -48,8 +47,8 @@ function mergeFixResults(results: FixResult[]): FixResult {
  * Set a value at a nested path in an object
  * Supports paths like "body.values[0].value" or "url"
  */
-function setNestedValue(obj: any, path: string, value: any): boolean {
-  if (!path) return false;
+function _setNestedValue(obj: any, path: string, value: any): boolean {
+  if (!path) {return false;}
   
   // Convert array notation [n] to .n for easier splitting
   const normalizedPath = path.replace(/\[(\d+)\]/g, '.$1');
@@ -87,10 +86,10 @@ const fixEmptyOptionsOnConditionalNodes: ExperimentalFix = {
     }
 
     for (const node of workflow.nodes) {
-      if (!node || typeof node !== 'object') continue;
+      if (!node || typeof node !== 'object') {continue;}
 
       if (node.type === 'n8n-nodes-base.if' || node.type === 'n8n-nodes-base.switch') {
-        const parameters = (node as any).parameters;
+        const {parameters} = (node as any);
 
         if (
           parameters &&
@@ -141,26 +140,26 @@ const fixSwitchV3RuleConditionsOptions: ExperimentalFix = {
     }
 
     for (const node of workflow.nodes) {
-      if (!node || typeof node !== 'object') continue;
+      if (!node || typeof node !== 'object') {continue;}
 
       // Only apply to Switch v3+
-      if (node.type !== 'n8n-nodes-base.switch') continue;
-      if (typeof node.typeVersion !== 'number' || node.typeVersion < 3) continue;
+      if (node.type !== 'n8n-nodes-base.switch') {continue;}
+      if (typeof node.typeVersion !== 'number' || node.typeVersion < 3) {continue;}
 
       const parameters = node.parameters as Record<string, unknown> | undefined;
-      if (!parameters) continue;
+      if (!parameters) {continue;}
 
       const rules = parameters.rules as Record<string, unknown> | undefined;
-      if (!rules || typeof rules !== 'object') continue;
+      if (!rules || typeof rules !== 'object') {continue;}
 
       const values = (rules as Record<string, unknown>).values as Array<Record<string, unknown>> | undefined;
-      if (!Array.isArray(values)) continue;
+      if (!Array.isArray(values)) {continue;}
 
       for (const rule of values) {
-        if (!rule || typeof rule !== 'object') continue;
+        if (!rule || typeof rule !== 'object') {continue;}
 
         const conditions = rule.conditions as Record<string, unknown> | undefined;
-        if (!conditions || typeof conditions !== 'object') continue;
+        if (!conditions || typeof conditions !== 'object') {continue;}
 
         // Check if options is missing or incomplete
         let needsFix = false;
@@ -233,17 +232,17 @@ const fixSwitchV3FallbackOutputLocation: ExperimentalFix = {
     }
 
     for (const node of workflow.nodes) {
-      if (!node || typeof node !== 'object') continue;
+      if (!node || typeof node !== 'object') {continue;}
 
       // Only apply to Switch v3+
-      if (node.type !== 'n8n-nodes-base.switch') continue;
-      if (typeof node.typeVersion !== 'number' || node.typeVersion < 3) continue;
+      if (node.type !== 'n8n-nodes-base.switch') {continue;}
+      if (typeof node.typeVersion !== 'number' || node.typeVersion < 3) {continue;}
 
       const parameters = node.parameters as Record<string, unknown> | undefined;
-      if (!parameters) continue;
+      if (!parameters) {continue;}
 
       const rules = parameters.rules as Record<string, unknown> | undefined;
-      if (!rules || typeof rules !== 'object') continue;
+      if (!rules || typeof rules !== 'object') {continue;}
 
       // Check if fallbackOutput is incorrectly in rules
       if ('fallbackOutput' in rules) {
@@ -300,7 +299,7 @@ const fixExpressionFormat: ExperimentalFix = {
      * Recursively scan and fix expression format in an object
      */
     function scanAndFix(obj: unknown, path: string[] = [], currentNode: any = null): void {
-      if (obj === null || obj === undefined) return;
+      if (obj === null || obj === undefined) {return;}
 
       if (typeof obj === 'string') {
         // Pattern: {{ expression }} should be ={{ expression }}
@@ -377,9 +376,9 @@ const fixExpressionFormat: ExperimentalFix = {
 
     // Process each node's parameters
     for (const node of workflow.nodes) {
-      if (!node || typeof node !== 'object') continue;
+      if (!node || typeof node !== 'object') {continue;}
       
-      const parameters = node.parameters;
+      const {parameters} = node;
       if (parameters && typeof parameters === 'object') {
         scanAndFix(parameters, [node.name || 'unknown', 'parameters'], node);
       }
@@ -408,21 +407,21 @@ const fixOutdatedTypeVersions: ExperimentalFix = {
     const versionService = new NodeVersionService();
 
     for (const node of workflow.nodes) {
-      if (!node || typeof node !== 'object') continue;
-      if (!node.type || typeof node.type !== 'string') continue;
+      if (!node || typeof node !== 'object') {continue;}
+      if (!node.type || typeof node.type !== 'string') {continue;}
 
       // Skip community nodes (non n8n-nodes-base)
-      if (!node.type.startsWith('n8n-nodes-base.')) continue;
+      if (!node.type.startsWith('n8n-nodes-base.')) {continue;}
 
       const currentVersion = String(node.typeVersion || '1');
       
       // Check if this node is tracked in our registry
-      if (!versionService.isNodeTracked(node.type)) continue;
+      if (!versionService.isNodeTracked(node.type)) {continue;}
 
       // Analyze if upgrade is needed
       const analysis = versionService.analyzeVersion(node.type, currentVersion);
       
-      if (!analysis.isOutdated) continue;
+      if (!analysis.isOutdated) {continue;}
 
       // Apply migration
       const result = migrationService.migrateNode(node as Record<string, unknown>);
@@ -485,16 +484,16 @@ async function fixNodeTypeCorrection(
   const service = similarityService || new NodeSimilarityService(repo);
 
   for (const node of workflow.nodes) {
-    if (!node || typeof node !== 'object') continue;
-    if (!node.type || typeof node.type !== 'string') continue;
+    if (!node || typeof node !== 'object') {continue;}
+    if (!node.type || typeof node.type !== 'string') {continue;}
 
     // Check if node type is known
     const nodeInfo = repo.getNode(node.type);
-    if (nodeInfo) continue; // Valid node type, skip
+    if (nodeInfo) {continue;} // Valid node type, skip
 
     // Try to find similar nodes
     const suggestions = await service.findSimilarNodes(node.type, 1);
-    if (suggestions.length === 0) continue;
+    if (suggestions.length === 0) {continue;}
 
     const topSuggestion = suggestions[0];
     

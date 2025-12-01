@@ -23,7 +23,7 @@ import type {
   ActionType,
 } from './types.js';
 
-import { getAllChangesForNode } from './breaking-changes-registry.js';
+import { getAllChangesForNode } from '../versioning/index.js';
 
 /**
  * Generate post-update guidance from a list of applied fixes
@@ -47,7 +47,7 @@ export function generateGuidanceFromFixes(fixDetails: FixDetail[]): PostUpdateGu
   // Generate guidance for each node
   const guidance: PostUpdateGuidance[] = [];
   
-  for (const [nodeKey, nodeFixes] of Array.from(nodeFixMap.entries())) {
+  for (const [_nodeKey, nodeFixes] of Array.from(nodeFixMap.entries())) {
     const firstFix = nodeFixes[0];
     const nodeGuidance = generateNodeGuidance(
       firstFix.nodeId,
@@ -410,7 +410,7 @@ function mapChangeTypeToActionType(
 function mapSeverityToPriority(
   severity: 'LOW' | 'MEDIUM' | 'HIGH'
 ): ActionPriority {
-  if (severity === 'HIGH') return 'CRITICAL';
+  if (severity === 'HIGH') {return 'CRITICAL';}
   return severity;
 }
 
@@ -421,7 +421,7 @@ function calculateConfidence(
   requiredActions: RequiredAction[],
   migrationStatus: MigrationStatus
 ): GuidanceConfidence {
-  if (migrationStatus === 'complete') return 'HIGH';
+  if (migrationStatus === 'complete') {return 'HIGH';}
 
   const criticalActions = requiredActions.filter(a => a.priority === 'CRITICAL');
 
@@ -445,10 +445,10 @@ function estimateTime(
 
   const totalComplexity = criticalCount * 5 + highCount * 3 + behaviorCount * 2;
 
-  if (totalComplexity === 0) return '< 1 minute';
-  if (totalComplexity <= 5) return '2-5 minutes';
-  if (totalComplexity <= 10) return '5-10 minutes';
-  if (totalComplexity <= 20) return '10-20 minutes';
+  if (totalComplexity === 0) {return '< 1 minute';}
+  if (totalComplexity <= 5) {return '2-5 minutes';}
+  if (totalComplexity <= 10) {return '5-10 minutes';}
+  if (totalComplexity <= 20) {return '10-20 minutes';}
   return '20+ minutes';
 }
 

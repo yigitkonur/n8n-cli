@@ -4,7 +4,7 @@
  */
 
 import chalk from 'chalk';
-import { getNodeRepository, type NodeSearchResult } from '../../core/db/nodes.js';
+import { getNodeRepository } from '../../core/db/nodes.js';
 import { formatHeader } from '../../core/formatters/header.js';
 import { formatTable, columnFormatters } from '../../core/formatters/table.js';
 import { formatSummary } from '../../core/formatters/summary.js';
@@ -116,10 +116,10 @@ export async function nodesSearchCommand(query: string, opts: SearchOptions): Pr
     console.log(tableOutput);
     
     // Summary
-    console.log('\n' + formatSummary({
+    console.log(`\n${  formatSummary({
       total: results.length,
       displayed: Math.min(results.length, displayLimit),
-    }));
+    })}`);
     
     // Next actions
     if (results.length > 0) {
@@ -142,6 +142,6 @@ export async function nodesSearchCommand(query: string, opts: SearchOptions): Pr
       console.log(chalk.dim('\n  The nodes database is missing.'));
       console.log(chalk.dim('  Ensure you are running from the package root directory.'));
     }
-    process.exitCode = 1; return;
+    process.exitCode = 1; 
   }
 }

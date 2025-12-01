@@ -63,7 +63,7 @@ export function applyProfileFilters(
         if (shouldFilterCredentialWarning(w)) {
           return false;
         }
-        if (w.type === 'security' || w.type === 'deprecated') return true;
+        if (w.type === 'security' || w.type === 'deprecated') {return true;}
         // FILTER OUT property visibility warnings (too noisy)
         if (w.type === 'inefficient' && w.message && w.message.includes('not visible')) {
           return false;
@@ -95,11 +95,11 @@ export function applyProfileFilters(
           return false;
         }
         // Keep security and deprecated warnings
-        if (w.type === 'security' || w.type === 'deprecated') return true;
+        if (w.type === 'security' || w.type === 'deprecated') {return true;}
         // Keep missing common properties
-        if (w.type === 'missing_common') return true;
+        if (w.type === 'missing_common') {return true;}
         // Keep best practice warnings
-        if (w.type === 'best_practice') return true;
+        if (w.type === 'best_practice') {return true;}
         // FILTER OUT inefficient warnings about property visibility
         if (w.type === 'inefficient' && w.message && w.message.includes('not visible')) {
           return false;
@@ -124,7 +124,7 @@ function enforceErrorHandlingForProfile(
   profile: ValidationProfile
 ): void {
   // Only enforce for strict profile on external service nodes
-  if (profile !== 'strict') return;
+  if (profile !== 'strict') {return;}
 
   const nodeType = result.operation?.resource || '';
   const errorProneTypes = ['httpRequest', 'webhook', 'database', 'api', 'slack', 'email', 'openai'];

@@ -107,7 +107,7 @@ export function renderTreeBranch(
 ): string {
   const connector = isLast ? TREE_CHARS.lastBranch : TREE_CHARS.branch;
   const colorFn = color || chalk.white;
-  return chalk.gray(prefix + connector) + ' ' + colorFn(item);
+  return `${chalk.gray(prefix + connector)  } ${  colorFn(item)}`;
 }
 
 /**
@@ -156,11 +156,11 @@ export function formatAlphaTree(
       const name = item.displayName || item.name;
       const typeStr = showType && item.type ? chalk.dim(` (${item.type})`) : '';
       
-      output += '  ' + renderTreeBranch(
+      output += `  ${  renderTreeBranch(
         `${icon}${icon ? ' ' : ''}${name}${typeStr}`,
         isLast,
         '  '
-      ) + '\n';
+      )  }\n`;
     }
 
     if (remaining > 0) {
@@ -216,7 +216,7 @@ export function formatCategoryTree(
       const name = item.displayName || item.name;
       const typeStr = showType && item.type ? chalk.dim(` ${item.type}`) : '';
       
-      output += '  ' + renderTreeBranch(name + typeStr, isLast, '  ') + '\n';
+      output += `  ${  renderTreeBranch(name + typeStr, isLast, '  ')  }\n`;
     }
 
     if (remaining > 0) {
@@ -244,7 +244,7 @@ export function formatSimpleTree(
   for (let i = 0; i < items.length; i++) {
     const isLast = i === items.length - 1;
     const itemText = icon ? `${icon} ${items[i]}` : items[i];
-    output += prefix + renderTreeBranch(itemText, isLast) + '\n';
+    output += `${prefix + renderTreeBranch(itemText, isLast)  }\n`;
   }
 
   return output;
@@ -272,21 +272,21 @@ export function formatOperationsTree(
     const isLastResource = r === resources.length - 1;
     
     // Resource header
-    output += prefix + renderTreeBranch(
+    output += `${prefix + renderTreeBranch(
       chalk.bold(capitalizeFirst(resource)),
       isLastResource && ops.length === 0,
       ''
-    ) + '\n';
+    )  }\n`;
 
     // Operations under this resource
     const opPrefix = prefix + (isLastResource ? TREE_CHARS.space : TREE_CHARS.pipe);
     for (let o = 0; o < ops.length; o++) {
       const isLastOp = o === ops.length - 1;
-      output += opPrefix + renderTreeBranch(
+      output += `${opPrefix + renderTreeBranch(
         chalk.green(ops[o]),
         isLastOp,
         ''
-      ) + '\n';
+      )  }\n`;
     }
   }
 
@@ -316,13 +316,13 @@ export function formatCategoryStats(
   const catWidth = 20;
   const countWidth = 8;
   output += chalk.bold(
-    '  ' +
-    'Category'.padEnd(catWidth) +
-    'Count'.padStart(countWidth) +
-    (showDescription ? '  Description' : '') +
-    '\n'
+    `  ${ 
+    'Category'.padEnd(catWidth) 
+    }${'Count'.padStart(countWidth) 
+    }${showDescription ? '  Description' : '' 
+    }\n`
   );
-  output += chalk.dim('  ' + '─'.repeat(catWidth + countWidth + (showDescription ? 30 : 0)) + '\n');
+  output += chalk.dim(`  ${  '─'.repeat(catWidth + countWidth + (showDescription ? 30 : 0))  }\n`);
 
   for (const stat of sorted) {
     const meta = CATEGORY_META[stat.category.toLowerCase()] || CATEGORY_META.default;
@@ -333,7 +333,7 @@ export function formatCategoryStats(
     output += `  ${catStr}${countStr}${descStr}\n`;
   }
 
-  output += chalk.dim('  ' + '─'.repeat(catWidth + countWidth) + '\n');
+  output += chalk.dim(`  ${  '─'.repeat(catWidth + countWidth)  }\n`);
   output += chalk.bold(`  ${'Total'.padEnd(catWidth)}${String(total).padStart(countWidth)}\n`);
 
   return output;
@@ -388,11 +388,11 @@ export function formatAuthMethodTree(
     for (let i = 0; i < displayItems.length; i++) {
       const item = displayItems[i];
       const isLast = i === displayItems.length - 1 && remaining === 0;
-      output += '  ' + renderTreeBranch(
+      output += `  ${  renderTreeBranch(
         `${item.displayName} ${chalk.dim(`(${item.name})`)}`,
         isLast,
         '  '
-      ) + '\n';
+      )  }\n`;
     }
 
     if (remaining > 0) {
@@ -407,6 +407,6 @@ export function formatAuthMethodTree(
  * Helper: Capitalize first letter
  */
 function capitalizeFirst(str: string): string {
-  if (!str) return str;
+  if (!str) {return str;}
   return str.charAt(0).toUpperCase() + str.slice(1);
 }

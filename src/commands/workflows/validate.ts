@@ -107,11 +107,11 @@ export async function workflowsValidateCommand(idOrFile: string | undefined, opt
         for (const nodeType of uniqueTypes) {
           const suggestions = await similarityService.findSimilarNodes(nodeType, 3);
           if (suggestions.length > 0) {
-            nodeSuggestions.set(nodeType, suggestions.map((s: { nodeType: string; confidence: number; reason: string; autoFixable: boolean }) => ({
+            nodeSuggestions.set(nodeType, suggestions.map((s) => ({
               value: s.nodeType,
               confidence: s.confidence,
               reason: s.reason,
-              autoFixable: s.autoFixable,
+              autoFixable: s.autoFixable ?? false,
             })));
           }
         }
@@ -382,17 +382,17 @@ function analyzeWorkflowUpgrades(nodes: any[], severityFilter?: string): Workflo
   let autoMigratableTotal = 0;
   
   for (const node of nodes) {
-    if (!node?.type || !node?.typeVersion) continue;
+    if (!node?.type || !node?.typeVersion) {continue;}
     
     const nodeType = node.type;
     const currentVersion = String(node.typeVersion);
     const latestVersion = getLatestRegistryVersion(nodeType);
     
-    if (!latestVersion) continue;
+    if (!latestVersion) {continue;}
     
     // Compare versions
     const comparison = versionService.compareVersions(currentVersion, latestVersion);
-    if (comparison >= 0) continue; // Already at or above latest
+    if (comparison >= 0) {continue;} // Already at or above latest
     
     // Analyze the upgrade
     const analysis = detector.analyzeVersionUpgrade(nodeType, currentVersion, latestVersion);
@@ -402,8 +402,8 @@ function analyzeWorkflowUpgrades(nodes: any[], severityFilter?: string): Workflo
       const filterLevel = severityFilter.toUpperCase();
       if (filterLevel !== analysis.overallSeverity) {
         // Skip if severity doesn't match filter
-        if (filterLevel === 'HIGH' && analysis.overallSeverity !== 'HIGH') continue;
-        if (filterLevel === 'MEDIUM' && !['HIGH', 'MEDIUM'].includes(analysis.overallSeverity)) continue;
+        if (filterLevel === 'HIGH' && analysis.overallSeverity !== 'HIGH') {continue;}
+        if (filterLevel === 'MEDIUM' && !['HIGH', 'MEDIUM'].includes(analysis.overallSeverity)) {continue;}
       }
     }
     

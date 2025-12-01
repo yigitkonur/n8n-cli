@@ -70,11 +70,11 @@ export function buildReverseConnectionMap(
       continue;
     }
 
-    if (!outputs || typeof outputs !== 'object') continue;
+    if (!outputs || typeof outputs !== 'object') {continue;}
 
     // Iterate through all output types (main, error, ai_tool, ai_languageModel, etc.)
     for (const [outputType, connections] of Object.entries(outputs as Record<string, unknown>)) {
-      if (!Array.isArray(connections)) continue;
+      if (!Array.isArray(connections)) {continue;}
 
       // Flatten nested arrays and process each connection
       const connArray = connections.flat().filter((c): c is { node: string; index?: number } =>
@@ -94,7 +94,7 @@ export function buildReverseConnectionMap(
 
         // Add reverse connection entry
         map.get(conn.node)!.push({
-          sourceName: sourceName,
+          sourceName,
           sourceType: outputType,
           type: outputType,
           index: conn.index ?? 0
@@ -140,7 +140,7 @@ function checkIfStreamingTarget(
 
   for (const conn of mainConnections) {
     const sourceNode = workflow.nodes.find(n => n.name === conn.sourceName);
-    if (!sourceNode) continue;
+    if (!sourceNode) {continue;}
 
     const normalizedType = NodeTypeNormalizer.normalizeToShortForm(sourceNode.type);
     if (normalizedType === 'nodes-langchain.chatTrigger') {
@@ -185,7 +185,7 @@ export function validateAIAgent(
     issues.push({
       severity: 'error',
       nodeId: node.id,
-      nodeName: nodeName,
+      nodeName,
       message: `AI Agent "${nodeName}" requires an ai_languageModel connection. Connect a language model node (e.g., OpenAI Chat Model, Anthropic Chat Model).`,
       code: 'MISSING_LANGUAGE_MODEL'
     });
@@ -193,7 +193,7 @@ export function validateAIAgent(
     issues.push({
       severity: 'error',
       nodeId: node.id,
-      nodeName: nodeName,
+      nodeName,
       message: `AI Agent "${nodeName}" has ${languageModelConnections.length} ai_languageModel connections. Maximum is 2 (for fallback model support).`,
       code: 'TOO_MANY_LANGUAGE_MODELS'
     });
@@ -203,7 +203,7 @@ export function validateAIAgent(
       issues.push({
         severity: 'warning',
         nodeId: node.id,
-        nodeName: nodeName,
+        nodeName,
         message: `AI Agent "${nodeName}" has 2 language models but needsFallback is not enabled. Set needsFallback=true or remove the second model.`
       });
     }
@@ -211,7 +211,7 @@ export function validateAIAgent(
     issues.push({
       severity: 'error',
       nodeId: node.id,
-      nodeName: nodeName,
+      nodeName,
       message: `AI Agent "${nodeName}" has needsFallback=true but only 1 language model connected. Connect a second model for fallback or disable needsFallback.`,
       code: 'FALLBACK_MISSING_SECOND_MODEL'
     });
@@ -225,7 +225,7 @@ export function validateAIAgent(
       issues.push({
         severity: 'error',
         nodeId: node.id,
-        nodeName: nodeName,
+        nodeName,
         message: `AI Agent "${nodeName}" has hasOutputParser=true but no ai_outputParser connection. Connect an output parser or set hasOutputParser=false.`,
         code: 'MISSING_OUTPUT_PARSER'
       });
@@ -234,7 +234,7 @@ export function validateAIAgent(
     issues.push({
       severity: 'warning',
       nodeId: node.id,
-      nodeName: nodeName,
+      nodeName,
       message: `AI Agent "${nodeName}" has an output parser connected but hasOutputParser is not true. Set hasOutputParser=true to enable output parsing.`
     });
   }
@@ -243,7 +243,7 @@ export function validateAIAgent(
     issues.push({
       severity: 'error',
       nodeId: node.id,
-      nodeName: nodeName,
+      nodeName,
       message: `AI Agent "${nodeName}" has ${outputParserConnections.length} output parsers. Only 1 is allowed.`,
       code: 'MULTIPLE_OUTPUT_PARSERS'
     });
@@ -251,12 +251,12 @@ export function validateAIAgent(
 
   // 3. Validate prompt type configuration
   if (params.promptType === 'define') {
-    const text = params.text;
+    const {text} = params;
     if (!text || (typeof text === 'string' && text.trim() === '')) {
       issues.push({
         severity: 'error',
         nodeId: node.id,
-        nodeName: nodeName,
+        nodeName,
         message: `AI Agent "${nodeName}" has promptType="define" but the text field is empty. Provide a custom prompt or switch to promptType="auto".`,
         code: 'MISSING_PROMPT_TEXT'
       });
@@ -264,19 +264,19 @@ export function validateAIAgent(
   }
 
   // 4. Check system message (RECOMMENDED)
-  const systemMessage = params.systemMessage;
+  const {systemMessage} = params;
   if (!systemMessage) {
     issues.push({
       severity: 'info',
       nodeId: node.id,
-      nodeName: nodeName,
+      nodeName,
       message: `AI Agent "${nodeName}" has no systemMessage. Consider adding one to define the agent's role, capabilities, and constraints.`
     });
   } else if (typeof systemMessage === 'string' && systemMessage.trim().length < MIN_SYSTEM_MESSAGE_LENGTH) {
     issues.push({
       severity: 'info',
       nodeId: node.id,
-      nodeName: nodeName,
+      nodeName,
       message: `AI Agent "${nodeName}" systemMessage is very short (minimum ${MIN_SYSTEM_MESSAGE_LENGTH} characters recommended). Provide more detail about the agent's role and capabilities.`
     });
   }
@@ -296,7 +296,7 @@ export function validateAIAgent(
       issues.push({
         severity: 'error',
         nodeId: node.id,
-        nodeName: nodeName,
+        nodeName,
         message: `AI Agent "${nodeName}" is in streaming mode (${streamSource}) but has outgoing main connections. Remove all main output connections - streaming responses flow back through the Chat Trigger.`,
         code: 'STREAMING_WITH_MAIN_OUTPUT'
       });
@@ -310,7 +310,7 @@ export function validateAIAgent(
     issues.push({
       severity: 'error',
       nodeId: node.id,
-      nodeName: nodeName,
+      nodeName,
       message: `AI Agent "${nodeName}" has ${memoryConnections.length} ai_memory connections. Only 1 memory is allowed.`,
       code: 'MULTIPLE_MEMORY_CONNECTIONS'
     });
@@ -323,7 +323,7 @@ export function validateAIAgent(
     issues.push({
       severity: 'info',
       nodeId: node.id,
-      nodeName: nodeName,
+      nodeName,
       message: `AI Agent "${nodeName}" has no ai_tool connections. Consider adding tools to enhance the agent's capabilities.`
     });
   }
@@ -334,7 +334,7 @@ export function validateAIAgent(
       issues.push({
         severity: 'error',
         nodeId: node.id,
-        nodeName: nodeName,
+        nodeName,
         message: `AI Agent "${nodeName}" has invalid maxIterations type. Must be a number.`,
         code: 'INVALID_MAX_ITERATIONS_TYPE'
       });
@@ -342,7 +342,7 @@ export function validateAIAgent(
       issues.push({
         severity: 'error',
         nodeId: node.id,
-        nodeName: nodeName,
+        nodeName,
         message: `AI Agent "${nodeName}" has maxIterations=${params.maxIterations}. Must be at least 1.`,
         code: 'MAX_ITERATIONS_TOO_LOW'
       });
@@ -350,7 +350,7 @@ export function validateAIAgent(
       issues.push({
         severity: 'warning',
         nodeId: node.id,
-        nodeName: nodeName,
+        nodeName,
         message: `AI Agent "${nodeName}" has maxIterations=${params.maxIterations}. Very high iteration counts (>${MAX_ITERATIONS_WARNING_THRESHOLD}) may cause long execution times and high costs.`
       });
     }
@@ -386,7 +386,7 @@ export function validateChatTrigger(
     issues.push({
       severity: 'error',
       nodeId: node.id,
-      nodeName: nodeName,
+      nodeName,
       message: `Chat Trigger "${nodeName}" has no outgoing connections. Connect it to an AI Agent or workflow.`,
       code: 'MISSING_CONNECTIONS'
     });
@@ -403,7 +403,7 @@ export function validateChatTrigger(
     issues.push({
       severity: 'error',
       nodeId: node.id,
-      nodeName: nodeName,
+      nodeName,
       message: `Chat Trigger "${nodeName}" connects to non-existent node "${firstConnection.node}".`,
       code: 'INVALID_TARGET_NODE'
     });
@@ -419,7 +419,7 @@ export function validateChatTrigger(
       issues.push({
         severity: 'error',
         nodeId: node.id,
-        nodeName: nodeName,
+        nodeName,
         message: `Chat Trigger "${nodeName}" has responseMode="streaming" but connects to "${targetNode.name}" (${targetType}). Streaming mode only works with AI Agent. Change responseMode to "lastNode" or connect to an AI Agent.`,
         code: 'STREAMING_WRONG_TARGET'
       });
@@ -448,7 +448,7 @@ export function validateChatTrigger(
       issues.push({
         severity: 'info',
         nodeId: node.id,
-        nodeName: nodeName,
+        nodeName,
         message: `Chat Trigger "${nodeName}" uses responseMode="lastNode" with AI Agent. Consider using responseMode="streaming" for better user experience with real-time responses.`
       });
     }
@@ -482,7 +482,7 @@ export function validateBasicLLMChain(
     issues.push({
       severity: 'error',
       nodeId: node.id,
-      nodeName: nodeName,
+      nodeName,
       message: `Basic LLM Chain "${nodeName}" requires an ai_languageModel connection. Connect a language model node.`,
       code: 'MISSING_LANGUAGE_MODEL'
     });
@@ -490,7 +490,7 @@ export function validateBasicLLMChain(
     issues.push({
       severity: 'error',
       nodeId: node.id,
-      nodeName: nodeName,
+      nodeName,
       message: `Basic LLM Chain "${nodeName}" has ${languageModelConnections.length} ai_languageModel connections. Basic LLM Chain only supports 1 language model (no fallback).`,
       code: 'MULTIPLE_LANGUAGE_MODELS'
     });
@@ -503,7 +503,7 @@ export function validateBasicLLMChain(
     issues.push({
       severity: 'error',
       nodeId: node.id,
-      nodeName: nodeName,
+      nodeName,
       message: `Basic LLM Chain "${nodeName}" has ${memoryConnections.length} ai_memory connections. Only 1 memory is allowed.`,
       code: 'MULTIPLE_MEMORY_CONNECTIONS'
     });
@@ -516,7 +516,7 @@ export function validateBasicLLMChain(
     issues.push({
       severity: 'error',
       nodeId: node.id,
-      nodeName: nodeName,
+      nodeName,
       message: `Basic LLM Chain "${nodeName}" has ai_tool connections. Basic LLM Chain does not support tools. Use AI Agent if you need tool support.`,
       code: 'TOOLS_NOT_SUPPORTED'
     });
@@ -524,12 +524,12 @@ export function validateBasicLLMChain(
 
   // 4. Validate prompt configuration
   if (params.promptType === 'define') {
-    const text = params.text;
+    const {text} = params;
     if (!text || (typeof text === 'string' && text.trim() === '')) {
       issues.push({
         severity: 'error',
         nodeId: node.id,
-        nodeName: nodeName,
+        nodeName,
         message: `Basic LLM Chain "${nodeName}" has promptType="define" but the text field is empty.`,
         code: 'MISSING_PROMPT_TEXT'
       });
@@ -557,7 +557,7 @@ export function validateAISpecificNodes(
   const reverseConnectionMap = buildReverseConnectionMap(workflow);
 
   for (const node of workflow.nodes) {
-    if (!node || node.disabled) continue;
+    if (!node || node.disabled) {continue;}
 
     const normalizedType = NodeTypeNormalizer.normalizeToShortForm(node.type);
 
@@ -610,7 +610,7 @@ export function hasAINodes(workflow: Workflow): boolean {
   ];
 
   return workflow.nodes.some(node => {
-    if (!node) return false;
+    if (!node) {return false;}
     const normalized = NodeTypeNormalizer.normalizeToShortForm(node.type);
     return aiNodeTypes.includes(normalized) || isAIToolSubNode(normalized);
   });
@@ -622,10 +622,10 @@ export function hasAINodes(workflow: Workflow): boolean {
 export function getAINodeCategory(nodeType: string): string | null {
   const normalized = NodeTypeNormalizer.normalizeToShortForm(nodeType);
 
-  if (normalized === 'nodes-langchain.agent') return 'AI Agent';
-  if (normalized === 'nodes-langchain.chatTrigger') return 'Chat Trigger';
-  if (normalized === 'nodes-langchain.chainLlm') return 'Basic LLM Chain';
-  if (isAIToolSubNode(normalized)) return 'AI Tool';
+  if (normalized === 'nodes-langchain.agent') {return 'AI Agent';}
+  if (normalized === 'nodes-langchain.chatTrigger') {return 'Chat Trigger';}
+  if (normalized === 'nodes-langchain.chainLlm') {return 'Basic LLM Chain';}
+  if (isAIToolSubNode(normalized)) {return 'AI Tool';}
 
   // Check for AI component nodes
   if (normalized.startsWith('nodes-langchain.')) {

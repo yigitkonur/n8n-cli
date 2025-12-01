@@ -5,7 +5,7 @@
  */
 
 import chalk from 'chalk';
-import { ExitCode, getExitCode, getExitCodeDescription } from './exit-codes.js';
+import { getExitCode, getExitCodeDescription } from './exit-codes.js';
 
 // Custom error classes for n8n API operations
 
@@ -95,9 +95,10 @@ export function handleN8nApiError(error: unknown): N8nApiError {
             'METHOD_NOT_ALLOWED',
             data
           );
-        case 429:
+        case 429: {
           const retryAfter = axiosError.response.headers['retry-after'];
-          return new N8nRateLimitError(retryAfter ? parseInt(retryAfter) : undefined);
+          return new N8nRateLimitError(retryAfter ? parseInt(retryAfter, 10) : undefined);
+        }
         default:
           if (status >= 500) {
             return new N8nServerError(message, status);
@@ -282,8 +283,8 @@ export function getErrorDocsUrl(code: string | undefined): string {
  * Task 06: Consistent API Key Masking
  */
 export function sanitizeForLogging(obj: unknown): unknown {
-  if (obj === null || obj === undefined) return obj;
-  if (typeof obj !== 'object') return obj;
+  if (obj === null || obj === undefined) {return obj;}
+  if (typeof obj !== 'object') {return obj;}
   
   if (Array.isArray(obj)) {
     return obj.map(sanitizeForLogging);

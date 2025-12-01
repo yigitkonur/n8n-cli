@@ -7,20 +7,20 @@ import chalk from 'chalk';
 import { readFile } from 'node:fs/promises';
 import { getApiClient } from '../../core/api/client.js';
 import { jsonParse } from '../../core/json-parser.js';
-import { formatHeader } from '../../core/formatters/header.js';
+import { formatHeader, formatDivider } from '../../core/formatters/header.js';
 import { formatNextActions } from '../../core/formatters/next-actions.js';
 import { outputJson } from '../../core/formatters/json.js';
 import { icons } from '../../core/formatters/theme.js';
 import { printError, N8nApiError } from '../../utils/errors.js';
 import { stripReadOnlyProperties } from '../../core/sanitizer.js';
-import { validateWorkflowStructure } from '../../core/validator.js';
-import { formatDivider } from '../../core/formatters/header.js';
+import { validateBeforeApi, displayValidationErrors } from '../../core/validation/index.js';
 
 interface CreateOptions {
   file?: string;
   name?: string;
   active?: boolean;
   dryRun?: boolean;
+  skipValidation?: boolean;
   json?: boolean;
 }
 
@@ -59,8 +59,12 @@ export async function workflowsCreateCommand(opts: CreateOptions): Promise<void>
       workflow.connections = {};
     }
     
-    // Validate and prepare workflow
-    const validation = validateWorkflowStructure(workflow);
+    // Validate workflow before API call
+    const validation = validateBeforeApi(workflow, {
+      rawSource: content,
+      skipValidation: opts.skipValidation,
+      json: opts.json,
+    });
     const cleanedWorkflow = stripReadOnlyProperties(workflow);
     
     // Dry-run mode: preview what would be created without actually creating
@@ -126,6 +130,17 @@ export async function workflowsCreateCommand(opts: CreateOptions): Promise<void>
       return;
     }
     
+    // Block on validation errors (unless --skip-validation)
+    if (!validation.shouldProceed) {
+      displayValidationErrors(validation, { json: opts.json, context: 'create' });
+      return;
+    }
+    
+    // Show warnings but proceed
+    if (validation.warnings.length > 0 && !opts.json) {
+      console.log(chalk.yellow(`  ${icons.warning} ${validation.warnings.length} validation warning(s) - proceeding anyway`));
+    }
+    
     const client = getApiClient();
     const created = await client.createWorkflow(cleanedWorkflow);
     
@@ -167,6 +182,6 @@ export async function workflowsCreateCommand(opts: CreateOptions): Promise<void>
     } else {
       console.error(chalk.red(`\n${icons.error} Error: ${(error as Error).message}`));
     }
-    process.exitCode = 1; return;
+    process.exitCode = 1; 
   }
 }

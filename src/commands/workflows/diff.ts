@@ -15,6 +15,7 @@ import { printError, N8nApiError } from '../../utils/errors.js';
 import { confirmAction, displayChangeSummary } from '../../utils/prompts.js';
 import { maybeBackupWorkflow } from '../../utils/backup.js';
 import { ExitCode } from '../../utils/exit-codes.js';
+import { validateBeforeApi, displayValidationErrors } from '../../core/validation/index.js';
 import type { WorkflowDiffOperation, WorkflowDiffRequest } from '../../types/workflow-diff.js';
 
 export interface DiffOptions {
@@ -22,6 +23,7 @@ export interface DiffOptions {
   file?: string;
   dryRun?: boolean;
   continueOnError?: boolean;
+  skipValidation?: boolean;
   force?: boolean;
   yes?: boolean;
   backup?: boolean;  // Commander inverts --no-backup to backup=false
@@ -226,13 +228,31 @@ export async function workflowsDiffCommand(id: string, opts: DiffOptions): Promi
       }
     }
 
-    // 8. Create backup (unless --no-backup)
+    // 8. Validate result workflow before API call
+    if (result.workflow) {
+      const validation = validateBeforeApi(result.workflow, {
+        skipValidation: opts.skipValidation,
+        json: opts.json,
+      });
+      
+      if (!validation.shouldProceed) {
+        displayValidationErrors(validation, { json: opts.json, context: 'diff' });
+        return;
+      }
+      
+      // Show warnings but proceed
+      if (validation.warnings.length > 0 && !opts.json) {
+        console.log(chalk.yellow(`  ${icons.warning} ${validation.warnings.length} validation warning(s) - proceeding anyway`));
+      }
+    }
+
+    // 9. Create backup (unless --no-backup)
     await maybeBackupWorkflow(workflow, id, { noBackup: opts.backup === false });
 
-    // 9. Push update via API
+    // 10. Push update via API
     const updatedWorkflow = await client.updateWorkflow(id, result.workflow!);
 
-    // 10. Handle activation/deactivation
+    // 11. Handle activation/deactivation
     if (result.shouldActivate) {
       await client.activateWorkflow(id);
     }
@@ -240,7 +260,7 @@ export async function workflowsDiffCommand(id: string, opts: DiffOptions): Promi
       await client.deactivateWorkflow(id);
     }
 
-    // 11. Save to file if requested
+    // 12. Save to file if requested
     if (opts.save) {
       try {
         writeFileSync(opts.save, JSON.stringify(updatedWorkflow, null, 2), 'utf-8');
@@ -249,7 +269,7 @@ export async function workflowsDiffCommand(id: string, opts: DiffOptions): Promi
       }
     }
 
-    // 12. Output result
+    // 13. Output result
     if (opts.json) {
       outputJson({
         success: true,
@@ -325,8 +345,7 @@ export async function workflowsDiffCommand(id: string, opts: DiffOptions): Promi
       } else {
         console.error(chalk.red(`\n${icons.error} ${(error as Error).message}`));
       }
-    } else {
-      if (opts.json) {
+    } else if (opts.json) {
         outputJson({
           success: false,
           error: {
@@ -337,7 +356,6 @@ export async function workflowsDiffCommand(id: string, opts: DiffOptions): Promi
       } else {
         console.error(chalk.red(`\n${icons.error} Error: ${(error as Error).message}`));
       }
-    }
     process.exitCode = ExitCode.GENERAL;
   }
 }

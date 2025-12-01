@@ -389,9 +389,9 @@ Examples:
   });
 
 // Default action for 'n8n nodes' without subcommand - show help with exit 0
-nodesCmd.action((cmd) => {
+nodesCmd.action((_cmd) => {
   // Check if an unknown subcommand was passed
-  const args = nodesCmd.args;
+  const {args} = nodesCmd;
   if (args.length > 0) {
     console.error(`error: unknown command 'n8n nodes ${args[0]}'`);
     console.error(`Run 'n8n nodes --help' to see available commands.`);
@@ -526,6 +526,7 @@ workflowsCmd
   .option('-f, --file <path>', 'Path to workflow JSON file (required)')
   .option('-n, --name <name>', 'Workflow name (overrides file)')
   .option('--dry-run', 'Preview without creating')
+  .option('--skip-validation', 'Skip pre-API validation (not recommended)')
   .option('--json', 'Output as JSON')
   .addHelpText('after', `
 ⚠️  Using exported workflow files?
@@ -552,6 +553,7 @@ workflowsCmd
   .option('-n, --name <name>', 'New workflow name')
   .option('--activate', 'Activate the workflow')
   .option('--deactivate', 'Deactivate the workflow')
+  .option('--skip-validation', 'Skip pre-API validation (not recommended)')
   .option('--force, --yes', 'Skip confirmation prompts')
   .option('--no-backup', 'Skip creating backup before changes')
   .option('--json', 'Output as JSON')
@@ -636,6 +638,7 @@ workflowsCmd
   .option('-f, --file <path>', 'Path to operations JSON file')
   .option('--dry-run', 'Validate without applying changes', false)
   .option('--continue-on-error', 'Apply valid operations, report failures', false)
+  .option('--skip-validation', 'Skip pre-API validation (not recommended)')
   .option('--force, --yes', 'Skip confirmation prompts')
   .option('--no-backup', 'Skip creating backup before changes')
   .option('-s, --save <path>', 'Save result workflow to file')
@@ -773,6 +776,7 @@ workflowsCmd
   .option('-n, --name <name>', 'Workflow name (overrides file)')
   .option('--dry-run', 'Preview without creating')
   .option('--activate', 'Activate workflow after import')
+  .option('--skip-validation', 'Skip pre-API validation (not recommended)')
   .option('--json', 'Output as JSON')
   .addHelpText('after', `
 Examples:
@@ -837,6 +841,7 @@ workflowsCmd
   .option('--no-autofix', 'Skip auto-fix of common issues (expression format, Switch v3+)')
   .option('--keep-credentials', 'Preserve credential references (default: strip)')
   .option('--dry-run', 'Preview deployment without creating workflow')
+  .option('--skip-validation', 'Skip pre-API validation (not recommended)')
   .option('-s, --save <path>', 'Save workflow JSON locally')
   .option('--json', 'Output as JSON')
   .addHelpText('after', `
@@ -944,7 +949,7 @@ Examples:
 
 // Default action for 'n8n workflows' without subcommand - show help with exit 0
 workflowsCmd.action(() => {
-  const args = workflowsCmd.args;
+  const {args} = workflowsCmd;
   if (args.length > 0) {
     console.error(`error: unknown command 'n8n workflows ${args[0]}'`);
     console.error(`Run 'n8n workflows --help' to see available commands.`);
@@ -1073,7 +1078,7 @@ Examples:
 
 // Default action for 'n8n executions' without subcommand - show help with exit 0
 executionsCmd.action(() => {
-  const args = executionsCmd.args;
+  const {args} = executionsCmd;
   if (args.length > 0) {
     console.error(`error: unknown command 'n8n executions ${args[0]}'`);
     console.error(`Run 'n8n executions --help' to see available commands.`);
@@ -1590,7 +1595,7 @@ Then search by task:
 
 // Default action for 'n8n templates' without subcommand - show help with exit 0
 templatesCmd.action(() => {
-  const args = templatesCmd.args;
+  const {args} = templatesCmd;
   if (args.length > 0) {
     console.error(`error: unknown command 'n8n templates ${args[0]}'`);
     console.error(`Run 'n8n templates --help' to see available commands.`);

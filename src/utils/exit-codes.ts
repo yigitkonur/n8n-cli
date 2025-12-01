@@ -75,7 +75,7 @@ export function getExitCode(error: unknown): ExitCode {
   
   // Handle errors with a code property (N8nApiError)
   if (typeof error === 'object' && error !== null && 'code' in error) {
-    const code = (error as { code?: string }).code;
+    const {code} = (error as { code?: string });
     if (code && code in errorCodeToExitCode) {
       return errorCodeToExitCode[code];
     }
@@ -83,13 +83,13 @@ export function getExitCode(error: unknown): ExitCode {
   
   // Handle errors with statusCode (HTTP-based)
   if (typeof error === 'object' && error !== null && 'statusCode' in error) {
-    const statusCode = (error as { statusCode?: number }).statusCode;
+    const {statusCode} = (error as { statusCode?: number });
     if (statusCode) {
-      if (statusCode === 401 || statusCode === 403) return ExitCode.NOPERM;
-      if (statusCode === 404) return ExitCode.DATAERR;
-      if (statusCode === 400) return ExitCode.DATAERR;
-      if (statusCode === 429) return ExitCode.TEMPFAIL;
-      if (statusCode >= 500) return ExitCode.PROTOCOL;
+      if (statusCode === 401 || statusCode === 403) {return ExitCode.NOPERM;}
+      if (statusCode === 404) {return ExitCode.DATAERR;}
+      if (statusCode === 400) {return ExitCode.DATAERR;}
+      if (statusCode === 429) {return ExitCode.TEMPFAIL;}
+      if (statusCode >= 500) {return ExitCode.PROTOCOL;}
     }
   }
   

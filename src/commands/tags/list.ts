@@ -43,7 +43,7 @@ export async function tagsListCommand(opts: ListOptions): Promise<void> {
       outputJson({
         data: tags,
         total: tags.length,
-        hasMore: !!response.nextCursor,
+        hasMore: Boolean(response.nextCursor),
         nextCursor: response.nextCursor,
       });
       return;
@@ -114,10 +114,10 @@ export async function tagsListCommand(opts: ListOptions): Promise<void> {
     
     // Summary
     const durationMs = Date.now() - startTime;
-    console.log('\n' + formatSummary({
+    console.log(`\n${  formatSummary({
       total: tags.length,
       durationMs,
-    }));
+    })}`);
     
     // Next actions
     if (tags.length > 0) {

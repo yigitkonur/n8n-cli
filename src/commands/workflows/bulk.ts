@@ -29,7 +29,7 @@ type BulkOperation = 'activate' | 'deactivate' | 'delete';
  * Parse IDs from comma-separated string
  */
 function parseIds(idsString?: string): string[] {
-  if (!idsString) return [];
+  if (!idsString) {return [];}
   return idsString.split(',').map(id => id.trim()).filter(Boolean);
 }
 
@@ -45,6 +45,7 @@ async function performBulkOperation(
   const succeeded: string[] = [];
   const failed: Array<{ id: string; error: string }> = [];
   
+   
   for (const id of workflowIds) {
     try {
       switch (operation) {
@@ -68,6 +69,9 @@ async function performBulkOperation(
             }
           }
           await client.deleteWorkflow(id);
+          break;
+        default:
+          // Unknown operation - skip
           break;
       }
       succeeded.push(id);

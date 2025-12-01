@@ -59,7 +59,7 @@ export async function templatesGetCommand(id: string, opts: GetOptions): Promise
     
     // Description
     if (template.description) {
-      console.log(theme.dim('  ' + template.description.slice(0, 200)));
+      console.log(theme.dim(`  ${  template.description.slice(0, 200)}`));
       if (template.description.length > 200) {
         console.log(theme.dim('  ...'));
       }
@@ -123,6 +123,6 @@ export async function templatesGetCommand(id: string, opts: GetOptions): Promise
     } else {
       console.error(chalk.red(`\n${icons.error} Error: ${error.message}`));
     }
-    process.exitCode = 1; return;
+    process.exitCode = 1; 
   }
 }

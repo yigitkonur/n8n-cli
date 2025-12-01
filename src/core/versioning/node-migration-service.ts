@@ -120,7 +120,7 @@ export class NodeMigrationService {
    * Apply a single migration change to a node
    */
   private applyMigration(node: Record<string, unknown>, change: DetectedChange): AppliedMigration | null {
-    if (!change.migrationStrategy) return null;
+    if (!change.migrationStrategy) {return null;}
 
     const { type, defaultValue, sourceProperty, targetProperty } = change.migrationStrategy;
 
@@ -186,7 +186,7 @@ export class NodeMigrationService {
 
     for (let i = 0; i < parts.length - 1; i++) {
       const part = parts[i];
-      if (!target[part] || typeof target[part] !== 'object') return null;
+      if (!target[part] || typeof target[part] !== 'object') {return null;}
       target = target[part] as Record<string, unknown>;
     }
 
@@ -219,14 +219,14 @@ export class NodeMigrationService {
     let sourceTarget: Record<string, unknown> = node;
 
     for (let i = 0; i < sourceParts.length - 1; i++) {
-      if (!sourceTarget[sourceParts[i]] || typeof sourceTarget[sourceParts[i]] !== 'object') return null;
+      if (!sourceTarget[sourceParts[i]] || typeof sourceTarget[sourceParts[i]] !== 'object') {return null;}
       sourceTarget = sourceTarget[sourceParts[i]] as Record<string, unknown>;
     }
 
     const sourceKey = sourceParts[sourceParts.length - 1];
     const oldValue = sourceTarget[sourceKey];
 
-    if (oldValue === undefined) return null; // Source doesn't exist
+    if (oldValue === undefined) {return null;} // Source doesn't exist
 
     // Set new value
     const targetParts = targetPath.split('.');
@@ -319,8 +319,8 @@ export class NodeMigrationService {
     const parts = version.split('.').map(Number);
 
     // Handle versions like "1.1" -> 1.1, "2.0" -> 2
-    if (parts.length === 1) return parts[0];
-    if (parts.length === 2) return parts[0] + parts[1] / 10;
+    if (parts.length === 1) {return parts[0];}
+    if (parts.length === 2) {return parts[0] + parts[1] / 10;}
 
     // For more complex versions, just use first number
     return parts[0];

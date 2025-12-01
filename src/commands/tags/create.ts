@@ -36,7 +36,7 @@ export async function tagsCreateCommand(opts: CreateOptions): Promise<void> {
     if (opts.json) {
       outputJson({
         success: true,
-        tag: tag,
+        tag,
       });
       return;
     }

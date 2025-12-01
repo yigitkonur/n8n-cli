@@ -4,8 +4,7 @@
  * Read-only operations for CLI use
  */
 
-import type { DatabaseAdapter } from './adapter.js';
-import { getDatabase } from './adapter.js';
+import { type DatabaseAdapter, getDatabase } from './adapter.js';
 import { NodeTypeNormalizer } from '../../utils/node-type-normalizer.js';
 
 /**
@@ -70,7 +69,7 @@ export class NodeRepository {
       }
     }
 
-    if (!row) return null;
+    if (!row) {return null;}
 
     return this.parseNodeRow(row);
   }
@@ -96,7 +95,7 @@ export class NodeRepository {
    */
   private searchNodesFTS(query: string, mode: 'OR' | 'AND', limit: number): NodeSearchResult[] {
     const cleanedQuery = query.trim();
-    if (!cleanedQuery) return [];
+    if (!cleanedQuery) {return [];}
     
     // Build FTS5 query based on mode
     let ftsQuery: string;
@@ -106,14 +105,14 @@ export class NodeRepository {
       ftsQuery = cleanedQuery;
     } else {
       const words = cleanedQuery.split(/\s+/).filter(w => w.length > 0);
-      if (words.length === 0) return [];
+      if (words.length === 0) {return [];}
       
       // Escape FTS5 special characters
       const escapedWords = words.map(w => 
         w.replace(/['"(){}[\]*+\-:^~]/g, '')
       ).filter(w => w.length > 0);
       
-      if (escapedWords.length === 0) return [];
+      if (escapedWords.length === 0) {return [];}
       
       ftsQuery = mode === 'AND' 
         ? escapedWords.join(' AND ')
@@ -158,7 +157,7 @@ export class NodeRepository {
    * Used when FTS5 unavailable or for FUZZY mode
    */
   private searchNodesLIKE(query: string, mode: 'OR' | 'AND' | 'FUZZY' = 'OR', limit: number = 20): NodeSearchResult[] {
-    let sql = '';
+    let sql: string;
     const params: any[] = [];
 
     if (mode === 'FUZZY') {
@@ -205,7 +204,7 @@ export class NodeRepository {
         .slice(0, limit);
       
       return matches.map(m => this.parseSearchRow(m.row, query));
-    } else {
+    } 
       // OR/AND mode
       const words = query.split(/\s+/).filter(w => w.length > 0);
       if (words.length === 0) {
@@ -231,7 +230,7 @@ export class NodeRepository {
         params.push(searchTerm, searchTerm, searchTerm);
       }
       params.push(limit);
-    }
+    
     
     const rows = this.db.prepare(sql).all(...params) as any[];
     return rows.map(row => this.parseSearchRow(row, query));
@@ -364,14 +363,14 @@ export class NodeRepository {
    */
   searchNodeProperties(nodeType: string, query: string, maxResults: number = 20): any[] {
     const node = this.getNode(nodeType);
-    if (!node || !node.properties) return [];
+    if (!node || !node.properties) {return [];}
     
     const results: any[] = [];
     const searchLower = query.toLowerCase();
     
     function searchProperties(properties: any[], path: string[] = []) {
       for (const prop of properties) {
-        if (results.length >= maxResults) break;
+        if (results.length >= maxResults) {break;}
         
         const currentPath = [...path, prop.name || prop.displayName];
         const pathString = currentPath.join('.');
@@ -402,7 +401,7 @@ export class NodeRepository {
    */
   getNodeOperations(nodeType: string): any[] {
     const node = this.getNode(nodeType);
-    if (!node) return [];
+    if (!node) {return [];}
 
     const operations: any[] = [];
 
@@ -435,7 +434,7 @@ export class NodeRepository {
    */
   getNodeResources(nodeType: string): any[] {
     const node = this.getNode(nodeType);
-    if (!node || !node.properties) return [];
+    if (!node || !node.properties) {return [];}
 
     const resources: any[] = [];
 
@@ -451,7 +450,7 @@ export class NodeRepository {
   // ===== Private helpers =====
   
   private safeJsonParse(json: string, defaultValue: any): any {
-    if (!json) return defaultValue;
+    if (!json) {return defaultValue;}
     try {
       return JSON.parse(json);
     } catch {
@@ -475,7 +474,7 @@ export class NodeRepository {
       properties: this.safeJsonParse(row.properties_schema, []),
       operations: this.safeJsonParse(row.operations, []),
       credentials: this.safeJsonParse(row.credentials_required, []),
-      hasDocumentation: !!row.documentation,
+      hasDocumentation: Boolean(row.documentation),
       outputs: row.outputs ? this.safeJsonParse(row.outputs, null) : null,
       outputNames: row.output_names ? this.safeJsonParse(row.output_names, null) : null
     };
@@ -505,8 +504,8 @@ export class NodeRepository {
    * Calculate Levenshtein distance between two strings
    */
   private levenshteinDistance(a: string, b: string): number {
-    if (a.length === 0) return b.length;
-    if (b.length === 0) return a.length;
+    if (a.length === 0) {return b.length;}
+    if (b.length === 0) {return a.length;}
     
     const matrix: number[][] = [];
     
@@ -541,13 +540,13 @@ export class NodeRepository {
     // Exact match in nodeType = highest score
     if (result.nodeType.toLowerCase().includes(queryLower)) {
       score += 100;
-      if (result.nodeType.toLowerCase() === queryLower) score += 50;
+      if (result.nodeType.toLowerCase() === queryLower) {score += 50;}
     }
     
     // Match in displayName
     if (result.displayName.toLowerCase().includes(queryLower)) {
       score += 75;
-      if (result.displayName.toLowerCase() === queryLower) score += 25;
+      if (result.displayName.toLowerCase() === queryLower) {score += 25;}
     }
     
     // Match in description

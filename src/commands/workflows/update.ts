@@ -16,12 +16,14 @@ import { confirmAction, displayChangeSummary } from '../../utils/prompts.js';
 import { maybeBackupWorkflow } from '../../utils/backup.js';
 import { getUserDatabase } from '../../core/user-db/index.js';
 import { WorkflowVersioningService } from '../../core/versioning/service.js';
+import { validateBeforeApi, displayValidationErrors } from '../../core/validation/index.js';
 
 interface UpdateOptions {
   file?: string;
   name?: string;
   activate?: boolean;
   deactivate?: boolean;
+  skipValidation?: boolean;
   json?: boolean;
   force?: boolean;
   yes?: boolean;
@@ -65,6 +67,23 @@ export async function workflowsUpdateCommand(id: string, opts: UpdateOptions): P
         return;
       }
       
+      // Validate workflow before API call
+      const validation = validateBeforeApi(workflow, {
+        rawSource: content,
+        skipValidation: opts.skipValidation,
+        json: opts.json,
+      });
+      
+      if (!validation.shouldProceed) {
+        displayValidationErrors(validation, { json: opts.json, context: 'update' });
+        return;
+      }
+      
+      // Show warnings but proceed
+      if (validation.warnings.length > 0 && !opts.json) {
+        console.log(chalk.yellow(`  \u26a0\ufe0f  ${validation.warnings.length} validation warning(s) - proceeding anyway`));
+      }
+      
       // Task 03: Backup original workflow before mutation (using versioning service)
       const original = await client.getWorkflow(id);
       if (opts.backup !== false) {
@@ -76,7 +95,7 @@ export async function workflowsUpdateCommand(id: string, opts: UpdateOptions): P
             metadata: { source: opts.file, command: 'workflows update' }
           });
           console.log(chalk.dim(`  📦 ${backupResult.message}`));
-        } catch (backupError) {
+        } catch {
           // Fall back to file backup if versioning fails
           await maybeBackupWorkflow(original, id, { noBackup: false });
         }
@@ -121,7 +140,7 @@ export async function workflowsUpdateCommand(id: string, opts: UpdateOptions): P
             metadata: { command: 'workflows update --name' }
           });
           console.log(chalk.dim(`  📦 ${backupResult.message}`));
-        } catch (backupError) {
+        } catch {
           // Fall back to file backup if versioning fails
           await maybeBackupWorkflow(original, id, { noBackup: false });
         }

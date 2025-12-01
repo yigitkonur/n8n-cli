@@ -16,7 +16,7 @@ export class NodeSpecificValidators {
    * Validate Slack node configuration with operation awareness
    */
   static validateSlack(context: NodeValidationContext): void {
-    const { config, errors, warnings, autofix } = context;
+    const { config, errors, warnings: _warnings, autofix: _autofix } = context;
     const resource = config.resource as string | undefined;
     const operation = config.operation as string | undefined;
 
@@ -31,6 +31,9 @@ export class NodeSpecificValidators {
           break;
         case 'delete':
           this.validateSlackDeleteMessage(context);
+          break;
+        default:
+          // No specific validation for other operations
           break;
       }
     }
@@ -425,7 +428,7 @@ export class NodeSpecificValidators {
     code: string,
     errors: ValidationError[],
     warnings: ValidationWarning[],
-    suggestions: string[]
+    _suggestions: string[]
   ): void {
     // Check for input data access
     if (!code.includes('items') && !code.includes('$input') && !code.includes('$json')) {
@@ -459,8 +462,8 @@ export class NodeSpecificValidators {
   private static validatePythonCode(
     code: string,
     errors: ValidationError[],
-    warnings: ValidationWarning[],
-    suggestions: string[]
+    _warnings: ValidationWarning[],
+    _suggestions: string[]
   ): void {
     // Check for unavailable imports
     const unavailableImports = ['requests', 'pandas', 'numpy', 'pip'];
@@ -481,8 +484,8 @@ export class NodeSpecificValidators {
     for (const line of lines) {
       const indent = line.match(/^(\s+)/);
       if (indent) {
-        if (indent[1].includes('\t')) indentTypes.add('tabs');
-        if (indent[1].includes(' ')) indentTypes.add('spaces');
+        if (indent[1].includes('\t')) {indentTypes.add('tabs');}
+        if (indent[1].includes(' ')) {indentTypes.add('spaces');}
       }
     }
     if (indentTypes.size > 1) {
@@ -501,7 +504,7 @@ export class NodeSpecificValidators {
    * Validate Postgres node configuration
    */
   static validatePostgres(context: NodeValidationContext): void {
-    const { config, errors, warnings, suggestions, autofix } = context;
+    const { config, errors, warnings: _warnings, suggestions, autofix: _autofix } = context;
     const operation = config.operation as string | undefined;
 
     // Common query validation
@@ -534,6 +537,9 @@ export class NodeSpecificValidators {
           });
         }
         break;
+      default:
+        // No specific validation for other operations
+        break;
     }
 
     // Connection timeout suggestion
@@ -549,7 +555,7 @@ export class NodeSpecificValidators {
    * Validate MySQL node configuration
    */
   static validateMySQL(context: NodeValidationContext): void {
-    const { config, errors, warnings, suggestions } = context;
+    const { config, errors, warnings: _warnings, suggestions } = context;
     const operation = config.operation as string | undefined;
 
     // Similar to Postgres
@@ -582,6 +588,9 @@ export class NodeSpecificValidators {
           });
         }
         break;
+      default:
+        // No specific validation for other operations
+        break;
     }
 
     // MySQL-specific
@@ -595,12 +604,12 @@ export class NodeSpecificValidators {
 
   private static validateSQLQuery(
     context: NodeValidationContext,
-    dbType: 'postgres' | 'mysql'
+    _dbType: 'postgres' | 'mysql'
   ): void {
     const { config, errors, warnings, suggestions } = context;
     const query = (config.query as string) || '';
 
-    if (!query) return;
+    if (!query) {return;}
 
     const lowerQuery = query.toLowerCase();
 
@@ -754,12 +763,12 @@ export class NodeSpecificValidators {
    * Validate Google Sheets node configuration
    */
   static validateGoogleSheets(context: NodeValidationContext): void {
-    const { config, errors, warnings, suggestions, autofix } = context;
+    const { config, errors, warnings, suggestions: _suggestions, autofix } = context;
     const operation = config.operation as string | undefined;
 
     // Operation-specific validations
     switch (operation) {
-      case 'append':
+      case 'append': {
         if (!config.range && !config.columns) {
           errors.push({
             type: 'missing_required',
@@ -779,6 +788,7 @@ export class NodeSpecificValidators {
           autofix.options = { ...(options || {}), valueInputMode: 'USER_ENTERED' };
         }
         break;
+      }
 
       case 'read':
         if (!config.range) {
@@ -816,6 +826,9 @@ export class NodeSpecificValidators {
           message: 'Deletion is permanent. Consider backing up data first',
           suggestion: 'Read the data before deletion to create a backup',
         });
+        break;
+      default:
+        // No specific validation for other operations
         break;
     }
 
@@ -917,7 +930,7 @@ export class NodeSpecificValidators {
     }
 
     switch (operation) {
-      case 'find':
+      case 'find': {
         // Query validation
         const query = config.query as string | undefined;
         if (query) {
@@ -933,6 +946,7 @@ export class NodeSpecificValidators {
           }
         }
         break;
+      }
 
       case 'insert':
         if (!config.fields && !config.documents) {
@@ -964,6 +978,9 @@ export class NodeSpecificValidators {
             fix: 'Add a query to specify which documents to delete',
           });
         }
+        break;
+      default:
+        // No specific validation for other operations
         break;
     }
 

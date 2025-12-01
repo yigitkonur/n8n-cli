@@ -19,7 +19,7 @@ export interface NextAction {
  *    n8n nodes search webhook --save webhook-nodes.json
  */
 export function formatNextActions(actions: NextAction[]): string {
-  if (actions.length === 0) return '';
+  if (actions.length === 0) {return '';}
   
   let output = chalk.cyan('\n⚡ Next steps:\n');
   
@@ -81,6 +81,9 @@ export function generateNextActions(
       if (context.templateId) {
         actions.push({ command: `n8n templates get ${context.templateId}` });
       }
+      break;
+    default:
+      // Unknown command type - no suggestions
       break;
   }
   

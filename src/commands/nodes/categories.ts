@@ -89,10 +89,10 @@ export async function nodesCategoriesCommand(opts: CategoriesOptions): Promise<v
 
     // Summary
     const durationMs = Date.now() - startTime;
-    console.log('\n' + formatSummary({
+    console.log(`\n${  formatSummary({
       total: stats.length,
       durationMs,
-    }));
+    })}`);
 
     // Next actions
     console.log(formatNextActions([
@@ -118,6 +118,6 @@ export async function nodesCategoriesCommand(opts: CategoriesOptions): Promise<v
  * Helper: Capitalize first letter
  */
 function capitalizeFirst(str: string): string {
-  if (!str) return str;
+  if (!str) {return str;}
   return str.charAt(0).toUpperCase() + str.slice(1);
 }

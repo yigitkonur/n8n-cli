@@ -58,7 +58,7 @@ interface AutofixOptions {
  * Parse fix types from comma-separated string
  */
 function parseFixTypes(input: string | undefined): FixType[] | undefined {
-  if (!input) return undefined;
+  if (!input) {return undefined;}
   
   const validTypes: FixType[] = [
     'expression-format',
@@ -116,7 +116,7 @@ function formatFix(fix: FixOperation): string {
   const beforeStr = fix.before === undefined ? '(missing)' : JSON.stringify(fix.before);
   const afterStr = fix.after === undefined ? '(removed)' : JSON.stringify(fix.after);
   
-  output += chalk.red(truncate(beforeStr, 40)) + ' → ' + chalk.green(truncate(afterStr, 40));
+  output += `${chalk.red(truncate(beforeStr, 40))  } → ${  chalk.green(truncate(afterStr, 40))}`;
   
   if (fix.description) {
     output += chalk.dim(`\n     └─ ${fix.description}`);
@@ -129,8 +129,8 @@ function formatFix(fix: FixOperation): string {
  * Truncate string for display
  */
 function truncate(str: string, maxLen: number): string {
-  if (str.length <= maxLen) return str;
-  return str.slice(0, maxLen - 3) + '...';
+  if (str.length <= maxLen) {return str;}
+  return `${str.slice(0, maxLen - 3)  }...`;
 }
 
 /**
@@ -393,7 +393,7 @@ export async function workflowsAutofixCommand(idOrFile: string, opts: AutofixOpt
             metadata: { fixes: result.fixes.length, confidence: opts.confidence }
           });
           console.log(chalk.dim(`  📦 ${backupResult.message}`));
-        } catch (backupError) {
+        } catch {
           // Fall back to file backup if versioning fails
           await maybeBackupWorkflow(original, idOrFile, { noBackup: false });
         }

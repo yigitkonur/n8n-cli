@@ -11,7 +11,7 @@ import { saveToJson, outputJson } from '../../core/formatters/json.js';
 import { icons } from '../../core/formatters/theme.js';
 import { printError, N8nApiError } from '../../utils/errors.js';
 import { formatNextActions } from '../../core/formatters/next-actions.js';
-import type { AuditCategory, AuditReport, AuditSection } from '../../types/n8n-api.js';
+import type { AuditCategory, AuditSection } from '../../types/n8n-api.js';
 
 export interface AuditOptions {
   categories?: string;
@@ -23,7 +23,7 @@ export interface AuditOptions {
 const VALID_CATEGORIES: AuditCategory[] = ['credentials', 'database', 'nodes', 'filesystem', 'instance'];
 
 function parseCategories(categoriesStr?: string): AuditCategory[] | undefined {
-  if (!categoriesStr) return undefined;
+  if (!categoriesStr) {return undefined;}
   
   const categories = categoriesStr.split(',').map(c => c.trim().toLowerCase());
   const valid: AuditCategory[] = [];

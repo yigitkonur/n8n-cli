@@ -47,6 +47,7 @@ export interface OutputContext {
 /**
  * No-op function for suppressed output
  */
+ 
 const noop = () => {};
 
 /**
