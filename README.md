@@ -579,6 +579,9 @@ n8n workflows autofix abc123 --apply --confidence high
 # Filter to specific fix types
 n8n workflows autofix abc123 --fix-types expression-format,webhook-missing-path
 
+# Apply version migration fixes from breaking changes registry
+n8n workflows autofix workflow.json --upgrade-versions --apply
+
 # Save fixed workflow locally
 n8n workflows autofix workflow.json --save fixed.json
 

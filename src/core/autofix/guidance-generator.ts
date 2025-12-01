@@ -23,10 +23,7 @@ import type {
   ActionType,
 } from './types.js';
 
-import {
-  getAllChangesForNode,
-  getBreakingChangesForNode,
-} from './breaking-changes-registry.js';
+import { getAllChangesForNode } from './breaking-changes-registry.js';
 
 /**
  * Generate post-update guidance from a list of applied fixes

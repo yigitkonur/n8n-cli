@@ -466,6 +466,7 @@ workflowsCmd
   .description('Validate a workflow (by ID or local file)')
   .option('-f, --file <path>', 'Path to workflow JSON file')
   .option('--profile <profile>', 'Validation profile: minimal, runtime, ai-friendly, strict', 'runtime')
+  .option('--mode <mode>', 'Validation mode: minimal, operation, full', 'operation')
   .option('--repair', 'Attempt to repair malformed JSON')
   .option('--fix', 'Auto-fix known issues')
   .option('--check-upgrades', 'Check for node version upgrades and breaking changes')
@@ -479,10 +480,15 @@ workflowsCmd
   .option('--json', 'Output as JSON')
   .addHelpText('after', `
 Validation Profiles:
-  minimal      Basic structure checks (fast)
-  runtime      Default: structure + node type validation
-  ai-friendly  Optimized output for LLM processing
-  strict       All checks + best practices warnings
+  minimal      Only missing required errors, security/deprecated warnings
+  runtime      Default: critical runtime errors, no visibility noise
+  ai-friendly  Balanced for AI agents with best practice warnings
+  strict       All checks + enforced error handling
+
+Validation Modes:
+  minimal      Only required + visible properties
+  operation    Default: properties relevant to current resource/operation
+  full         All properties regardless of visibility
 
 Upgrade Checking:
   --check-upgrades       Analyze nodes for available version upgrades
@@ -497,7 +503,8 @@ Version Checking:
    n8n workflows validate workflow.json --fix --save clean.json
 
 Examples:
-  n8n workflows validate workflow.json --check-upgrades
+  n8n workflows validate workflow.json --profile strict --mode full
+  n8n workflows validate workflow.json --profile ai-friendly
   n8n workflows validate workflow.json --check-upgrades --upgrade-severity HIGH --json
 `)
   .action(async (idOrFile, opts) => {
