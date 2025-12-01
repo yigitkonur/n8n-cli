@@ -573,12 +573,17 @@ Post-Update Guidance:
   - Step-by-step verification checklists
   Use --no-guidance to suppress this output.
 
+Version Upgrades:
+  Use --upgrade-versions to apply auto-migratable breaking changes
+  from the bundled registry. This enables 'version-migration' fixes.
+
 Examples:
   n8n workflows autofix abc123                       # Preview all fixes
   n8n workflows autofix abc123 --apply --force       # Apply without prompts
   n8n workflows autofix abc123 --confidence high     # Only high-confidence
   n8n workflows autofix abc123 --fix-types expression-format,webhook-missing-path
   n8n workflows autofix abc123 --max-fixes 10        # Limit to 10 fixes
+  n8n workflows autofix abc123 --upgrade-versions    # Apply version migrations
   n8n workflows autofix abc123 --json                # Machine-readable output
 `)
   .action(async (id, opts) => {

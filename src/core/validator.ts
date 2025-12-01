@@ -52,6 +52,24 @@ export interface ValidateOptions {
   validateExpressions?: boolean;  // Enable expression format validation (default: true)
   /** Pre-computed node type suggestions (Map: invalidType -> suggestions) */
   nodeSuggestions?: Map<string, ValidationIssue['suggestions']>;
+  
+  // Enhanced validation options
+  /** Enable enhanced validation with profiles and modes (default: false for backward compatibility) */
+  enhanced?: boolean;
+  /** Validation mode: 'minimal' | 'operation' | 'full' (default: 'operation') */
+  mode?: ValidationMode;
+  /** Validation profile: 'minimal' | 'runtime' | 'ai-friendly' | 'strict' (default: 'runtime') */
+  profile?: ValidationProfile;
+}
+
+/** Extended validation result with enhanced validation data */
+export interface ExtendedValidationResult extends ValidationResult {
+  /** Enhanced validation results per node (only when enhanced=true) */
+  enhancedResults?: Map<string, EnhancedValidationResult>;
+  /** Aggregated autofix suggestions */
+  autofix?: Record<string, unknown>;
+  /** Aggregated next steps */
+  nextSteps?: string[];
 }
 
 export function validateWorkflowStructure(data: unknown, options?: ValidateOptions): ValidationResult {
