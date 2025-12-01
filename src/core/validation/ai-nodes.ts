@@ -107,23 +107,6 @@ export function buildReverseConnectionMap(
 }
 
 /**
- * Get AI connections TO a specific node
- */
-export function getAIConnections(
-  nodeName: string,
-  reverseConnections: Map<string, ReverseConnection[]>,
-  connectionType?: string
-): ReverseConnection[] {
-  const incoming = reverseConnections.get(nodeName) || [];
-
-  if (connectionType) {
-    return incoming.filter(c => c.type === connectionType);
-  }
-
-  return incoming.filter(c => (AI_CONNECTION_TYPES as readonly string[]).includes(c.type));
-}
-
-/**
  * Check if AI Agent is a streaming target
  * Helper function to determine if an AI Agent is receiving streaming input from Chat Trigger
  */
@@ -616,33 +599,3 @@ export function hasAINodes(workflow: Workflow): boolean {
   });
 }
 
-/**
- * Helper: Get AI node type category
- */
-export function getAINodeCategory(nodeType: string): string | null {
-  const normalized = NodeTypeNormalizer.normalizeToShortForm(nodeType);
-
-  if (normalized === 'nodes-langchain.agent') {return 'AI Agent';}
-  if (normalized === 'nodes-langchain.chatTrigger') {return 'Chat Trigger';}
-  if (normalized === 'nodes-langchain.chainLlm') {return 'Basic LLM Chain';}
-  if (isAIToolSubNode(normalized)) {return 'AI Tool';}
-
-  // Check for AI component nodes
-  if (normalized.startsWith('nodes-langchain.')) {
-    if (normalized.includes('openAi') || normalized.includes('anthropic') || normalized.includes('googleGemini')) {
-      return 'Language Model';
-    }
-    if (normalized.includes('memory') || normalized.includes('buffer')) {
-      return 'Memory';
-    }
-    if (normalized.includes('vectorStore') || normalized.includes('pinecone') || normalized.includes('qdrant')) {
-      return 'Vector Store';
-    }
-    if (normalized.includes('embedding')) {
-      return 'Embeddings';
-    }
-    return 'AI Component';
-  }
-
-  return null;
-}

@@ -88,22 +88,6 @@ export function stripCredentials(workflow: Workflow): Workflow {
 }
 
 /**
- * Get unique credential types required by a workflow.
- * Useful for summary output showing "3 credential types needed".
- *
- * @param workflow - The workflow to analyze
- * @returns Array of unique credential type names
- *
- * @example
- * const types = getUniqueCredentialTypes(workflow);
- * // Returns: ['openAiApi', 'slackApi']
- */
-export function getUniqueCredentialTypes(workflow: Workflow): string[] {
-  const credentials = extractRequiredCredentials(workflow);
-  return [...new Set(credentials.map((c) => c.credentialType))];
-}
-
-/**
  * Group credentials by type with node details.
  * Useful for output like "openAiApi (used by 2 nodes)".
  *

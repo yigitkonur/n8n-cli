@@ -1,0 +1,1067 @@
+{
+  "name": "[14] [event] [application] [material generate]",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "internal/application/generate-materials",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "f1a2b3c4-d5e6-4f7a-8b9c-0d1e2f3a4b5c",
+      "name": "webhook-generate-materials",
+      "position": [
+        0,
+        0
+      ],
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "webhookId": "a2b3c4d5-e6f7-4a8b-9c0d-1e2f3a4b5c6d",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "InternalWebhookKey1",
+          "name": "Internal Webhook Key"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const input = $input.first().json.body;\n\n// Validate required UUIDs\nconst required = ['board_job_id', 'posting_id', 'profile_id'];\nfor (const field of required) {\n  if (!input[field] || !/^[0-9a-f-]{36}$/i.test(input[field])) {\n    throw new Error(`Invalid or missing ${field}`);\n  }\n}\n\nreturn [{\n  json: {\n    board_job_id: input.board_job_id,\n    posting_id: input.posting_id,\n    profile_id: input.profile_id,\n    form_id: input.form_id || null\n  }\n}];"
+      },
+      "id": "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
+      "name": "validate-input",
+      "position": [
+        250,
+        0
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={ \"error\": \"Invalid request - missing required UUIDs\", \"code\": \"VALIDATION_ERROR\" }",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "id": "c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f",
+      "name": "respond-400-validation-error",
+      "position": [
+        250,
+        -200
+      ],
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/posting",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "id",
+              "value": "=eq.{{ $json.posting_id }}"
+            },
+            {
+              "name": "select",
+              "value": "id,title,description_text,company_name,requirements_text"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "d4e5f6a7-b8c9-4d0e-1f2a-3b4c5d6e7f8a",
+      "name": "fetch-job-context",
+      "position": [
+        500,
+        0
+      ],
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "SupabaseServiceRole1",
+          "name": "Supabase account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/board_job",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "id",
+              "value": "=eq.{{ $('validate-input').item.json.board_job_id }}"
+            },
+            {
+              "name": "select",
+              "value": "id,board_status,profile_id"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "e5f6a7b8-c9d0-4e1f-2a3b-4c5d6e7f8a9b",
+      "name": "fetch-board-job",
+      "position": [
+        750,
+        0
+      ],
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "SupabaseServiceRole1",
+          "name": "Supabase account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.mem0.ai/v1/memories/search/",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"query\": \"Experience and skills relevant to: {{ $('fetch-job-context').first().json[0].description_text.substring(0, 500) }}\",\n  \"user_id\": \"{{ $('validate-input').item.json.profile_id }}\",\n  \"limit\": 15\n}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "f6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b0c",
+      "name": "query-mem0-context",
+      "position": [
+        1000,
+        0
+      ],
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "Mem0ApiKey1",
+          "name": "Mem0 API"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "name": "error_code",
+              "type": "string",
+              "value": "MEM0_ERROR"
+            },
+            {
+              "name": "error_message",
+              "type": "string",
+              "value": "Failed to query user context"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a7b8c9d0-e1f2-4a3b-4c5d-6e7f8a9b0c1d",
+      "name": "set-mem0-error",
+      "position": [
+        1000,
+        200
+      ],
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{ \"error\": \"Failed to retrieve user context\", \"code\": \"MEM0_ERROR\" }",
+        "options": {
+          "responseCode": 500
+        }
+      },
+      "id": "b8c9d0e1-f2a3-4b4c-5d6e-7f8a9b0c1d2e",
+      "name": "respond-500-mem0-error",
+      "position": [
+        1250,
+        200
+      ],
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const mem0Response = $('query-mem0-context').first().json;\nconst jobContextArr = $('fetch-job-context').first().json;\nconst jobContext = Array.isArray(jobContextArr) ? jobContextArr[0] : jobContextArr;\nconst input = $('validate-input').first().json;\n\n// Extract facts from Mem0 response\nconst facts = mem0Response.results || [];\nconst factTexts = facts.map(f => f.memory || f.text).filter(Boolean);\n\n// Minimum threshold for quality generation\nconst MIN_FACTS = 3;\nconst isSufficient = factTexts.length >= MIN_FACTS;\n\n// If insufficient, identify what's missing for targeted question\nlet missingContext = null;\nif (!isSufficient) {\n  const description = (jobContext.description_text || '').toLowerCase();\n  const requirements = (jobContext.requirements_text || '').toLowerCase();\n  \n  const criticalSkills = ['security clearance', 'visa', 'work authorization', \n    'kubernetes', 'aws', 'python', 'java', 'leadership', 'management'];\n  \n  for (const skill of criticalSkills) {\n    if ((description.includes(skill) || requirements.includes(skill)) && \n        !factTexts.some(f => f.toLowerCase().includes(skill))) {\n      missingContext = skill;\n      break;\n    }\n  }\n  missingContext = missingContext || 'relevant work experience';\n}\n\nreturn [{\n  json: {\n    is_sufficient: isSufficient,\n    fact_count: factTexts.length,\n    relevant_facts: factTexts.join('\\n\\n'),\n    missing_context: missingContext,\n    board_job_id: input.board_job_id,\n    posting_id: input.posting_id,\n    profile_id: input.profile_id,\n    job_title: jobContext.title,\n    job_description: jobContext.description_text,\n    company_name: jobContext.company_name,\n    requirements: jobContext.requirements_text\n  }\n}];"
+      },
+      "id": "c9d0e1f2-a3b4-4c5d-6e7f-8a9b0c1d2e3f",
+      "name": "evaluate-context-sufficiency",
+      "position": [
+        1250,
+        0
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "sufficient-check-1",
+              "leftValue": "={{ $json.is_sufficient }}",
+              "operator": {
+                "operation": "equals",
+                "type": "boolean"
+              },
+              "rightValue": true
+            }
+          ],
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          }
+        },
+        "options": {}
+      },
+      "id": "d0e1f2a3-b4c5-4d6e-7f8a-9b0c1d2e3f4a",
+      "name": "check-sufficient-context",
+      "position": [
+        1500,
+        0
+      ],
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/quick_question",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"board_job_id\": \"{{ $json.board_job_id }}\",\n  \"question_text\": \"Tell me about your experience with {{ $json.missing_context }}\",\n  \"question_context\": \"This job requires {{ $json.missing_context }} but we need more details from you\",\n  \"question_status\": \"pending\"\n}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "e1f2a3b4-c5d6-4e7f-8a9b-0c1d2e3f4a5b",
+      "name": "create-quick-question",
+      "position": [
+        1750,
+        300
+      ],
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "SupabaseServiceRole1",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/board_job",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "id",
+              "value": "=eq.{{ $('validate-input').item.json.board_job_id }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"board_status\": \"question\"\n}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "f2a3b4c5-d6e7-4f8a-9b0c-1d2e3f4a5b6c",
+      "name": "update-status-question",
+      "position": [
+        2000,
+        300
+      ],
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "SupabaseServiceRole1",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"status\": \"blocked\",\n  \"reason\": \"Quick question created - awaiting user response\",\n  \"question_id\": \"{{ $('create-quick-question').first().json.id }}\"\n}",
+        "options": {
+          "responseCode": 202
+        }
+      },
+      "id": "a3b4c5d6-e7f8-4a9b-0c1d-2e3f4a5b6c7d",
+      "name": "respond-202-question-created",
+      "position": [
+        2250,
+        300
+      ],
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const context = $input.first().json;\n\nconst models = [\n  { model: 'openai/gpt-4o', style: 'precise', name: 'GPT-4o' },\n  { model: 'anthropic/claude-3.5-sonnet', style: 'storytelling', name: 'Claude' },\n  { model: 'google/gemini-2.0-flash', style: 'analytical', name: 'Gemini' },\n  { model: 'x-ai/grok-beta', style: 'bold', name: 'Grok' },\n  { model: 'mistralai/mistral-large', style: 'balanced', name: 'Mistral' }\n];\n\nreturn models.map((m, index) => ({\n  json: {\n    version_number: index + 1,\n    llm_model: m.model,\n    model_name: m.name,\n    style_hint: m.style,\n    board_job_id: context.board_job_id,\n    profile_id: context.profile_id,\n    job_title: context.job_title,\n    job_description: context.job_description,\n    company_name: context.company_name,\n    relevant_facts: context.relevant_facts\n  }\n}));"
+      },
+      "id": "b4c5d6e7-f8a9-4b0c-1d2e-3f4a5b6c7d8e",
+      "name": "prepare-model-configs",
+      "position": [
+        1750,
+        0
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "promptPath": "application-cover-letter-generate",
+        "parametersUi": {
+          "parameter": [
+            {
+              "name": "job_title",
+              "value": "={{ $json.job_title }}"
+            },
+            {
+              "name": "company_name",
+              "value": "={{ $json.company_name }}"
+            },
+            {
+              "name": "job_description",
+              "value": "={{ $json.job_description }}"
+            },
+            {
+              "name": "relevant_facts",
+              "value": "={{ $json.relevant_facts }}"
+            },
+            {
+              "name": "style_hint",
+              "value": "={{ $json.style_hint }}"
+            },
+            {
+              "name": "model",
+              "value": "={{ $json.llm_model }}"
+            }
+          ]
+        }
+      },
+      "id": "c5d6e7f8-a9b0-4c1d-2e3f-4a5b6c7d8e9f",
+      "name": "generate-cover-letter",
+      "position": [
+        2000,
+        0
+      ],
+      "type": "n8n-nodes-latitude.latitude",
+      "typeVersion": 1,
+      "credentials": {
+        "latitudeApi": {
+          "id": "sJhnEc7B36cC3KXC",
+          "name": "Latitude account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "mode": "append",
+        "options": {}
+      },
+      "id": "d6e7f8a9-b0c1-4d2e-3f4a-5b6c7d8e9f0a",
+      "name": "merge-generated-letters",
+      "position": [
+        2250,
+        0
+      ],
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/board_job_document",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"board_job_id\": \"{{ $('validate-input').item.json.board_job_id }}\",\n  \"document_type\": \"cover_letter\",\n  \"is_selected\": true\n}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "e7f8a9b0-c1d2-4e3f-4a5b-6c7d8e9f0a1b",
+      "name": "create-document-container",
+      "position": [
+        2500,
+        0
+      ],
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "SupabaseServiceRole1",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const items = $input.all();\nconst documentResponse = $('create-document-container').first().json;\nconst documentId = Array.isArray(documentResponse) ? documentResponse[0].id : documentResponse.id;\n\n// Get all generated cover letters\nconst generatedItems = $('generate-cover-letter').all();\n\nreturn generatedItems.map((item, index) => ({\n  json: {\n    board_job_document_id: documentId,\n    version_number: index + 1,\n    llm_model: item.json.llm_model || $('prepare-model-configs').all()[index]?.json?.llm_model,\n    content_markdown: item.json.object?.cover_letter || item.json.text || '',\n    edit_type: 'initial'\n  }\n}));"
+      },
+      "id": "f8a9b0c1-d2e3-4f4a-5b6c-7d8e9f0a1b2c",
+      "name": "insert-document-versions",
+      "position": [
+        2750,
+        0
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/document_version",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"board_job_document_id\": \"{{ $json.board_job_document_id }}\",\n  \"version_number\": {{ $json.version_number }},\n  \"llm_model\": \"{{ $json.llm_model }}\",\n  \"content_markdown\": {{ JSON.stringify($json.content_markdown) }},\n  \"edit_type\": \"{{ $json.edit_type }}\"\n}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "a9b0c1d2-e3f4-4a5b-6c7d-8e9f0a1b2c3d",
+      "name": "batch-insert-versions",
+      "position": [
+        3000,
+        0
+      ],
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "SupabaseServiceRole1",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/board_job",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "id",
+              "value": "=eq.{{ $('validate-input').item.json.board_job_id }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"board_status\": \"ready\"\n}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "b0c1d2e3-f4a5-4b6c-7d8e-9f0a1b2c3d4e",
+      "name": "update-status-ready",
+      "position": [
+        3250,
+        0
+      ],
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "SupabaseServiceRole1",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"status\": \"success\",\n  \"board_job_id\": \"{{ $('validate-input').item.json.board_job_id }}\",\n  \"document_id\": \"{{ $('create-document-container').first().json.id || $('create-document-container').first().json[0].id }}\",\n  \"versions_created\": 5,\n  \"board_status\": \"ready\"\n}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+      "name": "respond-200-success",
+      "position": [
+        3500,
+        0
+      ],
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4
+    }
+  ],
+  "connections": {
+    "webhook-generate-materials": {
+      "main": [
+        [
+          {
+            "node": "validate-input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "validate-input": {
+      "main": [
+        [
+          {
+            "node": "fetch-job-context",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "respond-400-validation-error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "fetch-job-context": {
+      "main": [
+        [
+          {
+            "node": "fetch-board-job",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "respond-400-validation-error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "fetch-board-job": {
+      "main": [
+        [
+          {
+            "node": "query-mem0-context",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "respond-400-validation-error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "query-mem0-context": {
+      "main": [
+        [
+          {
+            "node": "evaluate-context-sufficiency",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "set-mem0-error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "set-mem0-error": {
+      "main": [
+        [
+          {
+            "node": "respond-500-mem0-error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "evaluate-context-sufficiency": {
+      "main": [
+        [
+          {
+            "node": "check-sufficient-context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "check-sufficient-context": {
+      "main": [
+        [
+          {
+            "node": "prepare-model-configs",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "create-quick-question",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "create-quick-question": {
+      "main": [
+        [
+          {
+            "node": "update-status-question",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "update-status-question": {
+      "main": [
+        [
+          {
+            "node": "respond-202-question-created",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "prepare-model-configs": {
+      "main": [
+        [
+          {
+            "node": "generate-cover-letter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "generate-cover-letter": {
+      "main": [
+        [
+          {
+            "node": "merge-generated-letters",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "merge-generated-letters": {
+      "main": [
+        [
+          {
+            "node": "create-document-container",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "create-document-container": {
+      "main": [
+        [
+          {
+            "node": "insert-document-versions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "insert-document-versions": {
+      "main": [
+        [
+          {
+            "node": "batch-insert-versions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "batch-insert-versions": {
+      "main": [
+        [
+          {
+            "node": "update-status-ready",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "update-status-ready": {
+      "main": [
+        [
+          {
+            "node": "respond-200-success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {
+    "webhook-generate-materials": [
+      {
+        "headers": {
+          "host": "aura.zeogen.com",
+          "content-type": "application/json",
+          "x-internal-key": "internal-webhook-secret-key-12345",
+          "x-forwarded-for": "10.0.0.1",
+          "x-forwarded-proto": "https"
+        },
+        "params": {},
+        "query": {},
+        "body": {
+          "board_job_id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+          "posting_id": "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
+          "profile_id": "d654bdd6-17ea-4d46-8222-b29ad507b633",
+          "form_id": null
+        },
+        "webhookUrl": "https://aura.zeogen.com/v1/internal/application/generate-materials",
+        "executionMode": "test"
+      }
+    ],
+    "validate-input": [
+      {
+        "board_job_id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+        "posting_id": "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
+        "profile_id": "d654bdd6-17ea-4d46-8222-b29ad507b633",
+        "form_id": null
+      }
+    ],
+    "fetch-job-context": [
+      {
+        "id": "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
+        "title": "Senior Software Engineer",
+        "description_text": "We are looking for a Senior Software Engineer to join our platform team. You will be responsible for designing and building scalable backend services using Python, Kubernetes, and AWS. The ideal candidate has 5+ years of experience with distributed systems and a passion for clean architecture.\n\nResponsibilities:\n- Design and implement microservices\n- Lead technical decisions and code reviews\n- Mentor junior engineers\n- Collaborate with product and design teams",
+        "company_name": "Stripe",
+        "requirements_text": "Requirements:\n- 5+ years of software engineering experience\n- Strong Python and Go skills\n- Experience with Kubernetes and AWS\n- Bachelor's degree in Computer Science or equivalent\n- Excellent communication skills\n\nNice to have:\n- Experience with distributed databases\n- Open source contributions"
+      }
+    ],
+    "fetch-board-job": [
+      {
+        "id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+        "board_status": "working",
+        "profile_id": "d654bdd6-17ea-4d46-8222-b29ad507b633"
+      }
+    ],
+    "query-mem0-context": [
+      {
+        "results": [
+          {
+            "id": "mem-001",
+            "memory": "Senior Software Engineer at Google for 6 years, leading the Search Infrastructure team",
+            "user_id": "d654bdd6-17ea-4d46-8222-b29ad507b633"
+          },
+          {
+            "id": "mem-002",
+            "memory": "Expert in Python with 10 years of experience, author of several open-source libraries",
+            "user_id": "d654bdd6-17ea-4d46-8222-b29ad507b633"
+          },
+          {
+            "id": "mem-003",
+            "memory": "Built and deployed microservices on Kubernetes handling 1M+ requests per second",
+            "user_id": "d654bdd6-17ea-4d46-8222-b29ad507b633"
+          },
+          {
+            "id": "mem-004",
+            "memory": "AWS Certified Solutions Architect with experience in multi-region deployments",
+            "user_id": "d654bdd6-17ea-4d46-8222-b29ad507b633"
+          },
+          {
+            "id": "mem-005",
+            "memory": "MS in Computer Science from Stanford University, focus on distributed systems",
+            "user_id": "d654bdd6-17ea-4d46-8222-b29ad507b633"
+          }
+        ]
+      }
+    ],
+    "evaluate-context-sufficiency": [
+      {
+        "is_sufficient": true,
+        "fact_count": 5,
+        "relevant_facts": "Senior Software Engineer at Google for 6 years, leading the Search Infrastructure team\n\nExpert in Python with 10 years of experience, author of several open-source libraries\n\nBuilt and deployed microservices on Kubernetes handling 1M+ requests per second\n\nAWS Certified Solutions Architect with experience in multi-region deployments\n\nMS in Computer Science from Stanford University, focus on distributed systems",
+        "missing_context": null,
+        "board_job_id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+        "posting_id": "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
+        "profile_id": "d654bdd6-17ea-4d46-8222-b29ad507b633",
+        "job_title": "Senior Software Engineer",
+        "job_description": "We are looking for a Senior Software Engineer to join our platform team. You will be responsible for designing and building scalable backend services using Python, Kubernetes, and AWS. The ideal candidate has 5+ years of experience with distributed systems and a passion for clean architecture.\n\nResponsibilities:\n- Design and implement microservices\n- Lead technical decisions and code reviews\n- Mentor junior engineers\n- Collaborate with product and design teams",
+        "company_name": "Stripe",
+        "requirements": "Requirements:\n- 5+ years of software engineering experience\n- Strong Python and Go skills\n- Experience with Kubernetes and AWS\n- Bachelor's degree in Computer Science or equivalent\n- Excellent communication skills\n\nNice to have:\n- Experience with distributed databases\n- Open source contributions"
+      }
+    ],
+    "prepare-model-configs": [
+      {
+        "version_number": 1,
+        "llm_model": "openai/gpt-4o",
+        "model_name": "GPT-4o",
+        "style_hint": "precise",
+        "board_job_id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+        "profile_id": "d654bdd6-17ea-4d46-8222-b29ad507b633",
+        "job_title": "Senior Software Engineer",
+        "job_description": "We are looking for a Senior Software Engineer to join our platform team...",
+        "company_name": "Stripe",
+        "relevant_facts": "Senior Software Engineer at Google for 6 years..."
+      },
+      {
+        "version_number": 2,
+        "llm_model": "anthropic/claude-3.5-sonnet",
+        "model_name": "Claude",
+        "style_hint": "storytelling",
+        "board_job_id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+        "profile_id": "d654bdd6-17ea-4d46-8222-b29ad507b633",
+        "job_title": "Senior Software Engineer",
+        "job_description": "We are looking for a Senior Software Engineer to join our platform team...",
+        "company_name": "Stripe",
+        "relevant_facts": "Senior Software Engineer at Google for 6 years..."
+      },
+      {
+        "version_number": 3,
+        "llm_model": "google/gemini-2.0-flash",
+        "model_name": "Gemini",
+        "style_hint": "analytical",
+        "board_job_id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+        "profile_id": "d654bdd6-17ea-4d46-8222-b29ad507b633",
+        "job_title": "Senior Software Engineer",
+        "job_description": "We are looking for a Senior Software Engineer to join our platform team...",
+        "company_name": "Stripe",
+        "relevant_facts": "Senior Software Engineer at Google for 6 years..."
+      },
+      {
+        "version_number": 4,
+        "llm_model": "x-ai/grok-beta",
+        "model_name": "Grok",
+        "style_hint": "bold",
+        "board_job_id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+        "profile_id": "d654bdd6-17ea-4d46-8222-b29ad507b633",
+        "job_title": "Senior Software Engineer",
+        "job_description": "We are looking for a Senior Software Engineer to join our platform team...",
+        "company_name": "Stripe",
+        "relevant_facts": "Senior Software Engineer at Google for 6 years..."
+      },
+      {
+        "version_number": 5,
+        "llm_model": "mistralai/mistral-large",
+        "model_name": "Mistral",
+        "style_hint": "balanced",
+        "board_job_id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+        "profile_id": "d654bdd6-17ea-4d46-8222-b29ad507b633",
+        "job_title": "Senior Software Engineer",
+        "job_description": "We are looking for a Senior Software Engineer to join our platform team...",
+        "company_name": "Stripe",
+        "relevant_facts": "Senior Software Engineer at Google for 6 years..."
+      }
+    ],
+    "generate-cover-letter": [
+      {
+        "text": "Dear Hiring Manager,\n\nI am writing to express my strong interest in the Senior Software Engineer position at Stripe...",
+        "object": {
+          "cover_letter": "Dear Hiring Manager,\n\nI am writing to express my strong interest in the Senior Software Engineer position at Stripe. With over 6 years of experience leading infrastructure teams at Google and a proven track record of building scalable distributed systems, I am confident I would be a valuable addition to your platform team.\n\nDuring my tenure at Google, I led the Search Infrastructure team where I architected and deployed microservices handling over 1 million requests per second on Kubernetes. My expertise in Python spans 10 years, during which I've authored several open-source libraries that are widely used in the industry. Additionally, I hold an AWS Certified Solutions Architect certification and have hands-on experience with multi-region deployments.\n\nMy academic background includes an MS in Computer Science from Stanford University with a focus on distributed systems, which has given me a strong theoretical foundation to complement my practical experience.\n\nI am particularly excited about Stripe's mission to increase the GDP of the internet and believe my skills in building robust, scalable backend services align perfectly with your team's needs.\n\nThank you for considering my application. I look forward to discussing how I can contribute to Stripe's continued success.\n\nBest regards,\nSarah Chen"
+        },
+        "usage": {
+          "inputTokens": 500,
+          "outputTokens": 300,
+          "totalTokens": 800
+        },
+        "llm_model": "openai/gpt-4o"
+      },
+      {
+        "text": "Dear Stripe Team,\n\nLet me tell you a story about building systems at scale...",
+        "object": {
+          "cover_letter": "Dear Stripe Team,\n\nLet me tell you a story about building systems at scale. Six years ago, I joined Google's Search Infrastructure team with a simple goal: make search faster and more reliable for billions of users. What followed was a journey of architecting systems that now handle millions of requests every second.\n\nBut this letter isn't just about what I've built\u2014it's about what I want to build next. When I read about Stripe's platform team and your commitment to developer experience, I saw an opportunity to bring my passion for clean architecture and scalable systems to a team that shares my values.\n\nMy Python expertise, Kubernetes experience, and AWS certifications are tools I've honed over a decade. But more importantly, I've learned how to mentor engineers, lead technical decisions, and translate complex distributed systems concepts into maintainable code.\n\nI would love the opportunity to discuss how my experience can help Stripe continue to revolutionize payments infrastructure.\n\nWarmly,\nSarah Chen"
+        },
+        "usage": {
+          "inputTokens": 500,
+          "outputTokens": 280,
+          "totalTokens": 780
+        },
+        "llm_model": "anthropic/claude-3.5-sonnet"
+      },
+      {
+        "text": "Dear Hiring Team,\n\nQuantifiable impact: 6 years at Google, 1M+ RPS systems, 10 years Python...",
+        "object": {
+          "cover_letter": "Dear Hiring Team,\n\n**Key Qualifications Match:**\n- \u2705 5+ years software engineering: 6 years at Google (Search Infrastructure Lead)\n- \u2705 Python expertise: 10 years, open-source library author\n- \u2705 Kubernetes: Production systems handling 1M+ RPS\n- \u2705 AWS: Certified Solutions Architect, multi-region deployments\n- \u2705 Education: MS Computer Science, Stanford (Distributed Systems focus)\n\n**Relevant Achievements:**\n1. Architected microservices infrastructure scaling to 1M+ requests/second\n2. Led technical decisions for Google's Search Infrastructure team\n3. Mentored 5+ junior engineers to senior-level promotions\n\n**Why Stripe:**\nYour platform team's focus on developer experience and scalable backend services aligns with my expertise in building maintainable, high-performance systems.\n\nI am ready to bring this analytical approach and proven track record to your team.\n\nBest regards,\nSarah Chen"
+        },
+        "usage": {
+          "inputTokens": 500,
+          "outputTokens": 250,
+          "totalTokens": 750
+        },
+        "llm_model": "google/gemini-2.0-flash"
+      },
+      {
+        "text": "Hey Stripe,\n\nLet's cut to the chase\u2014I'm the engineer you need...",
+        "object": {
+          "cover_letter": "Hey Stripe,\n\nLet's cut to the chase\u2014I'm the engineer you need.\n\nI've spent 6 years at Google building systems that don't break. My team's infrastructure handles over a million requests per second, and I've personally architected the Kubernetes deployments that made it possible. Python? Been writing it for a decade. AWS? Certified and battle-tested across multiple regions.\n\nBut here's what really matters: I know how to ship. I've led technical decisions, mentored engineers from junior to senior, and collaborated with product teams to turn ideas into production-ready code.\n\nStripe is doing something that actually matters\u2014building the economic infrastructure of the internet. I want in.\n\nLet's talk.\n\nSarah Chen"
+        },
+        "usage": {
+          "inputTokens": 500,
+          "outputTokens": 200,
+          "totalTokens": 700
+        },
+        "llm_model": "x-ai/grok-beta"
+      },
+      {
+        "text": "Dear Stripe Recruitment Team,\n\nI am pleased to submit my application...",
+        "object": {
+          "cover_letter": "Dear Stripe Recruitment Team,\n\nI am pleased to submit my application for the Senior Software Engineer position on your platform team. My background combines deep technical expertise with leadership experience that I believe would be valuable to your organization.\n\nAs a Senior Software Engineer at Google for the past six years, I have led the Search Infrastructure team in designing and deploying microservices that handle over one million requests per second. My technical skills include:\n\n\u2022 Python development (10 years of professional experience)\n\u2022 Kubernetes orchestration for large-scale deployments\n\u2022 AWS architecture (Solutions Architect certified)\n\u2022 Distributed systems design (MS from Stanford)\n\nBeyond technical execution, I take pride in mentoring team members and leading code reviews that maintain high standards while fostering growth.\n\nStripe's commitment to building excellent developer tools resonates with my own values around clean architecture and user-centric design. I would welcome the opportunity to contribute to your platform team.\n\nThank you for your consideration.\n\nSincerely,\nSarah Chen"
+        },
+        "usage": {
+          "inputTokens": 500,
+          "outputTokens": 270,
+          "totalTokens": 770
+        },
+        "llm_model": "mistralai/mistral-large"
+      }
+    ],
+    "create-document-container": [
+      {
+        "id": "doc-001-abcd-efgh-ijkl",
+        "board_job_id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+        "document_type": "cover_letter",
+        "is_selected": true,
+        "created_at": "2024-11-26T12:00:00Z"
+      }
+    ],
+    "insert-document-versions": [
+      {
+        "board_job_document_id": "doc-001-abcd-efgh-ijkl",
+        "version_number": 1,
+        "llm_model": "openai/gpt-4o",
+        "content_markdown": "Dear Hiring Manager,\n\nI am writing to express my strong interest in the Senior Software Engineer position at Stripe...",
+        "edit_type": "initial"
+      },
+      {
+        "board_job_document_id": "doc-001-abcd-efgh-ijkl",
+        "version_number": 2,
+        "llm_model": "anthropic/claude-3.5-sonnet",
+        "content_markdown": "Dear Stripe Team,\n\nLet me tell you a story about building systems at scale...",
+        "edit_type": "initial"
+      },
+      {
+        "board_job_document_id": "doc-001-abcd-efgh-ijkl",
+        "version_number": 3,
+        "llm_model": "google/gemini-2.0-flash",
+        "content_markdown": "Dear Hiring Team,\n\n**Key Qualifications Match:**...",
+        "edit_type": "initial"
+      },
+      {
+        "board_job_document_id": "doc-001-abcd-efgh-ijkl",
+        "version_number": 4,
+        "llm_model": "x-ai/grok-beta",
+        "content_markdown": "Hey Stripe,\n\nLet's cut to the chase\u2014I'm the engineer you need...",
+        "edit_type": "initial"
+      },
+      {
+        "board_job_document_id": "doc-001-abcd-efgh-ijkl",
+        "version_number": 5,
+        "llm_model": "mistralai/mistral-large",
+        "content_markdown": "Dear Stripe Recruitment Team,\n\nI am pleased to submit my application...",
+        "edit_type": "initial"
+      }
+    ],
+    "batch-insert-versions": [
+      {
+        "id": "ver-001",
+        "board_job_document_id": "doc-001-abcd-efgh-ijkl",
+        "version_number": 1,
+        "llm_model": "openai/gpt-4o",
+        "edit_type": "initial"
+      }
+    ],
+    "update-status-ready": [
+      {
+        "id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+        "board_status": "ready"
+      }
+    ],
+    "respond-200-success": [
+      {
+        "status": "success",
+        "board_job_id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+        "document_id": "doc-001-abcd-efgh-ijkl",
+        "versions_created": 5,
+        "board_status": "ready"
+      }
+    ]
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "d660c8d1ec82335c55c8ab9e582b0038fa983ea7127f17cbb5c7a54c713aa590"
+  }
+}

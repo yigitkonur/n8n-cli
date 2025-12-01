@@ -88,54 +88,6 @@ export function isQuiet(opts?: GlobalOptions): boolean {
 }
 
 /**
- * Create an output context based on global options
- * Use this in command handlers for consistent output handling
- */
-export function createOutputContext(opts?: GlobalOptions): OutputContext {
-  const verbose = isVerbose(opts);
-  const quiet = isQuiet(opts);
-  const colors = shouldUseColor(opts);
-  
-  // Use chalk directly - colors are disabled globally via disableColors() if needed
-  // In Chalk v5, we can't create new instances, so we rely on global level
-  const chalkInstance = chalk;
-  
-  return {
-    verbose,
-    quiet,
-    colors,
-    chalk: chalkInstance,
-    
-    // Standard log (respects quiet mode)
-    log: quiet ? noop : (...args: unknown[]) => console.log(...args),
-    
-    // Error log (always prints)
-    error: (...args: unknown[]) => console.error(...args),
-    
-    // Debug log (only in verbose mode)
-    debug: verbose 
-      ? (message: string, ...args: unknown[]) => {
-          const timestamp = new Date().toISOString().split('T')[1].replace('Z', '');
-          console.warn(chalkInstance.dim(`[${timestamp}] ${message}`), ...args);
-        }
-      : noop,
-    
-    // Info log (respects quiet mode)
-    info: quiet 
-      ? noop 
-      : (message: string) => console.log(chalkInstance.blue(`ℹ ${message}`)),
-    
-    // Success log (respects quiet mode)
-    success: quiet 
-      ? noop 
-      : (message: string) => console.log(chalkInstance.green(`✓ ${message}`)),
-    
-    // Warning log (always prints)
-    warn: (message: string) => console.warn(chalkInstance.yellow(`⚠ ${message}`)),
-  };
-}
-
-/**
  * Disable colors globally
  * Call this early in CLI startup if --no-color is set
  */

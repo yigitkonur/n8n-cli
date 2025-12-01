@@ -1,0 +1,921 @@
+{
+  "name": "[22] [webhook] [referral] [claim]",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "referral/claim",
+        "authentication": "jwtAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "3516869c-837e-4f63-ad6a-6ce88737d07e",
+      "name": "webhook-referral-claim",
+      "position": [
+        0,
+        0
+      ],
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "webhookId": "f22a0001-refe-4a01-b001-000000000002",
+      "credentials": {
+        "jwtAuth": {
+          "id": "Y81uL2Ni4CoBivqb",
+          "name": "Supabase JWT"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const input = $input.item.json;\nconst referralCode = input.body?.referral_code;\nconst referredProfileId = input.jwtPayload?.sub;\nconst userAgent = input.headers?.['user-agent'] || 'unknown';\n\n// Validate JWT payload\nif (!referredProfileId) {\n  throw new Error('AUTH_ERROR: Authentication required');\n}\n\n// Validate referral code exists\nif (!referralCode) {\n  throw new Error('VALIDATION_ERROR: Referral code required');\n}\n\n// Validate referral code format (12-char lowercase hex)\nif (!/^[a-f0-9]{12}$/i.test(referralCode)) {\n  throw new Error('VALIDATION_ERROR: Invalid referral code format');\n}\n\nreturn {\n  json: {\n    referral_code: referralCode.toLowerCase(),\n    referred_profile_id: referredProfileId,\n    user_agent: userAgent\n  }\n};"
+      },
+      "id": "bb5631d5-192f-4d0d-ac97-3bdd8ddb869b",
+      "name": "validate-input",
+      "position": [
+        250,
+        0
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "auth-error",
+                    "leftValue": "={{ $json.message }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    },
+                    "rightValue": "AUTH_ERROR"
+                  }
+                ],
+                "options": {
+                  "version": 2,
+                  "leftValue": "",
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
+                }
+              },
+              "renameOutput": true,
+              "outputKey": "auth_error"
+            }
+          ]
+        },
+        "mode": "rules",
+        "options": {
+          "fallbackOutput": "validation_error"
+        }
+      },
+      "id": "db37d224-c395-422e-93ad-33ad304b3796",
+      "name": "route-validation-error",
+      "position": [
+        500,
+        250
+      ],
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\"error\": \"Authentication required\", \"code\": \"AUTH_ERROR\"}",
+        "options": {
+          "responseCode": 401
+        }
+      },
+      "id": "98e6d1a1-1305-4a91-baca-8c0e551ea70c",
+      "name": "respond-401-unauthorized",
+      "position": [
+        750,
+        200
+      ],
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"error\": $json.message?.replace('VALIDATION_ERROR: ', '') || 'Invalid request', \"code\": \"VALIDATION_ERROR\" } }}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "id": "8290ccd0-3f4f-409c-b8b1-b8b8011bb0dd",
+      "name": "respond-400-validation-error",
+      "position": [
+        750,
+        400
+      ],
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "core.profile",
+        "returnAll": false,
+        "limit": 1,
+        "filterType": "string",
+        "filterString": "={{ 'referral_code=eq.' + $json.referral_code }}"
+      },
+      "id": "cf851acf-72f1-454e-aa87-01f4304d0fba",
+      "name": "lookup-referrer-by-code",
+      "position": [
+        500,
+        0
+      ],
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "credentials": {
+        "supabaseApi": {
+          "id": "SupabaseServiceRole1",
+          "name": "Supabase account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "found",
+              "leftValue": "={{ $json.id }}",
+              "operator": {
+                "type": "string",
+                "operation": "isNotEmpty"
+              },
+              "rightValue": ""
+            }
+          ],
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          }
+        }
+      },
+      "id": "92c854f1-ab8d-4405-ab4b-f254c8ad34aa",
+      "name": "check-referrer-found",
+      "position": [
+        750,
+        0
+      ],
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\"error\": \"Referral code not found\", \"code\": \"INVALID_CODE\"}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "id": "02cb617b-c39c-4a61-9fdf-85a36e2a9ddb",
+      "name": "respond-400-invalid-code",
+      "position": [
+        1000,
+        250
+      ],
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const referrerId = $json.id;\nconst referredId = $('validate-input').item.json.referred_profile_id;\n\nif (referrerId === referredId) {\n  throw new Error('SELF_REFERRAL: Cannot refer yourself');\n}\n\n// Calculate start of month for next step\nconst now = new Date();\nconst startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();\n\nreturn {\n  json: {\n    referrer_id: referrerId,\n    referrer_name: $json.full_name || 'Unknown',\n    referred_profile_id: referredId,\n    referral_code: $('validate-input').item.json.referral_code,\n    user_agent: $('validate-input').item.json.user_agent,\n    start_of_month: startOfMonth\n  }\n};"
+      },
+      "id": "c5b5f946-2114-4a53-930c-be8a35c94148",
+      "name": "check-self-referral",
+      "position": [
+        1000,
+        0
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\"error\": \"Cannot refer yourself\", \"code\": \"SELF_REFERRAL\"}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "id": "17f35eee-ddd6-45f1-88bd-5b1e0504c4b4",
+      "name": "respond-400-self-referral",
+      "position": [
+        1250,
+        250
+      ],
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "core.referral_reward",
+        "returnAll": false,
+        "limit": 1,
+        "filterType": "string",
+        "filterString": "={{ 'referrer_profile_id=eq.' + $json.referrer_id + '&' + 'referred_profile_id=eq.' + $json.referred_profile_id + '&' + reward_type=eq.signup }}"
+      },
+      "id": "dda9bdd3-334b-4e8e-b321-f0cc55908add",
+      "name": "check-duplicate-claim",
+      "position": [
+        1250,
+        0
+      ],
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "credentials": {
+        "supabaseApi": {
+          "id": "SupabaseServiceRole1",
+          "name": "Supabase account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "already-claimed",
+              "leftValue": "={{ $json.id }}",
+              "operator": {
+                "type": "string",
+                "operation": "isNotEmpty"
+              },
+              "rightValue": ""
+            }
+          ],
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          }
+        }
+      },
+      "id": "db4d6863-e87d-49ad-b36f-609a469f4d21",
+      "name": "if-already-claimed",
+      "position": [
+        1500,
+        0
+      ],
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"status\": \"success\", \"already_claimed\": true, \"message\": \"Referral already claimed\", \"reward_id\": $json.id } }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "6d02f28d-fb2c-4342-9e7b-f0f299bf330c",
+      "name": "respond-200-already-claimed",
+      "position": [
+        1750,
+        250
+      ],
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "core.referral_reward",
+        "returnAll": false,
+        "limit": 10,
+        "filterType": "string",
+        "filterString": "={{ 'referrer_profile_id=eq.' + $('check-self-referral').item.json.referrer_id + '&' + 'created_at=gte.' + $('check-self-referral').item.json.start_of_month }}"
+      },
+      "id": "117266f7-9f23-472d-8ddc-c5971c38fd65",
+      "name": "check-monthly-cap",
+      "position": [
+        1750,
+        0
+      ],
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "credentials": {
+        "supabaseApi": {
+          "id": "SupabaseServiceRole1",
+          "name": "Supabase account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "cap-reached",
+              "leftValue": "={{ $input.all().length }}",
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              },
+              "rightValue": 10
+            }
+          ],
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          }
+        }
+      },
+      "id": "af0cd779-32b9-48c5-bae4-5e28145f5bcd",
+      "name": "if-cap-exceeded",
+      "position": [
+        2000,
+        0
+      ],
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"error\": \"Monthly referral limit reached (10/month)\", \"code\": \"RATE_LIMITED\", \"retry_after\": Math.ceil((new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1) - new Date()) / 1000) } }}",
+        "options": {
+          "responseCode": 429
+        }
+      },
+      "id": "b8e72691-0a27-41d4-a9d7-cfcdddd03925",
+      "name": "respond-429-rate-limited",
+      "position": [
+        2250,
+        250
+      ],
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "tableId": "core.referral_reward",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldName": "referrer_profile_id",
+              "fieldValue": "={{ $('check-self-referral').item.json.referrer_id }}"
+            },
+            {
+              "fieldName": "referred_profile_id",
+              "fieldValue": "={{ $('check-self-referral').item.json.referred_profile_id }}"
+            },
+            {
+              "fieldName": "reward_type",
+              "fieldValue": "signup"
+            },
+            {
+              "fieldName": "credit_type",
+              "fieldValue": "apply"
+            },
+            {
+              "fieldName": "credits_awarded",
+              "fieldValue": "10"
+            }
+          ]
+        }
+      },
+      "id": "fd1a4790-f91f-447b-a160-13513813e1f7",
+      "name": "insert-referral-reward",
+      "position": [
+        2250,
+        0
+      ],
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "credentials": {
+        "supabaseApi": {
+          "id": "SupabaseServiceRole1",
+          "name": "Supabase account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\"error\": \"Failed to process referral\", \"code\": \"DATABASE_ERROR\"}",
+        "options": {
+          "responseCode": 500
+        }
+      },
+      "id": "c8045c7f-8799-4b89-9c1e-91f783fc5e2a",
+      "name": "respond-500-database-error",
+      "position": [
+        2500,
+        250
+      ],
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "tableId": "core.credit_transaction",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldName": "profile_id",
+              "fieldValue": "={{ $('check-self-referral').item.json.referrer_id }}"
+            },
+            {
+              "fieldName": "credit_type",
+              "fieldValue": "apply"
+            },
+            {
+              "fieldName": "transaction_type",
+              "fieldValue": "referral_bonus"
+            },
+            {
+              "fieldName": "amount",
+              "fieldValue": "10"
+            },
+            {
+              "fieldName": "related_entity_type",
+              "fieldValue": "referral"
+            },
+            {
+              "fieldName": "related_entity_id",
+              "fieldValue": "={{ $('insert-referral-reward').item.json.id }}"
+            },
+            {
+              "fieldName": "description",
+              "fieldValue": "={{ 'Referral signup bonus +10 Apply | UA: ' + $('check-self-referral').item.json.user_agent.substring(0, 100) }}"
+            }
+          ]
+        }
+      },
+      "id": "c08680d9-e3ec-43c3-b6be-ff5271ddebcc",
+      "name": "insert-credit-transaction",
+      "position": [
+        2500,
+        0
+      ],
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "credentials": {
+        "supabaseApi": {
+          "id": "SupabaseServiceRole1",
+          "name": "Supabase account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\"error\": \"Failed to grant credits\", \"code\": \"LEDGER_ERROR\"}",
+        "options": {
+          "responseCode": 500
+        }
+      },
+      "id": "dcecb8f7-dc2a-42b0-8f76-b277d70c6b53",
+      "name": "respond-500-ledger-error",
+      "position": [
+        2750,
+        250
+      ],
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "core.referral_reward",
+        "updateKey": "id",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldName": "id",
+              "fieldValue": "={{ $('insert-referral-reward').item.json.id }}"
+            },
+            {
+              "fieldName": "transaction_id",
+              "fieldValue": "={{ $json.id }}"
+            }
+          ]
+        }
+      },
+      "id": "1b56260a-9d62-45c8-8c20-5e7232e48690",
+      "name": "update-referral-reward-transaction",
+      "position": [
+        2750,
+        0
+      ],
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "credentials": {
+        "supabaseApi": {
+          "id": "SupabaseServiceRole1",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "core.profile",
+        "updateKey": "id",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldName": "id",
+              "fieldValue": "={{ $('check-self-referral').item.json.referred_profile_id }}"
+            },
+            {
+              "fieldName": "referred_by_profile_id",
+              "fieldValue": "={{ $('check-self-referral').item.json.referrer_id }}"
+            }
+          ]
+        }
+      },
+      "id": "c89ac4b8-3fd9-41b1-9dea-7c44fa03f02e",
+      "name": "update-referred-profile",
+      "position": [
+        3000,
+        0
+      ],
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "credentials": {
+        "supabaseApi": {
+          "id": "SupabaseServiceRole1",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "name": "status",
+              "type": "string",
+              "value": "success"
+            },
+            {
+              "name": "reward_id",
+              "type": "string",
+              "value": "={{ $('insert-referral-reward').item.json.id }}"
+            },
+            {
+              "name": "transaction_id",
+              "type": "string",
+              "value": "={{ $('insert-credit-transaction').item.json.id }}"
+            },
+            {
+              "name": "referrer_id",
+              "type": "string",
+              "value": "={{ $('check-self-referral').item.json.referrer_id }}"
+            },
+            {
+              "name": "credits_awarded",
+              "type": "number",
+              "value": "10"
+            },
+            {
+              "name": "balance_after",
+              "type": "number",
+              "value": "={{ $('insert-credit-transaction').item.json.balance_after }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "7c6af984-5e15-4778-b0d6-47b1ab05bf73",
+      "name": "set-success-response",
+      "position": [
+        3250,
+        0
+      ],
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "88752842-aee0-4e01-a9c5-a844542afc67",
+      "name": "respond-200-success",
+      "position": [
+        3500,
+        0
+      ],
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4
+    }
+  ],
+  "connections": {
+    "webhook-referral-claim": {
+      "main": [
+        [
+          {
+            "node": "validate-input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "validate-input": {
+      "main": [
+        [
+          {
+            "node": "lookup-referrer-by-code",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "route-validation-error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "route-validation-error": {
+      "main": [
+        [
+          {
+            "node": "respond-401-unauthorized",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "respond-400-validation-error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "lookup-referrer-by-code": {
+      "main": [
+        [
+          {
+            "node": "check-referrer-found",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "check-referrer-found": {
+      "main": [
+        [
+          {
+            "node": "check-self-referral",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "respond-400-invalid-code",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "check-self-referral": {
+      "main": [
+        [
+          {
+            "node": "check-duplicate-claim",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "respond-400-self-referral",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "check-duplicate-claim": {
+      "main": [
+        [
+          {
+            "node": "if-already-claimed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "if-already-claimed": {
+      "main": [
+        [
+          {
+            "node": "respond-200-already-claimed",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "check-monthly-cap",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "check-monthly-cap": {
+      "main": [
+        [
+          {
+            "node": "if-cap-exceeded",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "if-cap-exceeded": {
+      "main": [
+        [
+          {
+            "node": "respond-429-rate-limited",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "insert-referral-reward",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "insert-referral-reward": {
+      "main": [
+        [
+          {
+            "node": "insert-credit-transaction",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "respond-500-database-error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "insert-credit-transaction": {
+      "main": [
+        [
+          {
+            "node": "update-referral-reward-transaction",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "respond-500-ledger-error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "update-referral-reward-transaction": {
+      "main": [
+        [
+          {
+            "node": "update-referred-profile",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "update-referred-profile": {
+      "main": [
+        [
+          {
+            "node": "set-success-response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "set-success-response": {
+      "main": [
+        [
+          {
+            "node": "respond-200-success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {
+    "webhook-referral-claim": [
+      {
+        "body": {
+          "referral_code": "a3f2c1d4e5b6"
+        },
+        "jwtPayload": {
+          "sub": "referred-user-uuid",
+          "email": "newuser@example.com"
+        },
+        "headers": {
+          "user-agent": "Aura/1.0 iOS 17.0"
+        }
+      }
+    ],
+    "validate-input": [
+      {
+        "referral_code": "a3f2c1d4e5b6",
+        "referred_profile_id": "referred-user-uuid",
+        "user_agent": "Aura/1.0 iOS 17.0"
+      }
+    ],
+    "lookup-referrer-by-code": [
+      {
+        "id": "referrer-user-uuid",
+        "referral_code": "a3f2c1d4e5b6",
+        "full_name": "Referrer Name"
+      }
+    ],
+    "check-self-referral": [
+      {
+        "referrer_id": "referrer-user-uuid",
+        "referrer_name": "Referrer Name",
+        "referred_profile_id": "referred-user-uuid",
+        "start_of_month": "2024-11-01T00:00:00.000Z"
+      }
+    ],
+    "check-duplicate-claim": [],
+    "check-monthly-cap": [
+      {
+        "id": "reward-1"
+      },
+      {
+        "id": "reward-2"
+      }
+    ],
+    "insert-referral-reward": [
+      {
+        "id": "reward-new-uuid"
+      }
+    ],
+    "insert-credit-transaction": [
+      {
+        "id": "txn-new-uuid",
+        "balance_after": 150
+      }
+    ]
+  }
+}

@@ -1,0 +1,566 @@
+{
+  "name": "[03] [webhook] [document] [cv extract]",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "resume-to-markdown",
+        "authentication": "none",
+        "responseMode": "responseNode",
+        "options": {
+          "rawBody": true
+        }
+      },
+      "id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+      "name": "webhook-resume-to-markdown",
+      "position": [
+        -1900,
+        -32
+      ],
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "webhookId": "d6e7f8a9-b0c1-4d2e-3f4a-5b6c7d8e9f0a",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const input = $input.item;\nconst binary = input.binary?.data;\n\nif (!binary) {\n  throw new Error('No file provided in request');\n}\n\nconst allowedMimes = [\n  'image/jpeg', 'image/png', 'image/heic', 'image/heif',\n  'application/pdf', 'application/msword',\n  'application/vnd.openxmlformats-officedocument.wordprocessingml.document'\n];\n\nif (!allowedMimes.includes(binary.mimeType)) {\n  throw new Error(`Unsupported file format: ${binary.mimeType}`);\n}\n\nreturn {\n  json: {\n    fileName: binary.fileName,\n    mimeType: binary.mimeType,\n    clientIp: input.json.headers?.['x-forwarded-for']?.split(',')[0]?.trim()\n              || input.json.headers?.['x-real-ip']\n              || 'unknown'\n  },\n  binary: input.binary\n};"
+      },
+      "id": "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
+      "name": "validate-file-input",
+      "position": [
+        -1676,
+        -32
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"error\": $json.message || 'Invalid file', \"code\": \"FILE_ERROR\" } }}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "id": "c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f",
+      "name": "respond-400-file-error",
+      "position": [
+        -1452,
+        168
+      ],
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const staticData = $getWorkflowStaticData('global');\nconst now = Date.now();\nconst HOUR_MS = 3600000;\nconst MAX_REQUESTS_PER_HOUR = 5;\n\n// Initialize rate limit store\nif (!staticData.rateLimits) {\n  staticData.rateLimits = {};\n}\n\nconst clientIp = $input.item.json.clientIp;\nconst key = `cv-extract:${clientIp}`;\n\n// Clean expired entries (older than 1 hour)\nfor (const [k, v] of Object.entries(staticData.rateLimits)) {\n  if (now - v.windowStart > HOUR_MS) {\n    delete staticData.rateLimits[k];\n  }\n}\n\n// Check and update rate limit\nlet record = staticData.rateLimits[key];\nif (!record || now - record.windowStart > HOUR_MS) {\n  record = { count: 0, windowStart: now };\n}\n\nrecord.count++;\nstaticData.rateLimits[key] = record;\n\nif (record.count > MAX_REQUESTS_PER_HOUR) {\n  const retryAfter = Math.ceil((record.windowStart + HOUR_MS - now) / 1000);\n  throw new Error(`RATE_LIMITED:${retryAfter}`);\n}\n\nreturn $input.item;"
+      },
+      "id": "d4e5f6a7-b8c9-4d0e-1f2a-3b4c5d6e7f8a",
+      "name": "check-rate-limit",
+      "position": [
+        -1452,
+        -32
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"error\": \"Rate limit exceeded. Try again later.\", \"code\": \"RATE_LIMITED\", \"retryAfter\": parseInt($json.message?.split(':')[1]) || 3600 } }}",
+        "options": {
+          "responseCode": 429,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Retry-After",
+                "value": "={{ $json.message?.split(':')[1] || '3600' }}"
+              }
+            ]
+          }
+        }
+      },
+      "id": "e5f6a7b8-c9d0-4e1f-2a3b-4c5d6e7f8a9b",
+      "name": "respond-429-rate-limited",
+      "position": [
+        -1228,
+        168
+      ],
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const input = $input.item;\nconst binary = input.binary.data;\nconst mimeType = input.json.mimeType;\n\n// Size limits (bytes)\nconst SIZE_LIMITS = {\n  'image/jpeg': 10 * 1024 * 1024,  // 10MB\n  'image/png': 10 * 1024 * 1024,\n  'image/heic': 10 * 1024 * 1024,\n  'image/heif': 10 * 1024 * 1024,\n  'application/pdf': 25 * 1024 * 1024  // 25MB\n};\n\n// Magic bytes (hex prefixes)\nconst MAGIC_BYTES = {\n  'image/jpeg': ['ffd8ff'],\n  'image/png': ['89504e47'],\n  'application/pdf': ['25504446']\n};\n\n// Decode first 8 bytes for magic check\nconst base64Data = binary.data;\nconst rawBytes = Buffer.from(base64Data, 'base64');\nconst fileSize = rawBytes.length;\n\n// Check size limit\nconst maxSize = SIZE_LIMITS[mimeType] || 10 * 1024 * 1024;\nif (fileSize > maxSize) {\n  throw new Error(`File too large: ${(fileSize / 1024 / 1024).toFixed(1)}MB exceeds ${(maxSize / 1024 / 1024)}MB limit`);\n}\n\n// Check magic bytes for known types\nconst magicPatterns = MAGIC_BYTES[mimeType];\nif (magicPatterns) {\n  const headerHex = rawBytes.slice(0, 4).toString('hex').toLowerCase();\n  const isValid = magicPatterns.some(pattern => headerHex.startsWith(pattern));\n  if (!isValid) {\n    throw new Error('File content does not match declared type');\n  }\n}\n\nreturn {\n  json: { ...input.json, fileSize },\n  binary: input.binary\n};"
+      },
+      "id": "f6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b0c",
+      "name": "validate-file-magic",
+      "position": [
+        -1228,
+        -32
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"error\": $json.message || 'File validation failed', \"code\": \"VALIDATION_ERROR\" } }}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "id": "a7b8c9d0-e1f2-4a3b-4c5d-6e7f8a9b0c1d",
+      "name": "respond-400-validation-error",
+      "position": [
+        -1004,
+        168
+      ],
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://cv-file-processor-production.up.railway.app/process",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "file",
+              "inputDataFieldName": "data"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "b8c9d0e1-f2a3-4b4c-5d6e-7f8a9b0c1d2e",
+      "name": "optimize-image-railway",
+      "position": [
+        -1004,
+        -32
+      ],
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "onError": "continueErrorOutput",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "railway-cv-cred-id",
+          "name": "Railway CV Processor"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{ \"error\": \"Image optimization service unavailable\", \"code\": \"OPTIMIZATION_ERROR\" }",
+        "options": {
+          "responseCode": 500
+        }
+      },
+      "id": "c9d0e1f2-a3b4-4c5d-6e7f-8a9b0c1d2e3f",
+      "name": "respond-500-optimization-error",
+      "position": [
+        -780,
+        168
+      ],
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4
+    },
+    {
+      "parameters": {
+        "promptPath": "cv-extraction-from-image",
+        "parametersUi": {
+          "parameter": [
+            {
+              "name": "image_urls",
+              "value": "={{ $json.image_urls }}"
+            }
+          ]
+        }
+      },
+      "id": "d0e1f2a3-b4c5-4d6e-7f8a-9b0c1d2e3f4a",
+      "name": "latitude-cv-extraction",
+      "position": [
+        -780,
+        -32
+      ],
+      "type": "n8n-nodes-latitude.latitude",
+      "typeVersion": 1,
+      "onError": "continueErrorOutput",
+      "credentials": {
+        "latitudeApi": {
+          "id": "sJhnEc7B36cC3KXC",
+          "name": "Latitude account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{ \"error\": \"CV extraction failed\", \"code\": \"AI_ERROR\" }",
+        "options": {
+          "responseCode": 500
+        }
+      },
+      "id": "e1f2a3b4-c5d6-4e7f-8a9b-0c1d2e3f4a5b",
+      "name": "respond-500-ai-error",
+      "position": [
+        -556,
+        168
+      ],
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "cv-content-check-1",
+              "leftValue": "={{ $json.object?.status || $json.text || '' }}",
+              "operator": {
+                "operation": "notContains",
+                "type": "string"
+              },
+              "rightValue": "NO_CV_RELEVANT_DATA"
+            }
+          ],
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          }
+        },
+        "options": {}
+      },
+      "id": "f2a3b4c5-d6e7-4f8a-9b0c-1d2e3f4a5b6c",
+      "name": "check-cv-content",
+      "position": [
+        -556,
+        -32
+      ],
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{ \"error\": \"Image doesn't contain CV/resume data\", \"code\": \"NO_CV_DATA\" }",
+        "options": {
+          "responseCode": 422
+        }
+      },
+      "id": "a3b4c5d6-e7f8-4a9b-0c1d-2e3f4a5b6c7d",
+      "name": "respond-422-no-cv-data",
+      "position": [
+        -332,
+        168
+      ],
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const input = $input.item.json;\nconst obj = input.object || input;\n\n// Handle both XML-parsed and direct object responses\nconst cvExtraction = obj.cv_extraction || obj;\nconst summary = cvExtraction.candidate_summary || obj.candidate_summary || {};\nconst content = cvExtraction.extracted_content || obj.extracted_content || '';\n\n// Extract markdown from CDATA if present\nlet markdown = content;\nif (typeof content === 'string' && content.includes('CDATA')) {\n  const match = content.match(/<!\\[CDATA\\[([\\s\\S]*?)\\]\\]>/);\n  markdown = match ? match[1] : content;\n}\n\nreturn {\n  json: {\n    full_name: summary.full_name || 'Not specified',\n    title: summary.title || 'Professional',\n    location: summary.location || 'Not specified',\n    extracted_text: (markdown || '').trim(),\n    confidence: cvExtraction.confidence_score || obj.confidence_score || null,\n    debug_id: $execution.id\n  }\n};"
+      },
+      "id": "b4c5d6e7-f8a9-4b0c-1d2e-3f4a5b6c7d8e",
+      "name": "extract-response-fields",
+      "position": [
+        -332,
+        -32
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"status\": \"success\", \"data\": { \"full_name\": $json.full_name, \"title\": $json.title, \"location\": $json.location, \"extracted_text\": $json.extracted_text, \"debug_id\": $json.debug_id } } }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "c5d6e7f8-a9b0-4c1d-2e3f-4a5b6c7d8e9f",
+      "name": "respond-200-success",
+      "position": [
+        -108,
+        -32
+      ],
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4
+    }
+  ],
+  "connections": {
+    "webhook-resume-to-markdown": {
+      "main": [
+        [
+          {
+            "node": "validate-file-input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "validate-file-input": {
+      "main": [
+        [
+          {
+            "node": "check-rate-limit",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "respond-400-file-error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "check-rate-limit": {
+      "main": [
+        [
+          {
+            "node": "validate-file-magic",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "respond-429-rate-limited",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "validate-file-magic": {
+      "main": [
+        [
+          {
+            "node": "optimize-image-railway",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "respond-400-validation-error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "optimize-image-railway": {
+      "main": [
+        [
+          {
+            "node": "latitude-cv-extraction",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "respond-500-optimization-error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "latitude-cv-extraction": {
+      "main": [
+        [
+          {
+            "node": "check-cv-content",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "respond-500-ai-error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "check-cv-content": {
+      "main": [
+        [
+          {
+            "node": "extract-response-fields",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "respond-422-no-cv-data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "extract-response-fields": {
+      "main": [
+        [
+          {
+            "node": "respond-200-success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {
+    "webhook-resume-to-markdown": [
+      {
+        "headers": {
+          "host": "aura.zeogen.com",
+          "user-agent": "AuraApp/1.0.0 iOS/17.0",
+          "content-type": "multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW",
+          "x-forwarded-for": "203.0.113.42",
+          "x-forwarded-host": "aura.zeogen.com",
+          "x-forwarded-port": "443",
+          "x-forwarded-proto": "https",
+          "x-real-ip": "203.0.113.42",
+          "accept-encoding": "gzip"
+        },
+        "params": {},
+        "query": {},
+        "body": {},
+        "webhookUrl": "https://aura.zeogen.com/resume-to-markdown",
+        "executionMode": "test"
+      }
+    ],
+    "validate-file-input": [
+      {
+        "fileName": "resume_sarah_chen.jpg",
+        "mimeType": "image/jpeg",
+        "clientIp": "203.0.113.42"
+      }
+    ],
+    "check-rate-limit": [
+      {
+        "fileName": "resume_sarah_chen.jpg",
+        "mimeType": "image/jpeg",
+        "clientIp": "203.0.113.42"
+      }
+    ],
+    "validate-file-magic": [
+      {
+        "fileName": "resume_sarah_chen.jpg",
+        "mimeType": "image/jpeg",
+        "clientIp": "203.0.113.42",
+        "fileSize": 2458624
+      }
+    ],
+    "optimize-image-railway": [
+      {
+        "image_urls": [
+          "https://storage.googleapis.com/aura-cv-processing/optimized/abc123-page1.png"
+        ],
+        "pages": 1,
+        "processing_time_ms": 1250
+      }
+    ],
+    "latitude-cv-extraction": [
+      {
+        "text": "<cv_extraction>\n  <status>SUCCESS</status>\n  <confidence_score>0.94</confidence_score>\n  <candidate_summary>\n    <full_name>Sarah Chen</full_name>\n    <title>Senior Software Engineer</title>\n    <location>San Francisco, US</location>\n  </candidate_summary>\n  <extracted_content><![CDATA[# Sarah Chen\n\n**Senior Software Engineer**\nSan Francisco, CA | sarah.chen@email.com | linkedin.com/in/sarahchen\n\n## Summary\nExperienced software engineer with 8+ years building scalable distributed systems. Specialized in backend development, system design, and team leadership.\n\n## Experience\n\n### Senior Software Engineer | Stripe | 2021 - Present\n- Led development of payment processing microservices handling 10M+ daily transactions\n- Architected real-time fraud detection system reducing chargebacks by 35%\n- Mentored team of 5 junior engineers\n\n### Software Engineer | Google | 2018 - 2021\n- Built core components of Google Cloud Run infrastructure\n- Optimized container startup times by 40%\n- Contributed to open-source Kubernetes projects\n\n### Software Engineer | Dropbox | 2016 - 2018\n- Developed file synchronization algorithms for mobile clients\n- Reduced sync conflicts by 60% through improved conflict resolution\n\n## Education\n\n### Carnegie Mellon University\nM.S. Computer Science | 2016\n\n### UC Berkeley\nB.S. Computer Science | 2014\n\n## Skills\n- Languages: Go, Python, Java, TypeScript\n- Infrastructure: Kubernetes, AWS, GCP, Terraform\n- Databases: PostgreSQL, Redis, DynamoDB\n]]></extracted_content>\n</cv_extraction>",
+        "object": {
+          "cv_extraction": {
+            "status": "SUCCESS",
+            "confidence_score": 0.94,
+            "candidate_summary": {
+              "full_name": "Sarah Chen",
+              "title": "Senior Software Engineer",
+              "location": "San Francisco, US"
+            },
+            "extracted_content": "# Sarah Chen\n\n**Senior Software Engineer**\nSan Francisco, CA | sarah.chen@email.com | linkedin.com/in/sarahchen\n\n## Summary\nExperienced software engineer with 8+ years building scalable distributed systems. Specialized in backend development, system design, and team leadership.\n\n## Experience\n\n### Senior Software Engineer | Stripe | 2021 - Present\n- Led development of payment processing microservices handling 10M+ daily transactions\n- Architected real-time fraud detection system reducing chargebacks by 35%\n- Mentored team of 5 junior engineers\n\n### Software Engineer | Google | 2018 - 2021\n- Built core components of Google Cloud Run infrastructure\n- Optimized container startup times by 40%\n- Contributed to open-source Kubernetes projects\n\n### Software Engineer | Dropbox | 2016 - 2018\n- Developed file synchronization algorithms for mobile clients\n- Reduced sync conflicts by 60% through improved conflict resolution\n\n## Education\n\n### Carnegie Mellon University\nM.S. Computer Science | 2016\n\n### UC Berkeley\nB.S. Computer Science | 2014\n\n## Skills\n- Languages: Go, Python, Java, TypeScript\n- Infrastructure: Kubernetes, AWS, GCP, Terraform\n- Databases: PostgreSQL, Redis, DynamoDB"
+          }
+        },
+        "usage": {
+          "inputTokens": 5200,
+          "outputTokens": 1850,
+          "promptTokens": 5200,
+          "completionTokens": 1850,
+          "totalTokens": 7050,
+          "reasoningTokens": 0,
+          "cachedInputTokens": 0
+        },
+        "uuid": "e7f8a9b0-c1d2-4e3f-a5b6-c7d8e9f0a1b2"
+      }
+    ],
+    "check-cv-content": [
+      {
+        "cv_extraction": {
+          "status": "SUCCESS",
+          "confidence_score": 0.94,
+          "candidate_summary": {
+            "full_name": "Sarah Chen",
+            "title": "Senior Software Engineer",
+            "location": "San Francisco, US"
+          },
+          "extracted_content": "# Sarah Chen\n\n**Senior Software Engineer**\nSan Francisco, CA | sarah.chen@email.com | linkedin.com/in/sarahchen\n\n## Summary\nExperienced software engineer with 8+ years building scalable distributed systems. Specialized in backend development, system design, and team leadership.\n\n## Experience\n\n### Senior Software Engineer | Stripe | 2021 - Present\n- Led development of payment processing microservices handling 10M+ daily transactions\n- Architected real-time fraud detection system reducing chargebacks by 35%\n- Mentored team of 5 junior engineers\n\n### Software Engineer | Google | 2018 - 2021\n- Built core components of Google Cloud Run infrastructure\n- Optimized container startup times by 40%\n- Contributed to open-source Kubernetes projects\n\n### Software Engineer | Dropbox | 2016 - 2018\n- Developed file synchronization algorithms for mobile clients\n- Reduced sync conflicts by 60% through improved conflict resolution\n\n## Education\n\n### Carnegie Mellon University\nM.S. Computer Science | 2016\n\n### UC Berkeley\nB.S. Computer Science | 2014\n\n## Skills\n- Languages: Go, Python, Java, TypeScript\n- Infrastructure: Kubernetes, AWS, GCP, Terraform\n- Databases: PostgreSQL, Redis, DynamoDB"
+        }
+      }
+    ],
+    "extract-response-fields": [
+      {
+        "full_name": "Sarah Chen",
+        "title": "Senior Software Engineer",
+        "location": "San Francisco, US",
+        "extracted_text": "# Sarah Chen\n\n**Senior Software Engineer**\nSan Francisco, CA | sarah.chen@email.com | linkedin.com/in/sarahchen\n\n## Summary\nExperienced software engineer with 8+ years building scalable distributed systems. Specialized in backend development, system design, and team leadership.\n\n## Experience\n\n### Senior Software Engineer | Stripe | 2021 - Present\n- Led development of payment processing microservices handling 10M+ daily transactions\n- Architected real-time fraud detection system reducing chargebacks by 35%\n- Mentored team of 5 junior engineers\n\n### Software Engineer | Google | 2018 - 2021\n- Built core components of Google Cloud Run infrastructure\n- Optimized container startup times by 40%\n- Contributed to open-source Kubernetes projects\n\n### Software Engineer | Dropbox | 2016 - 2018\n- Developed file synchronization algorithms for mobile clients\n- Reduced sync conflicts by 60% through improved conflict resolution\n\n## Education\n\n### Carnegie Mellon University\nM.S. Computer Science | 2016\n\n### UC Berkeley\nB.S. Computer Science | 2014\n\n## Skills\n- Languages: Go, Python, Java, TypeScript\n- Infrastructure: Kubernetes, AWS, GCP, Terraform\n- Databases: PostgreSQL, Redis, DynamoDB",
+        "confidence": 0.94,
+        "debug_id": "exec-12345-abcde"
+      }
+    ],
+    "respond-200-success": [
+      {
+        "status": "success",
+        "data": {
+          "full_name": "Sarah Chen",
+          "title": "Senior Software Engineer",
+          "location": "San Francisco, US",
+          "extracted_text": "# Sarah Chen\n\n**Senior Software Engineer**\nSan Francisco, CA | sarah.chen@email.com | linkedin.com/in/sarahchen\n\n## Summary\nExperienced software engineer with 8+ years building scalable distributed systems. Specialized in backend development, system design, and team leadership.\n\n## Experience\n\n### Senior Software Engineer | Stripe | 2021 - Present\n- Led development of payment processing microservices handling 10M+ daily transactions\n- Architected real-time fraud detection system reducing chargebacks by 35%\n- Mentored team of 5 junior engineers\n\n### Software Engineer | Google | 2018 - 2021\n- Built core components of Google Cloud Run infrastructure\n- Optimized container startup times by 40%\n- Contributed to open-source Kubernetes projects\n\n### Software Engineer | Dropbox | 2016 - 2018\n- Developed file synchronization algorithms for mobile clients\n- Reduced sync conflicts by 60% through improved conflict resolution\n\n## Education\n\n### Carnegie Mellon University\nM.S. Computer Science | 2016\n\n### UC Berkeley\nB.S. Computer Science | 2014\n\n## Skills\n- Languages: Go, Python, Java, TypeScript\n- Infrastructure: Kubernetes, AWS, GCP, Terraform\n- Databases: PostgreSQL, Redis, DynamoDB",
+          "debug_id": "exec-12345-abcde"
+        }
+      }
+    ]
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "d660c8d1ec82335c55c8ab9e582b0038fa983ea7127f17cbb5c7a54c713aa590"
+  }
+}

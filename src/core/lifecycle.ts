@@ -9,7 +9,7 @@ import { debug } from './debug.js';
 
 // Cleanup state tracking
 let isCleaningUp = false;
-let cleanupComplete = false;
+let _cleanupComplete = false;
 
 /**
  * Cleanup timeout in milliseconds.
@@ -49,7 +49,7 @@ async function performCleanup(signal?: string): Promise<void> {
       debug('lifecycle', `closeDatabase error (ignored): ${dbError instanceof Error ? dbError.message : String(dbError)}`);
     }
     
-    cleanupComplete = true;
+    _cleanupComplete = true;
     debug('lifecycle', 'Cleanup complete');
   } catch (error) {
     debug('lifecycle', `Cleanup error: ${error instanceof Error ? error.message : String(error)}`);

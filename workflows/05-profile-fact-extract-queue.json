@@ -1,0 +1,1035 @@
+{
+  "name": "[05] [queue] [profile] [fact extract]",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "internal/fact-extraction",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "f1a2b3c4-d5e6-4f7a-8b9c-0d1e2f3a4b5c",
+      "name": "trigger-extraction-queue",
+      "position": [
+        -1900,
+        0
+      ],
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "webhookId": "e2f3a4b5-c6d7-4e8f-9a0b-1c2d3e4f5a6b",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "internalApiKey123",
+          "name": "Internal API Key"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const input = $input.item.json;\n\n// Validate required fields\nif (!input.body?.document_id) {\n  throw new Error('document_id is required');\n}\nif (!input.body?.profile_id) {\n  throw new Error('profile_id is required');\n}\nif (!input.body?.rendered_image_paths || !Array.isArray(input.body.rendered_image_paths)) {\n  throw new Error('rendered_image_paths array is required');\n}\nif (input.body.rendered_image_paths.length === 0) {\n  throw new Error('At least one image path is required');\n}\n\nconst mode = input.body.extraction_mode || 'deep';\nif (!['fast', 'deep'].includes(mode)) {\n  throw new Error('extraction_mode must be \"fast\" or \"deep\"');\n}\n\nreturn {\n  json: {\n    document_id: input.body.document_id,\n    profile_id: input.body.profile_id,\n    rendered_image_paths: input.body.rendered_image_paths,\n    extraction_mode: mode\n  }\n};"
+      },
+      "id": "a2b3c4d5-e6f7-4a8b-9c0d-1e2f3a4b5c6d",
+      "name": "validate-request",
+      "position": [
+        -1650,
+        0
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"error\": $json.message, \"code\": \"VALIDATION_ERROR\" } }}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "id": "b3c4d5e6-f7a8-4b9c-0d1e-2f3a4b5c6d7e",
+      "name": "respond-400",
+      "position": [
+        -1400,
+        200
+      ],
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Simulate atomic document lock for idempotency\n// In production: UPDATE core.document SET extraction_status = 'processing' \n// WHERE id = ? AND extraction_status = 'queued'\nconst docId = $input.item.json.document_id;\n\n// Simulated lock result - assume document is available\nconst lockResult = {\n  rowsAffected: 1,  // 1 = successfully locked, 0 = already processing\n  documentId: docId\n};\n\nreturn {\n  json: {\n    ...$input.item.json,\n    lock_acquired: lockResult.rowsAffected > 0\n  }\n};"
+      },
+      "id": "c4d5e6f7-a8b9-4c0d-1e2f-3a4b5c6d7e8f",
+      "name": "lock-document",
+      "position": [
+        -1400,
+        0
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "lock-check-1",
+              "leftValue": "={{ $json.lock_acquired }}",
+              "operator": {
+                "operation": "true",
+                "type": "boolean"
+              },
+              "rightValue": true
+            }
+          ],
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          }
+        },
+        "options": {}
+      },
+      "id": "d5e6f7a8-b9c0-4d1e-2f3a-4b5c6d7e8f9a",
+      "name": "check-lock-result",
+      "position": [
+        -1150,
+        0
+      ],
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{ \"status\": \"skipped\", \"reason\": \"already_processing\" }",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "e6f7a8b9-c0d1-4e2f-3a4b-5c6d7e8f9a0b",
+      "name": "respond-200-already-processing",
+      "position": [
+        -900,
+        200
+      ],
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Fetch existing facts for deduplication\n// In production: SELECT id, category_key, fact_title FROM core.fact \n// WHERE profile_id = ? AND source_document_id = ?\n\nconst profileId = $input.item.json.profile_id;\nconst documentId = $input.item.json.document_id;\n\n// Simulated existing facts (empty for first extraction)\nconst existingFacts = [];\n\nreturn {\n  json: {\n    ...$input.item.json,\n    existing_facts: existingFacts\n  }\n};"
+      },
+      "id": "f7a8b9c0-d1e2-4f3a-4b5c-6d7e8f9a0b1c",
+      "name": "fetch-existing-facts",
+      "position": [
+        -900,
+        0
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Download rendered images from Supabase Storage\n// In production: HTTP GET to Supabase Storage API with service role key\n\nconst paths = $input.item.json.rendered_image_paths;\nconst images = [];\n\n// Simulate downloaded images as base64 placeholders\nfor (const path of paths) {\n  images.push({\n    path: path,\n    base64: 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',\n    mime: 'image/png'\n  });\n}\n\nif (images.length === 0) {\n  throw new Error('STORAGE_ERROR: Failed to download images');\n}\n\nreturn {\n  json: {\n    ...$input.item.json,\n    images: images,\n    batch_count: Math.ceil(images.length / 4)\n  }\n};"
+      },
+      "id": "a8b9c0d1-e2f3-4a4b-5c6d-7e8f9a0b1c2d",
+      "name": "download-images",
+      "position": [
+        -650,
+        0
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{ \"error\": \"Failed to download document images\", \"code\": \"STORAGE_ERROR\" }",
+        "options": {
+          "responseCode": 500
+        }
+      },
+      "id": "b9c0d1e2-f3a4-4b5c-6d7e-8f9a0b1c2d3e",
+      "name": "respond-500-storage-error",
+      "position": [
+        -400,
+        200
+      ],
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "mode-check-1",
+              "leftValue": "={{ $json.extraction_mode }}",
+              "operator": {
+                "operation": "equals",
+                "type": "string"
+              },
+              "rightValue": "fast"
+            }
+          ],
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          }
+        },
+        "options": {}
+      },
+      "id": "c0d1e2f3-a4b5-4c6d-7e8f-9a0b1c2d3e4f",
+      "name": "check-extraction-mode",
+      "position": [
+        -400,
+        0
+      ],
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2
+    },
+    {
+      "parameters": {
+        "promptPath": "fast-fact-extraction-for-onboarding-only",
+        "parametersUi": {
+          "parameter": [
+            {
+              "name": "full_cv",
+              "value": "={{ $json.images.map(i => '[Image: ' + i.path + ']').join('\\n') }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-latitude.latitude",
+      "typeVersion": 1,
+      "position": [
+        -150,
+        -100
+      ],
+      "id": "d1e2f3a4-b5c6-4d7e-8f9a-0b1c2d3e4f5a",
+      "name": "latitude-fast-extract",
+      "credentials": {
+        "latitudeApi": {
+          "id": "sJhnEc7B36cC3KXC",
+          "name": "Latitude account"
+        }
+      },
+      "onError": "continueErrorOutput",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": {
+        "promptPath": "initial-fact-extraction",
+        "parametersUi": {
+          "parameter": [
+            {
+              "name": "full_cv",
+              "value": "={{ $json.images.map(i => '[Image: ' + i.path + ']').join('\\n') }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-latitude.latitude",
+      "typeVersion": 1,
+      "position": [
+        -150,
+        100
+      ],
+      "id": "e2f3a4b5-c6d7-4e8f-9a0b-1c2d3e4f5a6b",
+      "name": "latitude-deep-extract",
+      "credentials": {
+        "latitudeApi": {
+          "id": "sJhnEc7B36cC3KXC",
+          "name": "Latitude account"
+        }
+      },
+      "onError": "continueErrorOutput",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 10000
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{ \"error\": \"AI extraction failed\", \"code\": \"AI_ERROR\" }",
+        "options": {
+          "responseCode": 500
+        }
+      },
+      "id": "f3a4b5c6-d7e8-4f9a-0b1c-2d3e4f5a6b7c",
+      "name": "respond-500-ai-error",
+      "position": [
+        100,
+        250
+      ],
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4
+    },
+    {
+      "parameters": {
+        "mode": "append",
+        "mergeByFields": {
+          "values": []
+        },
+        "options": {}
+      },
+      "id": "a4b5c6d7-e8f9-4a0b-1c2d-3e4f5a6b7c8d",
+      "name": "merge-extraction",
+      "position": [
+        100,
+        0
+      ],
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3
+    },
+    {
+      "parameters": {
+        "jsCode": "// Transform Latitude output to facts and filter duplicates\nconst inputItem = $input.first().json;\nconst existingFacts = $('fetch-existing-facts').first().json.existing_facts || [];\n\n// Access the 'object' property from Latitude response\nconst extracted = inputItem.object || inputItem;\n\n// Category mapping for 9 fast categories\nconst categories = [\n  'professional_foundation',\n  'impact_achievement', \n  'working_identity',\n  'values_character',\n  'growth_learning',\n  'relationships_influence',\n  'unique_dimensions',\n  'operational_excellence',\n  'market_presence'\n];\n\nconst facts = [];\n\nfor (const cat of categories) {\n  if (extracted[cat] && Array.isArray(extracted[cat])) {\n    for (const factText of extracted[cat]) {\n      if (factText && typeof factText === 'string' && factText.trim()) {\n        facts.push({\n          category_key: cat,\n          fact_title: factText.substring(0, 100),\n          fact_detail: factText,\n          confidence: 0.85\n        });\n      }\n    }\n  }\n}\n\n// Filter out duplicates based on existing facts\nconst existingTitles = existingFacts.map(f => f.fact_title?.toLowerCase());\nconst newFacts = facts.filter(f => \n  !existingTitles.includes(f.fact_title?.toLowerCase())\n);\n\nreturn [{\n  json: {\n    document_id: $('validate-request').first().json.document_id,\n    profile_id: $('validate-request').first().json.profile_id,\n    facts: newFacts,\n    total_extracted: facts.length,\n    duplicates_filtered: facts.length - newFacts.length\n  }\n}];"
+      },
+      "id": "b5c6d7e8-f9a0-4b1c-2d3e-4f5a6b7c8d9e",
+      "name": "transform-and-dedupe",
+      "position": [
+        350,
+        0
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Insert facts into core.fact table\n// In production: INSERT INTO core.fact (...) VALUES (...) RETURNING id\n\nconst data = $input.item.json;\nconst facts = data.facts || [];\n\n// Simulate inserted facts with generated IDs\nconst insertedFacts = facts.map((fact, index) => ({\n  id: `fact-${Date.now()}-${index}`,\n  profile_id: data.profile_id,\n  category_key: fact.category_key,\n  fact_title: fact.fact_title,\n  fact_detail: fact.fact_detail,\n  extraction_source: 'cv_extraction',\n  source_document_id: data.document_id,\n  confidence: fact.confidence,\n  created_at: new Date().toISOString()\n}));\n\nreturn {\n  json: {\n    ...data,\n    inserted_facts: insertedFacts,\n    facts_created: insertedFacts.length\n  }\n};"
+      },
+      "id": "c6d7e8f9-a0b1-4c2d-3e4f-5a6b7c8d9e0f",
+      "name": "insert-facts",
+      "position": [
+        600,
+        0
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Create fact relationships (job \u2192 skill links)\nconst data = $input.item.json;\nconst facts = data.inserted_facts || [];\n\n// Find job-related facts\nconst jobs = facts.filter(f => \n  f.category_key?.includes('professional_foundation') ||\n  f.category_key?.includes('experience')\n);\n\n// Find skill-related facts  \nconst skills = facts.filter(f => \n  f.category_key?.includes('operational') ||\n  f.fact_title?.toLowerCase().includes('skill')\n);\n\n// Create relationships\nconst relationships = [];\nfor (const job of jobs.slice(0, 5)) {\n  for (const skill of skills.slice(0, 10)) {\n    if (job.id && skill.id) {\n      relationships.push({\n        source_fact_id: job.id,\n        target_fact_id: skill.id,\n        relationship_type: 'used_skill'\n      });\n    }\n  }\n}\n\nreturn {\n  json: {\n    ...data,\n    relationships_created: relationships.length\n  }\n};"
+      },
+      "id": "d7e8f9a0-b1c2-4d3e-4f5a-6b7c8d9e0f1a",
+      "name": "create-relationships",
+      "position": [
+        850,
+        0
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Queue facts for Mem0 synchronization\n// In production: INSERT INTO core.memory_sync_outbox (...)\n\nconst data = $input.item.json;\nconst facts = data.inserted_facts || [];\n\n// Simulate outbox entries\nconst outboxEntries = facts.map(f => ({\n  entity_type: 'fact',\n  entity_id: f.id,\n  operation: 'add',\n  payload: {\n    text: `${f.fact_title}: ${f.fact_detail || ''}`,\n    metadata: { category: f.category_key }\n  },\n  sync_status: 'pending'\n}));\n\nreturn {\n  json: {\n    ...data,\n    mem0_queued: outboxEntries.length\n  }\n};"
+      },
+      "id": "e8f9a0b1-c2d3-4e4f-5a6b-7c8d9e0f1a2b",
+      "name": "queue-mem0-sync",
+      "position": [
+        1100,
+        0
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Update document status to completed\n// In production: UPDATE core.document SET extraction_status = 'completed' WHERE id = ?\n\nconst data = $input.item.json;\n\n// Simulated update result\nconst updateResult = {\n  document_id: data.document_id,\n  extraction_status: 'completed',\n  processed_at: new Date().toISOString(),\n  extraction_metadata: {\n    model: 'latitude',\n    facts_created: data.facts_created\n  }\n};\n\nreturn {\n  json: {\n    status: 'success',\n    document_id: data.document_id,\n    facts_created: data.facts_created,\n    relationships_created: data.relationships_created || 0,\n    mem0_queued: data.mem0_queued || 0\n  }\n};"
+      },
+      "id": "f9a0b1c2-d3e4-4f5a-6b7c-8d9e0f1a2b3c",
+      "name": "update-document-complete",
+      "position": [
+        1350,
+        0
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "a0b1c2d3-e4f5-4a6b-7c8d-9e0f1a2b3c4d",
+      "name": "respond-200-success",
+      "position": [
+        1600,
+        0
+      ],
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4
+    }
+  ],
+  "connections": {
+    "trigger-extraction-queue": {
+      "main": [
+        [
+          {
+            "node": "validate-request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "validate-request": {
+      "main": [
+        [
+          {
+            "node": "lock-document",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "respond-400",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "lock-document": {
+      "main": [
+        [
+          {
+            "node": "check-lock-result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "check-lock-result": {
+      "main": [
+        [
+          {
+            "node": "fetch-existing-facts",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "respond-200-already-processing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "fetch-existing-facts": {
+      "main": [
+        [
+          {
+            "node": "download-images",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "download-images": {
+      "main": [
+        [
+          {
+            "node": "check-extraction-mode",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "respond-500-storage-error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "check-extraction-mode": {
+      "main": [
+        [
+          {
+            "node": "latitude-fast-extract",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "latitude-deep-extract",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "latitude-fast-extract": {
+      "main": [
+        [
+          {
+            "node": "merge-extraction",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "respond-500-ai-error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "latitude-deep-extract": {
+      "main": [
+        [
+          {
+            "node": "merge-extraction",
+            "type": "main",
+            "index": 1
+          }
+        ],
+        [
+          {
+            "node": "respond-500-ai-error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "merge-extraction": {
+      "main": [
+        [
+          {
+            "node": "transform-and-dedupe",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "transform-and-dedupe": {
+      "main": [
+        [
+          {
+            "node": "insert-facts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "insert-facts": {
+      "main": [
+        [
+          {
+            "node": "create-relationships",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "create-relationships": {
+      "main": [
+        [
+          {
+            "node": "queue-mem0-sync",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "queue-mem0-sync": {
+      "main": [
+        [
+          {
+            "node": "update-document-complete",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "update-document-complete": {
+      "main": [
+        [
+          {
+            "node": "respond-200-success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {
+    "trigger-extraction-queue": [
+      {
+        "headers": {
+          "host": "aura.zeogen.com",
+          "user-agent": "n8n-internal/1.0",
+          "content-length": "245",
+          "accept": "*/*",
+          "x-internal-key": "sk-internal-abc123xyz789",
+          "content-type": "application/json"
+        },
+        "params": {},
+        "query": {},
+        "body": {
+          "document_id": "doc-a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+          "profile_id": "d654bdd6-17ea-4d46-8222-b29ad507b633",
+          "rendered_image_paths": [
+            "documents/d654bdd6-17ea-4d46-8222-b29ad507b633/resume-page-1.png",
+            "documents/d654bdd6-17ea-4d46-8222-b29ad507b633/resume-page-2.png"
+          ],
+          "extraction_mode": "fast"
+        },
+        "webhookUrl": "https://aura.zeogen.com/internal/fact-extraction",
+        "executionMode": "test"
+      }
+    ],
+    "validate-request": [
+      {
+        "document_id": "doc-a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+        "profile_id": "d654bdd6-17ea-4d46-8222-b29ad507b633",
+        "rendered_image_paths": [
+          "documents/d654bdd6-17ea-4d46-8222-b29ad507b633/resume-page-1.png",
+          "documents/d654bdd6-17ea-4d46-8222-b29ad507b633/resume-page-2.png"
+        ],
+        "extraction_mode": "fast"
+      }
+    ],
+    "lock-document": [
+      {
+        "document_id": "doc-a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+        "profile_id": "d654bdd6-17ea-4d46-8222-b29ad507b633",
+        "rendered_image_paths": [
+          "documents/d654bdd6-17ea-4d46-8222-b29ad507b633/resume-page-1.png",
+          "documents/d654bdd6-17ea-4d46-8222-b29ad507b633/resume-page-2.png"
+        ],
+        "extraction_mode": "fast",
+        "lock_acquired": true
+      }
+    ],
+    "fetch-existing-facts": [
+      {
+        "document_id": "doc-a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+        "profile_id": "d654bdd6-17ea-4d46-8222-b29ad507b633",
+        "rendered_image_paths": [
+          "documents/d654bdd6-17ea-4d46-8222-b29ad507b633/resume-page-1.png",
+          "documents/d654bdd6-17ea-4d46-8222-b29ad507b633/resume-page-2.png"
+        ],
+        "extraction_mode": "fast",
+        "lock_acquired": true,
+        "existing_facts": []
+      }
+    ],
+    "download-images": [
+      {
+        "document_id": "doc-a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+        "profile_id": "d654bdd6-17ea-4d46-8222-b29ad507b633",
+        "rendered_image_paths": [
+          "documents/d654bdd6-17ea-4d46-8222-b29ad507b633/resume-page-1.png",
+          "documents/d654bdd6-17ea-4d46-8222-b29ad507b633/resume-page-2.png"
+        ],
+        "extraction_mode": "fast",
+        "lock_acquired": true,
+        "existing_facts": [],
+        "images": [
+          {
+            "path": "documents/d654bdd6-17ea-4d46-8222-b29ad507b633/resume-page-1.png",
+            "base64": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+            "mime": "image/png"
+          },
+          {
+            "path": "documents/d654bdd6-17ea-4d46-8222-b29ad507b633/resume-page-2.png",
+            "base64": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+            "mime": "image/png"
+          }
+        ],
+        "batch_count": 1
+      }
+    ],
+    "latitude-fast-extract": [
+      {
+        "text": "{\n  \"professional_foundation\": [\n    \"Senior Software Engineer at Stripe with 5 years experience\",\n    \"Previously Staff Engineer at Google for 3 years\",\n    \"Led backend systems team of 8 engineers\"\n  ],\n  \"impact_achievement\": [\n    \"Reduced API latency by 40% through caching optimization\",\n    \"Launched payment processing system handling $2B annually\",\n    \"Mentored 12 junior engineers to senior level\"\n  ],\n  \"working_identity\": [\n    \"Collaborative team player who thrives in cross-functional environments\",\n    \"Strong preference for async communication and documentation\"\n  ],\n  \"values_character\": [\n    \"Passionate about clean code and technical excellence\",\n    \"Committed to inclusive team cultures\"\n  ],\n  \"growth_learning\": [\n    \"MS Computer Science from Stanford University 2018\",\n    \"AWS Solutions Architect certification 2023\",\n    \"Currently learning Rust and systems programming\"\n  ],\n  \"relationships_influence\": [\n    \"Active speaker at local Python meetups\",\n    \"Mentoring 3 engineers through ADPList\"\n  ],\n  \"unique_dimensions\": [\n    \"Open source contributor to FastAPI project\",\n    \"Built personal finance app with 10k users\"\n  ],\n  \"operational_excellence\": [\n    \"Expert in Python, Go, and TypeScript\",\n    \"Proficient in Kubernetes and Terraform\",\n    \"Experience with PostgreSQL and Redis at scale\"\n  ],\n  \"market_presence\": [\n    \"Published article on distributed systems in InfoQ\",\n    \"Speaker at PyCon 2023\"\n  ]\n}",
+        "object": {
+          "professional_foundation": [
+            "Senior Software Engineer at Stripe with 5 years experience",
+            "Previously Staff Engineer at Google for 3 years",
+            "Led backend systems team of 8 engineers"
+          ],
+          "impact_achievement": [
+            "Reduced API latency by 40% through caching optimization",
+            "Launched payment processing system handling $2B annually",
+            "Mentored 12 junior engineers to senior level"
+          ],
+          "working_identity": [
+            "Collaborative team player who thrives in cross-functional environments",
+            "Strong preference for async communication and documentation"
+          ],
+          "values_character": [
+            "Passionate about clean code and technical excellence",
+            "Committed to inclusive team cultures"
+          ],
+          "growth_learning": [
+            "MS Computer Science from Stanford University 2018",
+            "AWS Solutions Architect certification 2023",
+            "Currently learning Rust and systems programming"
+          ],
+          "relationships_influence": [
+            "Active speaker at local Python meetups",
+            "Mentoring 3 engineers through ADPList"
+          ],
+          "unique_dimensions": [
+            "Open source contributor to FastAPI project",
+            "Built personal finance app with 10k users"
+          ],
+          "operational_excellence": [
+            "Expert in Python, Go, and TypeScript",
+            "Proficient in Kubernetes and Terraform",
+            "Experience with PostgreSQL and Redis at scale"
+          ],
+          "market_presence": [
+            "Published article on distributed systems in InfoQ",
+            "Speaker at PyCon 2023"
+          ]
+        },
+        "usage": {
+          "inputTokens": 1500,
+          "outputTokens": 450,
+          "promptTokens": 1500,
+          "completionTokens": 450,
+          "totalTokens": 1950,
+          "reasoningTokens": 0,
+          "cachedInputTokens": 0
+        },
+        "uuid": "lat-f1a2b3c4-d5e6-7890-abcd-ef1234567890"
+      }
+    ],
+    "latitude-deep-extract": [
+      {
+        "text": "{\n  \"professional_foundation\": [\n    \"Senior Software Engineer at Stripe with 5 years experience\",\n    \"Previously Staff Engineer at Google for 3 years\"\n  ],\n  \"impact_achievement\": [\n    \"Reduced API latency by 40% through caching optimization\"\n  ],\n  \"working_identity\": [\n    \"Collaborative team player\"\n  ],\n  \"values_character\": [\n    \"Passionate about clean code\"\n  ],\n  \"growth_learning\": [\n    \"MS Computer Science from Stanford\"\n  ],\n  \"relationships_influence\": [\n    \"Active speaker at meetups\"\n  ],\n  \"unique_dimensions\": [\n    \"Open source contributor\"\n  ],\n  \"operational_excellence\": [\n    \"Expert in Python and Go\"\n  ],\n  \"market_presence\": [\n    \"Speaker at PyCon 2023\"\n  ]\n}",
+        "object": {
+          "professional_foundation": [
+            "Senior Software Engineer at Stripe with 5 years experience",
+            "Previously Staff Engineer at Google for 3 years"
+          ],
+          "impact_achievement": [
+            "Reduced API latency by 40% through caching optimization"
+          ],
+          "working_identity": [
+            "Collaborative team player"
+          ],
+          "values_character": [
+            "Passionate about clean code"
+          ],
+          "growth_learning": [
+            "MS Computer Science from Stanford"
+          ],
+          "relationships_influence": [
+            "Active speaker at meetups"
+          ],
+          "unique_dimensions": [
+            "Open source contributor"
+          ],
+          "operational_excellence": [
+            "Expert in Python and Go"
+          ],
+          "market_presence": [
+            "Speaker at PyCon 2023"
+          ]
+        },
+        "usage": {
+          "inputTokens": 2500,
+          "outputTokens": 350,
+          "promptTokens": 2500,
+          "completionTokens": 350,
+          "totalTokens": 2850,
+          "reasoningTokens": 0,
+          "cachedInputTokens": 0
+        },
+        "uuid": "lat-a2b3c4d5-e6f7-8901-bcde-f23456789012"
+      }
+    ],
+    "transform-and-dedupe": [
+      {
+        "document_id": "doc-a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+        "profile_id": "d654bdd6-17ea-4d46-8222-b29ad507b633",
+        "facts": [
+          {
+            "category_key": "professional_foundation",
+            "fact_title": "Senior Software Engineer at Stripe with 5 years experience",
+            "fact_detail": "Senior Software Engineer at Stripe with 5 years experience",
+            "confidence": 0.85
+          },
+          {
+            "category_key": "professional_foundation",
+            "fact_title": "Previously Staff Engineer at Google for 3 years",
+            "fact_detail": "Previously Staff Engineer at Google for 3 years",
+            "confidence": 0.85
+          },
+          {
+            "category_key": "professional_foundation",
+            "fact_title": "Led backend systems team of 8 engineers",
+            "fact_detail": "Led backend systems team of 8 engineers",
+            "confidence": 0.85
+          },
+          {
+            "category_key": "impact_achievement",
+            "fact_title": "Reduced API latency by 40% through caching optimization",
+            "fact_detail": "Reduced API latency by 40% through caching optimization",
+            "confidence": 0.85
+          },
+          {
+            "category_key": "impact_achievement",
+            "fact_title": "Launched payment processing system handling $2B annually",
+            "fact_detail": "Launched payment processing system handling $2B annually",
+            "confidence": 0.85
+          },
+          {
+            "category_key": "impact_achievement",
+            "fact_title": "Mentored 12 junior engineers to senior level",
+            "fact_detail": "Mentored 12 junior engineers to senior level",
+            "confidence": 0.85
+          },
+          {
+            "category_key": "working_identity",
+            "fact_title": "Collaborative team player who thrives in cross-functional environments",
+            "fact_detail": "Collaborative team player who thrives in cross-functional environments",
+            "confidence": 0.85
+          },
+          {
+            "category_key": "working_identity",
+            "fact_title": "Strong preference for async communication and documentation",
+            "fact_detail": "Strong preference for async communication and documentation",
+            "confidence": 0.85
+          },
+          {
+            "category_key": "values_character",
+            "fact_title": "Passionate about clean code and technical excellence",
+            "fact_detail": "Passionate about clean code and technical excellence",
+            "confidence": 0.85
+          },
+          {
+            "category_key": "values_character",
+            "fact_title": "Committed to inclusive team cultures",
+            "fact_detail": "Committed to inclusive team cultures",
+            "confidence": 0.85
+          },
+          {
+            "category_key": "growth_learning",
+            "fact_title": "MS Computer Science from Stanford University 2018",
+            "fact_detail": "MS Computer Science from Stanford University 2018",
+            "confidence": 0.85
+          },
+          {
+            "category_key": "growth_learning",
+            "fact_title": "AWS Solutions Architect certification 2023",
+            "fact_detail": "AWS Solutions Architect certification 2023",
+            "confidence": 0.85
+          },
+          {
+            "category_key": "growth_learning",
+            "fact_title": "Currently learning Rust and systems programming",
+            "fact_detail": "Currently learning Rust and systems programming",
+            "confidence": 0.85
+          },
+          {
+            "category_key": "relationships_influence",
+            "fact_title": "Active speaker at local Python meetups",
+            "fact_detail": "Active speaker at local Python meetups",
+            "confidence": 0.85
+          },
+          {
+            "category_key": "relationships_influence",
+            "fact_title": "Mentoring 3 engineers through ADPList",
+            "fact_detail": "Mentoring 3 engineers through ADPList",
+            "confidence": 0.85
+          },
+          {
+            "category_key": "unique_dimensions",
+            "fact_title": "Open source contributor to FastAPI project",
+            "fact_detail": "Open source contributor to FastAPI project",
+            "confidence": 0.85
+          },
+          {
+            "category_key": "unique_dimensions",
+            "fact_title": "Built personal finance app with 10k users",
+            "fact_detail": "Built personal finance app with 10k users",
+            "confidence": 0.85
+          },
+          {
+            "category_key": "operational_excellence",
+            "fact_title": "Expert in Python, Go, and TypeScript",
+            "fact_detail": "Expert in Python, Go, and TypeScript",
+            "confidence": 0.85
+          },
+          {
+            "category_key": "operational_excellence",
+            "fact_title": "Proficient in Kubernetes and Terraform",
+            "fact_detail": "Proficient in Kubernetes and Terraform",
+            "confidence": 0.85
+          },
+          {
+            "category_key": "operational_excellence",
+            "fact_title": "Experience with PostgreSQL and Redis at scale",
+            "fact_detail": "Experience with PostgreSQL and Redis at scale",
+            "confidence": 0.85
+          },
+          {
+            "category_key": "market_presence",
+            "fact_title": "Published article on distributed systems in InfoQ",
+            "fact_detail": "Published article on distributed systems in InfoQ",
+            "confidence": 0.85
+          },
+          {
+            "category_key": "market_presence",
+            "fact_title": "Speaker at PyCon 2023",
+            "fact_detail": "Speaker at PyCon 2023",
+            "confidence": 0.85
+          }
+        ],
+        "total_extracted": 22,
+        "duplicates_filtered": 0
+      }
+    ],
+    "insert-facts": [
+      {
+        "document_id": "doc-a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+        "profile_id": "d654bdd6-17ea-4d46-8222-b29ad507b633",
+        "facts": [],
+        "total_extracted": 22,
+        "duplicates_filtered": 0,
+        "inserted_facts": [
+          {
+            "id": "fact-1732607400000-0",
+            "profile_id": "d654bdd6-17ea-4d46-8222-b29ad507b633",
+            "category_key": "professional_foundation",
+            "fact_title": "Senior Software Engineer at Stripe with 5 years experience",
+            "fact_detail": "Senior Software Engineer at Stripe with 5 years experience",
+            "extraction_source": "cv_extraction",
+            "source_document_id": "doc-a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+            "confidence": 0.85,
+            "created_at": "2024-11-26T12:50:00.000Z"
+          },
+          {
+            "id": "fact-1732607400000-1",
+            "profile_id": "d654bdd6-17ea-4d46-8222-b29ad507b633",
+            "category_key": "professional_foundation",
+            "fact_title": "Previously Staff Engineer at Google for 3 years",
+            "fact_detail": "Previously Staff Engineer at Google for 3 years",
+            "extraction_source": "cv_extraction",
+            "source_document_id": "doc-a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+            "confidence": 0.85,
+            "created_at": "2024-11-26T12:50:00.000Z"
+          },
+          {
+            "id": "fact-1732607400000-2",
+            "profile_id": "d654bdd6-17ea-4d46-8222-b29ad507b633",
+            "category_key": "impact_achievement",
+            "fact_title": "Reduced API latency by 40% through caching optimization",
+            "fact_detail": "Reduced API latency by 40% through caching optimization",
+            "extraction_source": "cv_extraction",
+            "source_document_id": "doc-a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+            "confidence": 0.85,
+            "created_at": "2024-11-26T12:50:00.000Z"
+          },
+          {
+            "id": "fact-1732607400000-3",
+            "profile_id": "d654bdd6-17ea-4d46-8222-b29ad507b633",
+            "category_key": "operational_excellence",
+            "fact_title": "Expert in Python, Go, and TypeScript",
+            "fact_detail": "Expert in Python, Go, and TypeScript",
+            "extraction_source": "cv_extraction",
+            "source_document_id": "doc-a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+            "confidence": 0.85,
+            "created_at": "2024-11-26T12:50:00.000Z"
+          }
+        ],
+        "facts_created": 4
+      }
+    ],
+    "create-relationships": [
+      {
+        "document_id": "doc-a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+        "profile_id": "d654bdd6-17ea-4d46-8222-b29ad507b633",
+        "facts": [],
+        "total_extracted": 22,
+        "duplicates_filtered": 0,
+        "inserted_facts": [],
+        "facts_created": 4,
+        "relationships_created": 2
+      }
+    ],
+    "queue-mem0-sync": [
+      {
+        "document_id": "doc-a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+        "profile_id": "d654bdd6-17ea-4d46-8222-b29ad507b633",
+        "facts": [],
+        "total_extracted": 22,
+        "duplicates_filtered": 0,
+        "inserted_facts": [],
+        "facts_created": 4,
+        "relationships_created": 2,
+        "mem0_queued": 4
+      }
+    ],
+    "update-document-complete": [
+      {
+        "status": "success",
+        "document_id": "doc-a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+        "facts_created": 4,
+        "relationships_created": 2,
+        "mem0_queued": 4
+      }
+    ],
+    "respond-200-success": [
+      {
+        "status": "success",
+        "document_id": "doc-a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+        "facts_created": 4,
+        "relationships_created": 2,
+        "mem0_queued": 4
+      }
+    ]
+  },
+  "settings": {},
+  "tags": [],
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "d660c8d1ec82335c55c8ab9e582b0038fa983ea7127f17cbb5c7a54c713aa590"
+  }
+}

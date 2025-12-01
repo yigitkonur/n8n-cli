@@ -124,35 +124,3 @@ export function extractOperationContext(config: Record<string, unknown>): Operat
   };
 }
 
-/**
- * Get visibility requirement explanation for a property
- * Useful for error messages explaining why a property is hidden
- */
-export function getVisibilityRequirement(
-  prop: NodeProperty,
-  config: Record<string, unknown>
-): string | undefined {
-  if (!prop || !prop.displayOptions?.show) {
-    return undefined;
-  }
-
-  const requirements: string[] = [];
-  for (const [field, values] of Object.entries(prop.displayOptions.show)) {
-    const expectedValues = Array.isArray(values) ? values : [values];
-    const currentValue = config[field];
-
-    // Only include if the current value doesn't match
-    if (!expectedValues.includes(currentValue)) {
-      const valueStr = expectedValues.length === 1
-        ? `"${expectedValues[0]}"`
-        : expectedValues.map(v => `"${v}"`).join(' or ');
-      requirements.push(`${field}=${valueStr}`);
-    }
-  }
-
-  if (requirements.length === 0) {
-    return undefined;
-  }
-
-  return `Requires: ${requirements.join(', ')}`;
-}

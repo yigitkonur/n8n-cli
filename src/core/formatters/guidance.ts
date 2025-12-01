@@ -166,31 +166,6 @@ export function formatPostUpdateGuidance(guidanceList: PostUpdateGuidance[]): st
 }
 
 /**
- * Format guidance in a compact single-line format (for --quiet mode or logging)
- */
-export function formatGuidanceCompact(guidanceList: PostUpdateGuidance[]): string {
-  if (!guidanceList || guidanceList.length === 0) {
-    return '';
-  }
-
-  const lines: string[] = [];
-  
-  for (const g of guidanceList) {
-    const statusIcon = g.migrationStatus === 'complete' ? '✓' : g.migrationStatus === 'partial' ? '◐' : '✋';
-    const confColor = g.confidence === 'HIGH' ? chalk.green : g.confidence === 'MEDIUM' ? chalk.yellow : chalk.red;
-    
-    lines.push(
-      `${statusIcon} ${g.nodeName} (${g.nodeType}): ` +
-      `${confColor(g.confidence)} confidence, ` +
-      `${g.requiredActions.length} actions, ` +
-      `${g.estimatedTime}`
-    );
-  }
-  
-  return lines.join('\n');
-}
-
-/**
  * Format guidance summary header (shows count and overall status)
  */
 export function formatGuidanceSummary(guidanceList: PostUpdateGuidance[]): string {

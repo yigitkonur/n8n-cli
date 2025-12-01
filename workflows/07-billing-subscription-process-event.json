@@ -1,0 +1,1295 @@
+{
+  "name": "[07] [event] [billing] [subscription process]",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "internal/billing/subscription-process",
+        "authentication": "headerAuth",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+      "name": "webhook-subscription-event",
+      "position": [
+        0,
+        0
+      ],
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "webhookId": "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "InternalWebhookKey1",
+          "name": "Internal Webhook Key"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/revenuecat_event",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "id",
+              "value": "=eq.{{ $json.body.revenuecat_event_id }}"
+            },
+            {
+              "name": "select",
+              "value": "*"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f",
+      "name": "fetch-event-details",
+      "position": [
+        250,
+        0
+      ],
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "SupabaseServiceRole1",
+          "name": "Supabase account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const body = $('webhook-subscription-event').item.json.body;\nconst eventData = $input.item.json;\nconst event = Array.isArray(eventData) ? eventData[0] : eventData;\n\nif (!body.profile_id) {\n  throw new Error('Missing profile_id - cannot process subscription event');\n}\n\nif (!event || !event.product_id) {\n  throw new Error('Missing product_id in event data');\n}\n\nreturn {\n  json: {\n    profile_id: body.profile_id,\n    event_id: body.revenuecat_event_id,\n    event_type: body.event_type,\n    product_id: event.product_id,\n    period_type: event.period_type || 'NORMAL',\n    store: event.store,\n    is_sandbox: event.environment === 'SANDBOX',\n    transaction_id: event.transaction_id,\n    original_transaction_id: event.original_transaction_id,\n    app_user_id: event.app_user_id,\n    purchased_at_ms: event.purchased_at_ms,\n    expiration_at_ms: event.expiration_at_ms,\n    price_usd: event.price_usd,\n    currency: event.currency,\n    event_details: event.event_details || {}\n  }\n};"
+      },
+      "id": "d4e5f6a7-b8c9-4d0e-1f2a-3b4c5d6e7f8a",
+      "name": "validate-event",
+      "position": [
+        500,
+        0
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "name": "error_type",
+              "type": "string",
+              "value": "VALIDATION_ERROR"
+            },
+            {
+              "name": "error_message",
+              "type": "string",
+              "value": "={{ $json.message }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "e5f6a7b8-c9d0-4e1f-2a3b-4c5d6e7f8a9b",
+      "name": "set-validation-error",
+      "position": [
+        500,
+        200
+      ],
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/revenuecat_event",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "id",
+              "value": "=eq.{{ $('webhook-subscription-event').item.json.body.revenuecat_event_id }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"processing_error\": \"{{ $json.error_message }}\",\n  \"processed\": false\n}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "f6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b0c",
+      "name": "mark-event-failed",
+      "position": [
+        750,
+        200
+      ],
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "SupabaseServiceRole1",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "rules",
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.event_type }}",
+                    "rightValue": "INITIAL_PURCHASE",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and",
+                "options": {
+                  "version": 2,
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
+                }
+              },
+              "renameOutput": true,
+              "outputKey": "initial_purchase"
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.event_type }}",
+                    "rightValue": "RENEWAL",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and",
+                "options": {
+                  "version": 2,
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
+                }
+              },
+              "renameOutput": true,
+              "outputKey": "renewal"
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.event_type }}",
+                    "rightValue": "UNCANCELLATION",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and",
+                "options": {
+                  "version": 2,
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
+                }
+              },
+              "renameOutput": true,
+              "outputKey": "uncancellation"
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.event_type }}",
+                    "rightValue": "CANCELLATION",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and",
+                "options": {
+                  "version": 2,
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
+                }
+              },
+              "renameOutput": true,
+              "outputKey": "cancellation"
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.event_type }}",
+                    "rightValue": "EXPIRATION",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and",
+                "options": {
+                  "version": 2,
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
+                }
+              },
+              "renameOutput": true,
+              "outputKey": "expiration"
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.event_type }}",
+                    "rightValue": "BILLING_ISSUE",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and",
+                "options": {
+                  "version": 2,
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
+                }
+              },
+              "renameOutput": true,
+              "outputKey": "billing_issue"
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.event_type }}",
+                    "rightValue": "SUBSCRIPTION_PAUSED",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and",
+                "options": {
+                  "version": 2,
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
+                }
+              },
+              "renameOutput": true,
+              "outputKey": "paused"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "id": "a7b8c9d0-e1f2-4a3b-4c5d-6e7f8a9b0c1d",
+      "name": "switch-event-type",
+      "position": [
+        750,
+        0
+      ],
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/subscription",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Prefer",
+              "value": "resolution=merge-duplicates"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"profile_id\": \"{{ $json.profile_id }}\",\n  \"rc_app_user_id\": \"{{ $json.app_user_id }}\",\n  \"rc_transaction_id\": \"{{ $json.transaction_id }}\",\n  \"rc_original_transaction_id\": \"{{ $json.original_transaction_id }}\",\n  \"product_id\": \"{{ $json.product_id }}\",\n  \"store\": \"{{ $json.store }}\",\n  \"is_sandbox\": {{ $json.is_sandbox }},\n  \"status\": \"active\",\n  \"period_type\": \"{{ $json.period_type }}\",\n  \"purchased_at\": \"{{ new Date($json.purchased_at_ms).toISOString() }}\",\n  \"original_purchased_at\": \"{{ new Date($json.purchased_at_ms).toISOString() }}\",\n  \"expires_at\": \"{{ new Date($json.expiration_at_ms).toISOString() }}\",\n  \"will_renew\": true,\n  \"price_usd\": {{ $json.price_usd || 0 }},\n  \"currency\": \"{{ $json.currency || 'USD' }}\"\n}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "b8c9d0e1-f2a3-4b4c-5d6e-7f8a9b0c1d2e",
+      "name": "upsert-subscription-active",
+      "position": [
+        1000,
+        -200
+      ],
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "SupabaseServiceRole1",
+          "name": "Supabase account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/entitlement",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Prefer",
+              "value": "resolution=merge-duplicates"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"profile_id\": \"{{ $('validate-event').item.json.profile_id }}\",\n  \"entitlement_id\": \"pro\",\n  \"product_id\": \"{{ $('validate-event').item.json.product_id }}\",\n  \"is_active\": true,\n  \"will_renew\": true,\n  \"period_type\": \"{{ $('validate-event').item.json.period_type }}\",\n  \"ownership_type\": \"PURCHASED\",\n  \"original_purchase_at\": \"{{ new Date($('validate-event').item.json.purchased_at_ms).toISOString() }}\",\n  \"latest_purchase_at\": \"{{ new Date($('validate-event').item.json.purchased_at_ms).toISOString() }}\",\n  \"expires_at\": \"{{ new Date($('validate-event').item.json.expiration_at_ms).toISOString() }}\",\n  \"store\": \"{{ $('validate-event').item.json.store }}\",\n  \"is_sandbox\": {{ $('validate-event').item.json.is_sandbox }}\n}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "c9d0e1f2-a3b4-4c5d-6e7f-8a9b0c1d2e3f",
+      "name": "upsert-entitlement-active",
+      "position": [
+        1250,
+        -200
+      ],
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "SupabaseServiceRole1",
+          "name": "Supabase account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "should-grant-credits-1",
+              "leftValue": "={{ ['INITIAL_PURCHASE', 'RENEWAL'].includes($('validate-event').item.json.event_type) && $('validate-event').item.json.period_type === 'NORMAL' }}",
+              "operator": {
+                "operation": "equals",
+                "type": "boolean"
+              },
+              "rightValue": true
+            }
+          ],
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          }
+        },
+        "options": {}
+      },
+      "id": "d0e1f2a3-b4c5-4d6e-7f8a-9b0c1d2e3f4a",
+      "name": "check-should-grant-credits",
+      "position": [
+        1500,
+        -200
+      ],
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const profileId = $('validate-event').item.json.profile_id;\nconst subscriptionData = $('upsert-subscription-active').item.json;\nconst subscriptionId = Array.isArray(subscriptionData) && subscriptionData.length > 0 \n  ? subscriptionData[0].id \n  : (subscriptionData.id || $('validate-event').item.json.event_id);\n\n// Return credit transactions to be inserted\nreturn {\n  json: {\n    profile_id: profileId,\n    subscription_id: subscriptionId,\n    credits: [\n      { credit_type: 'apply', amount: 30, description: 'Pro subscription: +30 Apply credits' },\n      { credit_type: 'boost', amount: 5, description: 'Pro subscription: +5 Boost credits' },\n      { credit_type: 'radar', amount: 4, description: 'Pro subscription: +4 Radar credits' }\n    ]\n  }\n};"
+      },
+      "id": "e1f2a3b4-c5d6-4e7f-8a9b-0c1d2e3f4a5b",
+      "name": "prepare-credit-grants",
+      "position": [
+        1750,
+        -300
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/credit_transaction",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "=[\n  {\n    \"profile_id\": \"{{ $json.profile_id }}\",\n    \"credit_type\": \"apply\",\n    \"transaction_type\": \"subscription_grant\",\n    \"amount\": 30,\n    \"related_entity_type\": \"subscription\",\n    \"related_entity_id\": \"{{ $json.subscription_id }}\",\n    \"description\": \"Pro subscription: +30 Apply credits\"\n  },\n  {\n    \"profile_id\": \"{{ $json.profile_id }}\",\n    \"credit_type\": \"boost\",\n    \"transaction_type\": \"subscription_grant\",\n    \"amount\": 5,\n    \"related_entity_type\": \"subscription\",\n    \"related_entity_id\": \"{{ $json.subscription_id }}\",\n    \"description\": \"Pro subscription: +5 Boost credits\"\n  },\n  {\n    \"profile_id\": \"{{ $json.profile_id }}\",\n    \"credit_type\": \"radar\",\n    \"transaction_type\": \"subscription_grant\",\n    \"amount\": 4,\n    \"related_entity_type\": \"subscription\",\n    \"related_entity_id\": \"{{ $json.subscription_id }}\",\n    \"description\": \"Pro subscription: +4 Radar credits\"\n  }\n]",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "f2a3b4c5-d6e7-4f8a-9b0c-1d2e3f4a5b6c",
+      "name": "grant-subscription-credits",
+      "position": [
+        2000,
+        -300
+      ],
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "SupabaseServiceRole1",
+          "name": "Supabase account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineAll",
+        "options": {}
+      },
+      "id": "a3b4c5d6-e7f8-4a9b-0c1d-2e3f4a5b6c7d",
+      "name": "merge-activation-complete",
+      "position": [
+        2250,
+        -200
+      ],
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/subscription",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "profile_id",
+              "value": "=eq.{{ $json.profile_id }}"
+            },
+            {
+              "name": "rc_original_transaction_id",
+              "value": "=eq.{{ $json.original_transaction_id }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"will_renew\": false,\n  \"cancel_reason\": \"{{ $json.event_details.cancel_reason || 'UNSUBSCRIBE' }}\",\n  \"unsubscribe_detected_at\": \"{{ new Date().toISOString() }}\"\n}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "b4c5d6e7-f8a9-4b0c-1d2e-3f4a5b6c7d8e",
+      "name": "update-subscription-cancelled",
+      "position": [
+        1000,
+        0
+      ],
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "SupabaseServiceRole1",
+          "name": "Supabase account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/subscription",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "profile_id",
+              "value": "=eq.{{ $json.profile_id }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"status\": \"expired\",\n  \"will_renew\": false\n}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "c5d6e7f8-a9b0-4c1d-2e3f-4a5b6c7d8e9f",
+      "name": "update-subscription-expired",
+      "position": [
+        1000,
+        200
+      ],
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "SupabaseServiceRole1",
+          "name": "Supabase account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/entitlement",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "profile_id",
+              "value": "=eq.{{ $('validate-event').item.json.profile_id }}"
+            },
+            {
+              "name": "entitlement_id",
+              "value": "=eq.pro"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"is_active\": false,\n  \"will_renew\": false\n}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "d6e7f8a9-b0c1-4d2e-3f4a-5b6c7d8e9f0a",
+      "name": "deactivate-entitlement",
+      "position": [
+        1250,
+        200
+      ],
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "SupabaseServiceRole1",
+          "name": "Supabase account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/profile",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "id",
+              "value": "=eq.{{ $('validate-event').item.json.profile_id }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"subscription_tier\": \"free\"\n}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "e7f8a9b0-c1d2-4e3f-4a5b-6c7d8e9f0a1b",
+      "name": "downgrade-profile-tier",
+      "position": [
+        1500,
+        200
+      ],
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "SupabaseServiceRole1",
+          "name": "Supabase account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/subscription",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "profile_id",
+              "value": "=eq.{{ $json.profile_id }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"status\": \"billing_issue\",\n  \"billing_issue_detected_at\": \"{{ new Date().toISOString() }}\",\n  \"grace_period_expires_at\": {{ $json.event_details.grace_period_expiration_at_ms ? '\"' + new Date($json.event_details.grace_period_expiration_at_ms).toISOString() + '\"' : null }}\n}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "f8a9b0c1-d2e3-4f4a-5b6c-7d8e9f0a1b2c",
+      "name": "update-subscription-billing-issue",
+      "position": [
+        1000,
+        400
+      ],
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "SupabaseServiceRole1",
+          "name": "Supabase account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/subscription",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "profile_id",
+              "value": "=eq.{{ $json.profile_id }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"status\": \"paused\",\n  \"auto_resume_at\": {{ $json.event_details.auto_resume_at_ms ? '\"' + new Date($json.event_details.auto_resume_at_ms).toISOString() + '\"' : null }}\n}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "a9b0c1d2-e3f4-4a5b-6c7d-8e9f0a1b2c3d",
+      "name": "update-subscription-paused",
+      "position": [
+        1000,
+        600
+      ],
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "SupabaseServiceRole1",
+          "name": "Supabase account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineAll",
+        "options": {}
+      },
+      "id": "b0c1d2e3-f4a5-4b6c-7d8e-9f0a1b2c3d4e",
+      "name": "merge-all-paths",
+      "position": [
+        2500,
+        200
+      ],
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/revenuecat_event",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "id",
+              "value": "=eq.{{ $('webhook-subscription-event').item.json.body.revenuecat_event_id }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"processed\": true,\n  \"processed_at\": \"{{ new Date().toISOString() }}\"\n}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+      "name": "mark-event-processed",
+      "position": [
+        2750,
+        200
+      ],
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "SupabaseServiceRole1",
+          "name": "Supabase account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "webhook-subscription-event": {
+      "main": [
+        [
+          {
+            "node": "fetch-event-details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "fetch-event-details": {
+      "main": [
+        [
+          {
+            "node": "validate-event",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "mark-event-failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "validate-event": {
+      "main": [
+        [
+          {
+            "node": "switch-event-type",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "set-validation-error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "set-validation-error": {
+      "main": [
+        [
+          {
+            "node": "mark-event-failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "switch-event-type": {
+      "main": [
+        [
+          {
+            "node": "upsert-subscription-active",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "upsert-subscription-active",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "upsert-subscription-active",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "update-subscription-cancelled",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "update-subscription-expired",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "update-subscription-billing-issue",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "update-subscription-paused",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "merge-all-paths",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "upsert-subscription-active": {
+      "main": [
+        [
+          {
+            "node": "upsert-entitlement-active",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "upsert-entitlement-active": {
+      "main": [
+        [
+          {
+            "node": "check-should-grant-credits",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "check-should-grant-credits": {
+      "main": [
+        [
+          {
+            "node": "prepare-credit-grants",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "merge-activation-complete",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "prepare-credit-grants": {
+      "main": [
+        [
+          {
+            "node": "grant-subscription-credits",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "grant-subscription-credits": {
+      "main": [
+        [
+          {
+            "node": "merge-activation-complete",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "merge-activation-complete": {
+      "main": [
+        [
+          {
+            "node": "merge-all-paths",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "update-subscription-cancelled": {
+      "main": [
+        [
+          {
+            "node": "merge-all-paths",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "update-subscription-expired": {
+      "main": [
+        [
+          {
+            "node": "deactivate-entitlement",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "deactivate-entitlement": {
+      "main": [
+        [
+          {
+            "node": "downgrade-profile-tier",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "downgrade-profile-tier": {
+      "main": [
+        [
+          {
+            "node": "merge-all-paths",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "update-subscription-billing-issue": {
+      "main": [
+        [
+          {
+            "node": "merge-all-paths",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "update-subscription-paused": {
+      "main": [
+        [
+          {
+            "node": "merge-all-paths",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "merge-all-paths": {
+      "main": [
+        [
+          {
+            "node": "mark-event-processed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {
+    "webhook-subscription-event": [
+      {
+        "headers": {
+          "host": "aura.zeogen.com",
+          "x-internal-key": "internal-webhook-secret-key",
+          "content-type": "application/json"
+        },
+        "body": {
+          "revenuecat_event_id": "550e8400-e29b-41d4-a716-446655440001",
+          "profile_id": "d654bdd6-4e8a-4b9c-9f12-3456789abcde",
+          "event_type": "INITIAL_PURCHASE"
+        }
+      }
+    ],
+    "fetch-event-details": [
+      {
+        "id": "550e8400-e29b-41d4-a716-446655440001",
+        "profile_id": "d654bdd6-4e8a-4b9c-9f12-3456789abcde",
+        "event_type": "INITIAL_PURCHASE",
+        "product_id": "aura_pro_monthly",
+        "period_type": "NORMAL",
+        "store": "APP_STORE",
+        "environment": "PRODUCTION",
+        "transaction_id": "2000000123456789",
+        "original_transaction_id": "2000000123456789",
+        "app_user_id": "$RCAnonymousID:abc123def456",
+        "purchased_at_ms": 1732608000000,
+        "expiration_at_ms": 1735286400000,
+        "price_usd": 9.99,
+        "currency": "USD",
+        "event_details": {},
+        "processed": false,
+        "processing_error": null
+      }
+    ],
+    "validate-event": [
+      {
+        "profile_id": "d654bdd6-4e8a-4b9c-9f12-3456789abcde",
+        "event_id": "550e8400-e29b-41d4-a716-446655440001",
+        "event_type": "INITIAL_PURCHASE",
+        "product_id": "aura_pro_monthly",
+        "period_type": "NORMAL",
+        "store": "APP_STORE",
+        "is_sandbox": false,
+        "transaction_id": "2000000123456789",
+        "original_transaction_id": "2000000123456789",
+        "app_user_id": "$RCAnonymousID:abc123def456",
+        "purchased_at_ms": 1732608000000,
+        "expiration_at_ms": 1735286400000,
+        "price_usd": 9.99,
+        "currency": "USD",
+        "event_details": {}
+      }
+    ],
+    "switch-event-type": [
+      {
+        "profile_id": "d654bdd6-4e8a-4b9c-9f12-3456789abcde",
+        "event_id": "550e8400-e29b-41d4-a716-446655440001",
+        "event_type": "INITIAL_PURCHASE",
+        "product_id": "aura_pro_monthly",
+        "period_type": "NORMAL",
+        "store": "APP_STORE",
+        "is_sandbox": false,
+        "transaction_id": "2000000123456789",
+        "original_transaction_id": "2000000123456789",
+        "app_user_id": "$RCAnonymousID:abc123def456",
+        "purchased_at_ms": 1732608000000,
+        "expiration_at_ms": 1735286400000,
+        "price_usd": 9.99,
+        "currency": "USD",
+        "event_details": {}
+      }
+    ],
+    "upsert-subscription-active": [
+      {
+        "id": "sub-550e8400-e29b-41d4-a716-446655440001",
+        "profile_id": "d654bdd6-4e8a-4b9c-9f12-3456789abcde",
+        "rc_app_user_id": "$RCAnonymousID:abc123def456",
+        "rc_transaction_id": "2000000123456789",
+        "rc_original_transaction_id": "2000000123456789",
+        "product_id": "aura_pro_monthly",
+        "store": "APP_STORE",
+        "is_sandbox": false,
+        "status": "active",
+        "period_type": "NORMAL",
+        "purchased_at": "2024-11-26T12:00:00.000Z",
+        "original_purchased_at": "2024-11-26T12:00:00.000Z",
+        "expires_at": "2024-12-26T12:00:00.000Z",
+        "will_renew": true,
+        "price_usd": 9.99,
+        "currency": "USD"
+      }
+    ],
+    "upsert-entitlement-active": [
+      {
+        "id": "ent-550e8400-e29b-41d4-a716-446655440001",
+        "profile_id": "d654bdd6-4e8a-4b9c-9f12-3456789abcde",
+        "entitlement_id": "pro",
+        "product_id": "aura_pro_monthly",
+        "is_active": true,
+        "will_renew": true,
+        "period_type": "NORMAL",
+        "ownership_type": "PURCHASED",
+        "original_purchase_at": "2024-11-26T12:00:00.000Z",
+        "latest_purchase_at": "2024-11-26T12:00:00.000Z",
+        "expires_at": "2024-12-26T12:00:00.000Z",
+        "store": "APP_STORE",
+        "is_sandbox": false
+      }
+    ],
+    "check-should-grant-credits": [
+      {
+        "profile_id": "d654bdd6-4e8a-4b9c-9f12-3456789abcde",
+        "event_type": "INITIAL_PURCHASE",
+        "period_type": "NORMAL",
+        "should_grant": true
+      }
+    ],
+    "prepare-credit-grants": [
+      {
+        "profile_id": "d654bdd6-4e8a-4b9c-9f12-3456789abcde",
+        "subscription_id": "sub-550e8400-e29b-41d4-a716-446655440001",
+        "credits": [
+          {
+            "credit_type": "apply",
+            "amount": 30,
+            "description": "Pro subscription: +30 Apply credits"
+          },
+          {
+            "credit_type": "boost",
+            "amount": 5,
+            "description": "Pro subscription: +5 Boost credits"
+          },
+          {
+            "credit_type": "radar",
+            "amount": 4,
+            "description": "Pro subscription: +4 Radar credits"
+          }
+        ]
+      }
+    ],
+    "grant-subscription-credits": [
+      {
+        "id": "txn-001",
+        "profile_id": "d654bdd6-4e8a-4b9c-9f12-3456789abcde",
+        "credit_type": "apply",
+        "transaction_type": "subscription_grant",
+        "amount": 30,
+        "related_entity_type": "subscription",
+        "related_entity_id": "sub-550e8400-e29b-41d4-a716-446655440001"
+      },
+      {
+        "id": "txn-002",
+        "profile_id": "d654bdd6-4e8a-4b9c-9f12-3456789abcde",
+        "credit_type": "boost",
+        "transaction_type": "subscription_grant",
+        "amount": 5,
+        "related_entity_type": "subscription",
+        "related_entity_id": "sub-550e8400-e29b-41d4-a716-446655440001"
+      },
+      {
+        "id": "txn-003",
+        "profile_id": "d654bdd6-4e8a-4b9c-9f12-3456789abcde",
+        "credit_type": "radar",
+        "transaction_type": "subscription_grant",
+        "amount": 4,
+        "related_entity_type": "subscription",
+        "related_entity_id": "sub-550e8400-e29b-41d4-a716-446655440001"
+      }
+    ],
+    "merge-activation-complete": [
+      {
+        "status": "activation_complete",
+        "profile_id": "d654bdd6-4e8a-4b9c-9f12-3456789abcde",
+        "subscription_id": "sub-550e8400-e29b-41d4-a716-446655440001",
+        "credits_granted": true
+      }
+    ],
+    "update-subscription-cancelled": [
+      {
+        "profile_id": "d654bdd6-4e8a-4b9c-9f12-3456789abcde",
+        "will_renew": false,
+        "cancel_reason": "UNSUBSCRIBE",
+        "unsubscribe_detected_at": "2024-11-26T12:00:00.000Z"
+      }
+    ],
+    "update-subscription-expired": [
+      {
+        "profile_id": "d654bdd6-4e8a-4b9c-9f12-3456789abcde",
+        "status": "expired",
+        "will_renew": false
+      }
+    ],
+    "deactivate-entitlement": [
+      {
+        "profile_id": "d654bdd6-4e8a-4b9c-9f12-3456789abcde",
+        "entitlement_id": "pro",
+        "is_active": false,
+        "will_renew": false
+      }
+    ],
+    "downgrade-profile-tier": [
+      {
+        "id": "d654bdd6-4e8a-4b9c-9f12-3456789abcde",
+        "subscription_tier": "free"
+      }
+    ],
+    "update-subscription-billing-issue": [
+      {
+        "profile_id": "d654bdd6-4e8a-4b9c-9f12-3456789abcde",
+        "status": "billing_issue",
+        "billing_issue_detected_at": "2024-11-26T12:00:00.000Z",
+        "grace_period_expires_at": "2024-12-03T12:00:00.000Z"
+      }
+    ],
+    "update-subscription-paused": [
+      {
+        "profile_id": "d654bdd6-4e8a-4b9c-9f12-3456789abcde",
+        "status": "paused",
+        "auto_resume_at": "2025-01-26T12:00:00.000Z"
+      }
+    ],
+    "merge-all-paths": [
+      {
+        "status": "processed",
+        "profile_id": "d654bdd6-4e8a-4b9c-9f12-3456789abcde",
+        "event_type": "INITIAL_PURCHASE"
+      }
+    ],
+    "mark-event-processed": [
+      {
+        "id": "550e8400-e29b-41d4-a716-446655440001",
+        "processed": true,
+        "processed_at": "2024-11-26T12:00:00.000Z"
+      }
+    ]
+  },
+  "settings": {},
+  "tags": [],
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "d660c8d1ec82335c55c8ab9e582b0038fa983ea7127f17cbb5c7a54c713aa590"
+  }
+}

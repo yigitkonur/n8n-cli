@@ -125,64 +125,6 @@ export function promptInput(
 }
 
 /**
- * Prompt for sensitive input (like API keys)
- * Input is hidden from the terminal
- * @param message - Prompt message
- */
-export function promptSecret(message: string): Promise<string> {
-  if (isNonInteractive()) {
-    throw new Error(
-      'Cannot prompt for secret input in non-interactive mode.\n' +
-      'Provide required values via command-line flags or environment variables.'
-    );
-  }
-  
-  const prompt = `${message}: `;
-  
-  return new Promise((resolve) => {
-    const rl = readline.createInterface({
-      input: process.stdin,
-      output: process.stdout,
-    });
-    
-    // Hide input by not echoing
-    if (process.stdin.isTTY) {
-      process.stdin.setRawMode?.(true);
-    }
-    
-    process.stdout.write(chalk.cyan(prompt));
-    
-    let input = '';
-    
-    const onData = (char: Buffer) => {
-      const c = char.toString();
-      
-      if (c === '\n' || c === '\r') {
-        process.stdin.setRawMode?.(false);
-        process.stdin.removeListener('data', onData);
-        process.stdout.write('\n');
-        rl.close();
-        resolve(input);
-      } else if (c === '\u0003') { // Ctrl+C
-        process.stdin.setRawMode?.(false);
-        process.stdin.removeListener('data', onData);
-        console.log(chalk.yellow('\nAborted.'));
-        rl.close();
-        process.exit(1);
-      } else if (c === '\u007F' || c === '\b') { // Backspace
-        if (input.length > 0) {
-          input = input.slice(0, -1);
-        }
-      } else {
-        input += c;
-      }
-    };
-    
-    process.stdin.on('data', onData);
-  });
-}
-
-/**
  * Prompt user for confirmation
  * 
  * @param message - The message to display

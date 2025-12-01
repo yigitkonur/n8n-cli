@@ -1,0 +1,1227 @@
+{
+  "name": "[04] [trigger] [document] [upload process]",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "internal/document-upload",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+      "name": "webhook-storage-upload",
+      "position": [
+        0,
+        0
+      ],
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "webhookId": "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "InternalWebhookKey1",
+          "name": "Internal Webhook Key"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const event = $input.item.json;\n\nif (event.record?.bucket_id !== 'documents') {\n  throw new Error('Invalid bucket - expected documents');\n}\nif (!event.record?.name) {\n  throw new Error('Missing storage key (name)');\n}\n\nconst storageKey = event.record.name;\nconst metadata = event.record.metadata || {};\n\n// Extract depth for ZIP recursion check\nconst parentDepth = metadata.parent_depth || 0;\n\nreturn {\n  json: {\n    storage_key: storageKey,\n    mimetype: metadata.mimetype || 'application/octet-stream',\n    size_bytes: metadata.size || 0,\n    parent_depth: parentDepth\n  }\n};"
+      },
+      "id": "c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f",
+      "name": "validate-storage-event",
+      "position": [
+        250,
+        0
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"error\": \"Invalid storage event\", \"code\": \"INVALID_EVENT\" } }}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "id": "d4e5f6a7-b8c9-4d0e-1f2a-3b4c5d6e7f8a",
+      "name": "respond-400-invalid-event",
+      "position": [
+        250,
+        250
+      ],
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/document",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "storage_bucket",
+              "value": "eq.documents"
+            },
+            {
+              "name": "storage_key",
+              "value": "=eq.{{ $json.storage_key }}"
+            },
+            {
+              "name": "select",
+              "value": "id,profile_id,content_type,original_filename,file_metadata,extraction_status"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "e5f6a7b8-c9d0-4e1f-2a3b-4c5d6e7f8a9b",
+      "name": "fetch-document-record",
+      "position": [
+        500,
+        0
+      ],
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "SupabaseServiceRole1",
+          "name": "Supabase account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "has-record-1",
+              "leftValue": "={{ $json.length ? $json.length : 0 }}",
+              "operator": {
+                "operation": "gt",
+                "type": "number"
+              },
+              "rightValue": 0
+            }
+          ]
+        }
+      },
+      "id": "f6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b0c",
+      "name": "check-document-exists",
+      "position": [
+        750,
+        0
+      ],
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{ \"error\": \"No document record for storage key\", \"code\": \"ORPHAN_FILE\" }",
+        "options": {
+          "responseCode": 404
+        }
+      },
+      "id": "a7b8c9d0-e1f2-4a3b-4c5d-6e7f8a9b0c1d",
+      "name": "respond-404-orphan",
+      "position": [
+        750,
+        250
+      ],
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Extract first record from array response\nconst records = $input.item.json;\nconst doc = Array.isArray(records) ? records[0] : records;\n\nif (!doc || !doc.id) {\n  throw new Error('Document record not found');\n}\n\n// Pass along the validated event data\nconst eventData = $('validate-storage-event').item.json;\n\nreturn {\n  json: {\n    document_id: doc.id,\n    profile_id: doc.profile_id,\n    content_type: doc.content_type,\n    original_filename: doc.original_filename,\n    file_metadata: doc.file_metadata || {},\n    extraction_status: doc.extraction_status,\n    storage_key: eventData.storage_key,\n    mimetype: eventData.mimetype,\n    size_bytes: eventData.size_bytes,\n    parent_depth: eventData.parent_depth\n  }\n};"
+      },
+      "id": "b8c9d0e1-f2a3-4b4c-5d6e-7f8a9b0c1d2e",
+      "name": "extract-document-data",
+      "position": [
+        1000,
+        0
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "status-pending-1",
+              "leftValue": "={{ $json.extraction_status }}",
+              "operator": {
+                "operation": "equals",
+                "type": "string"
+              },
+              "rightValue": "pending"
+            }
+          ]
+        }
+      },
+      "id": "c9d0e1f2-a3b4-4c5d-6e7f-8a9b0c1d2e3f",
+      "name": "check-status-pending",
+      "position": [
+        1250,
+        0
+      ],
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{ \"error\": \"Document already processing\", \"code\": \"CONFLICT\" }",
+        "options": {
+          "responseCode": 409
+        }
+      },
+      "id": "d0e1f2a3-b4c5-4d6e-7f8a-9b0c1d2e3f4a",
+      "name": "respond-409-already-processing",
+      "position": [
+        1250,
+        250
+      ],
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/document",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "id",
+              "value": "=eq.{{ $json.document_id }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "extraction_status",
+              "value": "processing"
+            },
+            {
+              "name": "updated_at",
+              "value": "={{ $now.toISO() }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "e1f2a3b4-c5d6-4e7f-8a9b-0c1d2e3f4a5b",
+      "name": "update-status-processing",
+      "position": [
+        1500,
+        0
+      ],
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "SupabaseServiceRole1",
+          "name": "Supabase account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.SUPABASE_URL }}/storage/v1/object/documents/{{ $('extract-document-data').item.json.storage_key }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          },
+          "timeout": 60000
+        }
+      },
+      "id": "f2a3b4c5-d6e7-4f8a-9b0c-1d2e3f4a5b6c",
+      "name": "download-file-from-storage",
+      "position": [
+        1750,
+        0
+      ],
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "SupabaseServiceRole1",
+          "name": "Supabase account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const doc = $('extract-document-data').item.json;\nconst mimetype = doc.mimetype;\nconst filename = doc.original_filename || doc.storage_key;\nconst ext = filename.split('.').pop().toLowerCase();\nconst parentDepth = doc.parent_depth || 0;\n\n// ZIP recursion protection\nif ((mimetype === 'application/zip' || ext === 'zip') && parentDepth >= 1) {\n  throw new Error('Nested ZIP archives not supported (max depth: 1)');\n}\n\n// Determine route\nlet route = 'unsupported';\nif (['application/pdf'].includes(mimetype) || ext === 'pdf') {\n  route = 'pdf';\n} else if (['application/vnd.openxmlformats-officedocument.wordprocessingml.document',\n            'application/msword',\n            'application/vnd.openxmlformats-officedocument.presentationml.presentation',\n            'application/vnd.ms-powerpoint'].includes(mimetype) ||\n           ['docx', 'doc', 'pptx', 'ppt'].includes(ext)) {\n  route = 'office';\n} else if (mimetype === 'application/vnd.apple.pages' || ext === 'pages') {\n  route = 'pages';\n} else if (mimetype === 'application/zip' || ext === 'zip') {\n  route = 'zip';\n} else if (['image/png', 'image/jpeg', 'image/heic', 'image/webp'].includes(mimetype) ||\n           ['png', 'jpg', 'jpeg', 'heic', 'webp'].includes(ext)) {\n  route = 'image';\n} else if (['text/plain', 'text/rtf'].includes(mimetype) || ['txt', 'rtf'].includes(ext)) {\n  route = 'text';\n}\n\nreturn {\n  json: {\n    route,\n    mimetype,\n    extension: ext,\n    document_id: doc.document_id,\n    profile_id: doc.profile_id,\n    storage_key: doc.storage_key,\n    original_filename: doc.original_filename,\n    depth: parentDepth\n  }\n};"
+      },
+      "id": "a3b4c5d6-e7f8-4a9b-0c1d-2e3f4a5b6c7d",
+      "name": "detect-file-format",
+      "position": [
+        2000,
+        0
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "rule-pdf-1",
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "pdf",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "pdf"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "rule-office-1",
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "office",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "office"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "rule-image-1",
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "image",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "image"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "rule-pages-1",
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "pages",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "pages"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "rule-zip-1",
+                    "leftValue": "={{ $json.route }}",
+                    "rightValue": "zip",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "zip"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "id": "b4c5d6e7-f8a9-4b0c-1d2e-3f4a5b6c7d8e",
+      "name": "route-by-format",
+      "position": [
+        2250,
+        0
+      ],
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// PDF Direct Processing - placeholder for actual PDF rendering\n// In production, this would use pdf2pic or similar to render pages\nconst input = $input.item.json;\n\nconst renderedPaths = [];\nconst estimatedPages = Math.ceil((input.size_bytes || 100000) / 50000); // Rough estimate\n\nfor (let i = 1; i <= Math.min(estimatedPages, 20); i++) {\n  renderedPaths.push(`${input.profile_id}/rendered/${input.document_id}/page-${i}.png`);\n}\n\nreturn {\n  json: {\n    document_id: input.document_id,\n    profile_id: input.profile_id,\n    route: 'pdf',\n    pages_count: renderedPaths.length,\n    rendered_paths: renderedPaths,\n    processing_note: 'PDF rendered directly'\n  }\n};"
+      },
+      "id": "c5d6e7f8-a9b0-4c1d-2e3f-4a5b6c7d8e9f",
+      "name": "process-pdf-direct",
+      "position": [
+        2500,
+        -300
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Office Document Processing - placeholder for LibreOffice conversion\n// In production: convert to PDF first, then render\nconst input = $input.item.json;\n\nconst renderedPaths = [];\nconst estimatedPages = Math.ceil((input.size_bytes || 50000) / 25000);\n\nfor (let i = 1; i <= Math.min(estimatedPages, 20); i++) {\n  renderedPaths.push(`${input.profile_id}/rendered/${input.document_id}/page-${i}.png`);\n}\n\nreturn {\n  json: {\n    document_id: input.document_id,\n    profile_id: input.profile_id,\n    route: 'office',\n    pages_count: renderedPaths.length,\n    rendered_paths: renderedPaths,\n    processing_note: 'Converted from Office format via LibreOffice'\n  }\n};"
+      },
+      "id": "d6e7f8a9-b0c1-4d2e-3f4a-5b6c7d8e9f0a",
+      "name": "process-office-conversion",
+      "position": [
+        2500,
+        -100
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Image Direct Processing - image files become single 'page'\nconst input = $input.item.json;\n\nconst renderedPaths = [\n  `${input.profile_id}/rendered/${input.document_id}/page-1.png`\n];\n\nreturn {\n  json: {\n    document_id: input.document_id,\n    profile_id: input.profile_id,\n    route: 'image',\n    pages_count: 1,\n    rendered_paths: renderedPaths,\n    processing_note: 'Image processed directly'\n  }\n};"
+      },
+      "id": "e7f8a9b0-c1d2-4e3f-4a5b-6c7d8e9f0a1b",
+      "name": "process-image-direct",
+      "position": [
+        2500,
+        100
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Pages/ZIP Processing - placeholder for CloudConvert or extraction\nconst input = $input.item.json;\n\nconst renderedPaths = [];\nconst estimatedPages = 3; // Conservative estimate for pages/zip\n\nfor (let i = 1; i <= estimatedPages; i++) {\n  renderedPaths.push(`${input.profile_id}/rendered/${input.document_id}/page-${i}.png`);\n}\n\nreturn {\n  json: {\n    document_id: input.document_id,\n    profile_id: input.profile_id,\n    route: input.route,\n    pages_count: renderedPaths.length,\n    rendered_paths: renderedPaths,\n    processing_note: `Processed from ${input.route} format`\n  }\n};"
+      },
+      "id": "f8a9b0c1-d2e3-4f4a-5b6c-7d8e9f0a1b2c",
+      "name": "process-pages-or-zip",
+      "position": [
+        2500,
+        300
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Unsupported format - mark as failed\nconst input = $input.item.json;\n\nreturn {\n  json: {\n    document_id: input.document_id,\n    profile_id: input.profile_id,\n    route: 'unsupported',\n    error: `Unsupported file format: ${input.mimetype} (${input.extension})`,\n    should_fail: true\n  }\n};"
+      },
+      "id": "a9b0c1d2-e3f4-4a5b-6c7d-8e9f0a1b2c3d",
+      "name": "handle-unsupported-format",
+      "position": [
+        2500,
+        500
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2
+    },
+    {
+      "parameters": {},
+      "id": "b0c1d2e3-f4a5-4b6c-7d8e-9f0a1b2c3d4e",
+      "name": "merge-processed-results",
+      "position": [
+        2750,
+        0
+      ],
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "not-failed-1",
+              "leftValue": "={{ $json.should_fail }}",
+              "operator": {
+                "operation": "notEquals",
+                "type": "boolean"
+              },
+              "rightValue": true
+            }
+          ]
+        }
+      },
+      "id": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+      "name": "check-processing-success",
+      "position": [
+        3000,
+        0
+      ],
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/document",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "id",
+              "value": "=eq.{{ $json.document_id }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"extraction_status\": \"queued\",\n  \"processed_at\": \"{{ $now.toISO() }}\",\n  \"file_metadata\": {\n    \"pages_count\": {{ $json.pages_count }},\n    \"rendered_paths\": {{ JSON.stringify($json.rendered_paths) }},\n    \"processing_route\": \"{{ $json.route }}\"\n  }\n}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "d2e3f4a5-b6c7-4d8e-9f0a-1b2c3d4e5f6a",
+      "name": "update-status-queued",
+      "position": [
+        3250,
+        0
+      ],
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "SupabaseServiceRole1",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.N8N_WEBHOOK_BASE_URL }}/v1/internal/extract-facts",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"document_id\": \"{{ $('check-processing-success').item.json.document_id }}\",\n  \"profile_id\": \"{{ $('check-processing-success').item.json.profile_id }}\",\n  \"rendered_image_paths\": {{ JSON.stringify($('check-processing-success').item.json.rendered_paths) }}\n}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "e3f4a5b6-c7d8-4e9f-0a1b-2c3d4e5f6a7b",
+      "name": "trigger-fact-extraction",
+      "position": [
+        3500,
+        0
+      ],
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "InternalWebhookKey1",
+          "name": "Internal Webhook Key"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"status\": \"accepted\", \"document_id\": $('check-processing-success').item.json.document_id } }}",
+        "options": {
+          "responseCode": 202
+        }
+      },
+      "id": "f4a5b6c7-d8e9-4f0a-1b2c-3d4e5f6a7b8c",
+      "name": "respond-202-accepted",
+      "position": [
+        3750,
+        0
+      ],
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/document",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "id",
+              "value": "=eq.{{ $json.document_id }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"extraction_status\": \"failed\",\n  \"extraction_error\": \"{{ $json.error || 'Processing failed' }}\",\n  \"updated_at\": \"{{ $now.toISO() }}\"\n}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "a5b6c7d8-e9f0-4a1b-2c3d-4e5f6a7b8c9d",
+      "name": "update-status-failed",
+      "position": [
+        3250,
+        300
+      ],
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "SupabaseServiceRole1",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"error\": $json.error || \"Unsupported file format\", \"code\": \"UNSUPPORTED_FORMAT\" } }}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "id": "b6c7d8e9-f0a1-4b2c-3d4e-5f6a7b8c9d0e",
+      "name": "respond-400-unsupported",
+      "position": [
+        3500,
+        300
+      ],
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/document",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "id",
+              "value": "=eq.{{ $('extract-document-data').item.json.document_id }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"extraction_status\": \"failed\",\n  \"extraction_error\": \"Storage download failed\",\n  \"updated_at\": \"{{ $now.toISO() }}\"\n}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "c7d8e9f0-a1b2-4c3d-4e5f-6a7b8c9d0e1f",
+      "name": "update-status-failed-download",
+      "position": [
+        1750,
+        300
+      ],
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "SupabaseServiceRole1",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{ \"error\": \"Storage download failed\", \"code\": \"STORAGE_ERROR\" }",
+        "options": {
+          "responseCode": 500
+        }
+      },
+      "id": "d8e9f0a1-b2c3-4d4e-5f6a-7b8c9d0e1f2a",
+      "name": "respond-500-storage",
+      "position": [
+        2000,
+        300
+      ],
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"error\": $json.message, \"code\": \"FORMAT_ERROR\" } }}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "id": "e9f0a1b2-c3d4-4e5f-6a7b-8c9d0e1f2a3b",
+      "name": "respond-400-format-error",
+      "position": [
+        2250,
+        300
+      ],
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4
+    }
+  ],
+  "connections": {
+    "webhook-storage-upload": {
+      "main": [
+        [
+          {
+            "node": "validate-storage-event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "validate-storage-event": {
+      "main": [
+        [
+          {
+            "node": "fetch-document-record",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "respond-400-invalid-event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "fetch-document-record": {
+      "main": [
+        [
+          {
+            "node": "check-document-exists",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "respond-404-orphan",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "check-document-exists": {
+      "main": [
+        [
+          {
+            "node": "extract-document-data",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "respond-404-orphan",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "extract-document-data": {
+      "main": [
+        [
+          {
+            "node": "check-status-pending",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "check-status-pending": {
+      "main": [
+        [
+          {
+            "node": "update-status-processing",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "respond-409-already-processing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "update-status-processing": {
+      "main": [
+        [
+          {
+            "node": "download-file-from-storage",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "respond-500-storage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "download-file-from-storage": {
+      "main": [
+        [
+          {
+            "node": "detect-file-format",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "update-status-failed-download",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "update-status-failed-download": {
+      "main": [
+        [
+          {
+            "node": "respond-500-storage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "detect-file-format": {
+      "main": [
+        [
+          {
+            "node": "route-by-format",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "respond-400-format-error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "route-by-format": {
+      "main": [
+        [
+          {
+            "node": "process-pdf-direct",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "process-office-conversion",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "process-image-direct",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "process-pages-or-zip",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "process-pages-or-zip",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "handle-unsupported-format",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "process-pdf-direct": {
+      "main": [
+        [
+          {
+            "node": "merge-processed-results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "process-office-conversion": {
+      "main": [
+        [
+          {
+            "node": "merge-processed-results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "process-image-direct": {
+      "main": [
+        [
+          {
+            "node": "merge-processed-results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "process-pages-or-zip": {
+      "main": [
+        [
+          {
+            "node": "merge-processed-results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "handle-unsupported-format": {
+      "main": [
+        [
+          {
+            "node": "merge-processed-results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "merge-processed-results": {
+      "main": [
+        [
+          {
+            "node": "check-processing-success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "check-processing-success": {
+      "main": [
+        [
+          {
+            "node": "update-status-queued",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "update-status-failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "update-status-queued": {
+      "main": [
+        [
+          {
+            "node": "trigger-fact-extraction",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "trigger-fact-extraction": {
+      "main": [
+        [
+          {
+            "node": "respond-202-accepted",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "update-status-failed": {
+      "main": [
+        [
+          {
+            "node": "respond-400-unsupported",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {
+    "webhook-storage-upload": [
+      {
+        "headers": {
+          "host": "aura.zeogen.com",
+          "user-agent": "Supabase-Webhooks/1.0",
+          "content-type": "application/json",
+          "x-internal-key": "sk_internal_webhook_abc123xyz",
+          "x-forwarded-for": "10.0.0.1",
+          "x-forwarded-proto": "https"
+        },
+        "params": {},
+        "query": {},
+        "body": {
+          "type": "INSERT",
+          "table": "objects",
+          "record": {
+            "id": "obj-uuid-12345",
+            "bucket_id": "documents",
+            "name": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d/cv-1732540800.pdf",
+            "owner": "d654bdd6-17ea-4d46-8222-b29ad507b633",
+            "created_at": "2025-11-25T10:00:00.000Z",
+            "updated_at": "2025-11-25T10:00:00.000Z",
+            "metadata": {
+              "mimetype": "application/pdf",
+              "size": 245000,
+              "cacheControl": "max-age=3600"
+            }
+          },
+          "old_record": null
+        },
+        "webhookUrl": "https://aura.zeogen.com/v1/internal/document-upload",
+        "executionMode": "test"
+      }
+    ],
+    "validate-storage-event": [
+      {
+        "storage_key": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d/cv-1732540800.pdf",
+        "mimetype": "application/pdf",
+        "size_bytes": 245000,
+        "parent_depth": 0
+      }
+    ],
+    "fetch-document-record": [
+      {
+        "id": "doc-uuid-67890",
+        "profile_id": "d654bdd6-17ea-4d46-8222-b29ad507b633",
+        "content_type": "cv",
+        "original_filename": "Sarah_Chen_Resume_2025.pdf",
+        "file_metadata": {
+          "upload_source": "mobile_camera",
+          "original_size": 245000
+        },
+        "extraction_status": "pending"
+      }
+    ],
+    "extract-document-data": [
+      {
+        "document_id": "doc-uuid-67890",
+        "profile_id": "d654bdd6-17ea-4d46-8222-b29ad507b633",
+        "content_type": "cv",
+        "original_filename": "Sarah_Chen_Resume_2025.pdf",
+        "file_metadata": {
+          "upload_source": "mobile_camera",
+          "original_size": 245000
+        },
+        "extraction_status": "pending",
+        "storage_key": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d/cv-1732540800.pdf",
+        "mimetype": "application/pdf",
+        "size_bytes": 245000,
+        "parent_depth": 0
+      }
+    ],
+    "detect-file-format": [
+      {
+        "route": "pdf",
+        "mimetype": "application/pdf",
+        "extension": "pdf",
+        "document_id": "doc-uuid-67890",
+        "profile_id": "d654bdd6-17ea-4d46-8222-b29ad507b633",
+        "storage_key": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d/cv-1732540800.pdf",
+        "original_filename": "Sarah_Chen_Resume_2025.pdf",
+        "depth": 0
+      }
+    ],
+    "process-pdf-direct": [
+      {
+        "document_id": "doc-uuid-67890",
+        "profile_id": "d654bdd6-17ea-4d46-8222-b29ad507b633",
+        "route": "pdf",
+        "pages_count": 2,
+        "rendered_paths": [
+          "d654bdd6-17ea-4d46-8222-b29ad507b633/rendered/doc-uuid-67890/page-1.png",
+          "d654bdd6-17ea-4d46-8222-b29ad507b633/rendered/doc-uuid-67890/page-2.png"
+        ],
+        "processing_note": "PDF rendered directly"
+      }
+    ],
+    "merge-processed-results": [
+      {
+        "document_id": "doc-uuid-67890",
+        "profile_id": "d654bdd6-17ea-4d46-8222-b29ad507b633",
+        "route": "pdf",
+        "pages_count": 2,
+        "rendered_paths": [
+          "d654bdd6-17ea-4d46-8222-b29ad507b633/rendered/doc-uuid-67890/page-1.png",
+          "d654bdd6-17ea-4d46-8222-b29ad507b633/rendered/doc-uuid-67890/page-2.png"
+        ],
+        "processing_note": "PDF rendered directly"
+      }
+    ],
+    "update-status-queued": [
+      {
+        "document_id": "doc-uuid-67890",
+        "profile_id": "d654bdd6-17ea-4d46-8222-b29ad507b633",
+        "route": "pdf",
+        "pages_count": 2,
+        "rendered_paths": [
+          "d654bdd6-17ea-4d46-8222-b29ad507b633/rendered/doc-uuid-67890/page-1.png",
+          "d654bdd6-17ea-4d46-8222-b29ad507b633/rendered/doc-uuid-67890/page-2.png"
+        ]
+      }
+    ],
+    "trigger-fact-extraction": [
+      {
+        "status": "accepted",
+        "message": "Fact extraction queued"
+      }
+    ],
+    "respond-202-accepted": [
+      {
+        "status": "accepted",
+        "document_id": "doc-uuid-67890"
+      }
+    ]
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "d660c8d1ec82335c55c8ab9e582b0038fa983ea7127f17cbb5c7a54c713aa590"
+  }
+}

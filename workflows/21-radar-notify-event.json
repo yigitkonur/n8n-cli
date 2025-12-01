@@ -1,0 +1,877 @@
+{
+  "name": "[21] [event] [radar] [notify]",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "internal/radar/notify",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "21000001-0001-4000-8000-000000000001",
+      "name": "webhook-radar-notify",
+      "position": [
+        0,
+        0
+      ],
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "webhookId": "21000001-0001-4000-8000-000000000002",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "internal-webhook-auth-cred",
+          "name": "Internal Webhook Auth"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const input = $input.item.json;\nconst body = input.body;\n\nconst UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;\n\n// Required field validation\nconst required = ['radar_config_id', 'posting_id', 'board_job_id', 'match_score', 'profile_id'];\nfor (const field of required) {\n  if (!body?.[field]) {\n    throw new Error(`Missing required field: ${field}`);\n  }\n}\n\n// UUID validation\nconst uuidFields = ['radar_config_id', 'posting_id', 'board_job_id', 'profile_id'];\nfor (const field of uuidFields) {\n  if (!UUID_REGEX.test(body[field])) {\n    throw new Error(`Invalid UUID format: ${field}`);\n  }\n}\n\n// Match score validation\nconst score = parseInt(body.match_score, 10);\nif (isNaN(score) || score < 0 || score > 100) {\n  throw new Error('match_score must be integer 0-100');\n}\n\nreturn {\n  json: {\n    radar_config_id: body.radar_config_id,\n    posting_id: body.posting_id,\n    board_job_id: body.board_job_id,\n    match_score: score,\n    profile_id: body.profile_id\n  }\n};"
+      },
+      "id": "21000001-0001-4000-8000-000000000003",
+      "name": "validate-input",
+      "position": [
+        250,
+        0
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"error\": $json.message || 'Validation failed', \"code\": \"VALIDATION_ERROR\" } }}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "id": "21000001-0001-4000-8000-000000000004",
+      "name": "respond-400-validation",
+      "position": [
+        500,
+        250
+      ],
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Simulate Supabase: SELECT id, profile_id, min_match_score, is_active FROM job.radar_config WHERE id = :radar_config_id\nconst radarConfigId = $input.item.json.radar_config_id;\n\n// Simulated radar config for testing\nconst radarConfig = {\n  id: radarConfigId,\n  profile_id: $input.item.json.profile_id,\n  min_match_score: 85,\n  is_active: true\n};\n\nreturn {\n  json: {\n    ...$input.item.json,\n    radar_config: radarConfig\n  }\n};"
+      },
+      "id": "21000001-0001-4000-8000-000000000005",
+      "name": "fetch-radar-config",
+      "position": [
+        500,
+        0
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "condition-radar-exists",
+              "leftValue": "={{ $json.radar_config?.id }}",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              },
+              "rightValue": ""
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "21000001-0001-4000-8000-000000000006",
+      "name": "check-radar-exists",
+      "position": [
+        750,
+        0
+      ],
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{ \"error\": \"Radar configuration not found\", \"code\": \"RADAR_NOT_FOUND\" }",
+        "options": {
+          "responseCode": 404
+        }
+      },
+      "id": "21000001-0001-4000-8000-000000000007",
+      "name": "respond-404-radar",
+      "position": [
+        1000,
+        250
+      ],
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "condition-radar-active",
+              "leftValue": "={{ $json.radar_config?.is_active }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              },
+              "rightValue": ""
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "21000001-0001-4000-8000-000000000008",
+      "name": "check-radar-active",
+      "position": [
+        1000,
+        0
+      ],
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{ \"notification_sent\": false, \"skipped_reason\": \"radar_inactive\", \"message\": \"Radar is not active\" }",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "21000001-0001-4000-8000-000000000009",
+      "name": "respond-200-inactive",
+      "position": [
+        1250,
+        250
+      ],
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "condition-meets-threshold",
+              "leftValue": "={{ $json.match_score }}",
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              },
+              "rightValue": "={{ $json.radar_config?.min_match_score }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "21000001-0001-4000-8000-000000000010",
+      "name": "check-threshold",
+      "position": [
+        1250,
+        0
+      ],
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"notification_sent\": false, \"skipped_reason\": \"below_threshold\", \"match_score\": $json.match_score, \"min_required\": $json.radar_config?.min_match_score } }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "21000001-0001-4000-8000-000000000011",
+      "name": "respond-200-below-threshold",
+      "position": [
+        1500,
+        250
+      ],
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Simulate Supabase: SELECT id, title, company_name FROM job.posting WHERE id = :posting_id\nconst postingId = $input.item.json.posting_id;\n\n// Simulated posting for testing\nconst posting = {\n  id: postingId,\n  title: 'Senior Backend Engineer',\n  company_name: 'Stripe'\n};\n\nreturn {\n  json: {\n    ...$input.item.json,\n    posting: posting\n  }\n};"
+      },
+      "id": "21000001-0001-4000-8000-000000000012",
+      "name": "fetch-posting",
+      "position": [
+        1500,
+        0
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{ \"error\": \"Failed to fetch job posting\", \"code\": \"POSTING_FETCH_ERROR\" }",
+        "options": {
+          "responseCode": 500
+        }
+      },
+      "id": "21000001-0001-4000-8000-000000000013",
+      "name": "respond-500-fetch",
+      "position": [
+        1750,
+        350
+      ],
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "condition-posting-exists",
+              "leftValue": "={{ $json.posting?.id }}",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              },
+              "rightValue": ""
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "21000001-0001-4000-8000-000000000014",
+      "name": "check-posting-exists",
+      "position": [
+        1750,
+        0
+      ],
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{ \"error\": \"Job posting not found\", \"code\": \"POSTING_NOT_FOUND\" }",
+        "options": {
+          "responseCode": 404
+        }
+      },
+      "id": "21000001-0001-4000-8000-000000000015",
+      "name": "respond-404-posting",
+      "position": [
+        2000,
+        250
+      ],
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Simulate Supabase: SELECT id FROM job.board_job WHERE profile_id = :profile_id AND board_status = 'ready'\nconst profileId = $input.item.json.profile_id;\n\n// Simulated count of ready applications (3 for testing)\nconst readyJobs = [\n  { id: 'board-job-001' },\n  { id: 'board-job-002' },\n  { id: 'board-job-003' }\n];\n\nreturn {\n  json: {\n    ...$input.item.json,\n    badge_count: readyJobs.length\n  }\n};"
+      },
+      "id": "21000001-0001-4000-8000-000000000016",
+      "name": "calculate-badge-count",
+      "position": [
+        2000,
+        0
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const data = $input.item.json;\nconst posting = data.posting;\nconst matchScore = data.match_score;\nconst badgeCount = data.badge_count;\n\n// Build notification message\nconst title = '\ud83c\udfaf Perfect Match Found!';\nconst body = `${posting.title} at ${posting.company_name} - ${matchScore}% match`;\n\nreturn {\n  json: {\n    push_payload: {\n      to: data.profile_id,\n      title: title,\n      body: body,\n      data: {\n        type: 'radar_match',\n        board_job_id: data.board_job_id,\n        posting_id: data.posting_id,\n        match_score: matchScore\n      },\n      badge: badgeCount,\n      sound: 'default',\n      priority: 'high'\n    },\n    profile_id: data.profile_id,\n    board_job_id: data.board_job_id,\n    badge_count: badgeCount,\n    posting_title: posting.title,\n    company_name: posting.company_name,\n    match_score: matchScore\n  }\n};"
+      },
+      "id": "21000001-0001-4000-8000-000000000017",
+      "name": "prepare-notification",
+      "position": [
+        2250,
+        0
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://exp.host/--/api/v2/push/send",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.push_payload) }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "21000001-0001-4000-8000-000000000018",
+      "name": "send-push-notification",
+      "position": [
+        2500,
+        0
+      ],
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "expo-push-cred",
+          "name": "Expo Push Token"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "assign-push-error",
+              "name": "push_error",
+              "type": "string",
+              "value": "={{ $json.message || 'Push notification failed' }}"
+            },
+            {
+              "id": "assign-notification-sent",
+              "name": "notification_sent",
+              "type": "boolean",
+              "value": "false"
+            },
+            {
+              "id": "assign-badge-count",
+              "name": "badge_count",
+              "type": "number",
+              "value": "={{ $('prepare-notification').item.json.badge_count }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "21000001-0001-4000-8000-000000000019",
+      "name": "set-push-error",
+      "position": [
+        2750,
+        250
+      ],
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"notification_sent\": false, \"push_error\": $json.push_error, \"badge_count\": $json.badge_count, \"message\": \"Threshold met but push notification failed\" } }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "21000001-0001-4000-8000-000000000020",
+      "name": "respond-200-partial",
+      "position": [
+        3000,
+        250
+      ],
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Simulate Supabase: UPDATE job.board_job SET radar_notification_sent_at = NOW() WHERE id = :board_job_id\nconst boardJobId = $('prepare-notification').item.json.board_job_id;\n\n// Simulated update result\nreturn {\n  json: {\n    ...$('prepare-notification').item.json,\n    update_result: {\n      success: true,\n      board_job_id: boardJobId,\n      radar_notification_sent_at: new Date().toISOString()\n    }\n  }\n};"
+      },
+      "id": "21000001-0001-4000-8000-000000000021",
+      "name": "update-notification-status",
+      "position": [
+        2750,
+        0
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"notification_sent\": true, \"badge_count\": $json.badge_count, \"posting_title\": $json.posting_title, \"company_name\": $json.company_name, \"match_score\": $json.match_score } }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "21000001-0001-4000-8000-000000000022",
+      "name": "respond-200-success",
+      "position": [
+        3000,
+        0
+      ],
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4
+    }
+  ],
+  "connections": {
+    "webhook-radar-notify": {
+      "main": [
+        [
+          {
+            "node": "validate-input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "validate-input": {
+      "main": [
+        [
+          {
+            "node": "fetch-radar-config",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "respond-400-validation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "fetch-radar-config": {
+      "main": [
+        [
+          {
+            "node": "check-radar-exists",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "respond-500-fetch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "check-radar-exists": {
+      "main": [
+        [
+          {
+            "node": "check-radar-active",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "respond-404-radar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "check-radar-active": {
+      "main": [
+        [
+          {
+            "node": "check-threshold",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "respond-200-inactive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "check-threshold": {
+      "main": [
+        [
+          {
+            "node": "fetch-posting",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "respond-200-below-threshold",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "fetch-posting": {
+      "main": [
+        [
+          {
+            "node": "check-posting-exists",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "respond-500-fetch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "check-posting-exists": {
+      "main": [
+        [
+          {
+            "node": "calculate-badge-count",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "respond-404-posting",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "calculate-badge-count": {
+      "main": [
+        [
+          {
+            "node": "prepare-notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "prepare-notification": {
+      "main": [
+        [
+          {
+            "node": "send-push-notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "send-push-notification": {
+      "main": [
+        [
+          {
+            "node": "update-notification-status",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "set-push-error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "set-push-error": {
+      "main": [
+        [
+          {
+            "node": "respond-200-partial",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "update-notification-status": {
+      "main": [
+        [
+          {
+            "node": "respond-200-success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {
+    "webhook-radar-notify": [
+      {
+        "headers": {
+          "host": "aura.zeogen.com",
+          "user-agent": "n8n-workflow/20",
+          "content-type": "application/json",
+          "x-internal-key": "sk_internal_radar_notify_xxx",
+          "x-forwarded-for": "10.0.0.1",
+          "x-forwarded-proto": "https"
+        },
+        "params": {},
+        "query": {},
+        "body": {
+          "radar_config_id": "a1b2c3d4-1111-4000-8000-000000000001",
+          "posting_id": "e5f6g7h8-2222-4000-8000-000000000002",
+          "board_job_id": "i9j0k1l2-3333-4000-8000-000000000003",
+          "match_score": 92,
+          "profile_id": "m3n4o5p6-4444-4000-8000-000000000004"
+        },
+        "webhookUrl": "https://aura.zeogen.com/internal/radar/notify",
+        "executionMode": "test"
+      }
+    ],
+    "validate-input": [
+      {
+        "radar_config_id": "a1b2c3d4-1111-4000-8000-000000000001",
+        "posting_id": "e5f6g7h8-2222-4000-8000-000000000002",
+        "board_job_id": "i9j0k1l2-3333-4000-8000-000000000003",
+        "match_score": 92,
+        "profile_id": "m3n4o5p6-4444-4000-8000-000000000004"
+      }
+    ],
+    "fetch-radar-config": [
+      {
+        "radar_config_id": "a1b2c3d4-1111-4000-8000-000000000001",
+        "posting_id": "e5f6g7h8-2222-4000-8000-000000000002",
+        "board_job_id": "i9j0k1l2-3333-4000-8000-000000000003",
+        "match_score": 92,
+        "profile_id": "m3n4o5p6-4444-4000-8000-000000000004",
+        "radar_config": {
+          "id": "a1b2c3d4-1111-4000-8000-000000000001",
+          "profile_id": "m3n4o5p6-4444-4000-8000-000000000004",
+          "min_match_score": 85,
+          "is_active": true
+        }
+      }
+    ],
+    "check-radar-exists": [
+      {
+        "radar_config_id": "a1b2c3d4-1111-4000-8000-000000000001",
+        "posting_id": "e5f6g7h8-2222-4000-8000-000000000002",
+        "board_job_id": "i9j0k1l2-3333-4000-8000-000000000003",
+        "match_score": 92,
+        "profile_id": "m3n4o5p6-4444-4000-8000-000000000004",
+        "radar_config": {
+          "id": "a1b2c3d4-1111-4000-8000-000000000001",
+          "profile_id": "m3n4o5p6-4444-4000-8000-000000000004",
+          "min_match_score": 85,
+          "is_active": true
+        }
+      }
+    ],
+    "check-radar-active": [
+      {
+        "radar_config_id": "a1b2c3d4-1111-4000-8000-000000000001",
+        "posting_id": "e5f6g7h8-2222-4000-8000-000000000002",
+        "board_job_id": "i9j0k1l2-3333-4000-8000-000000000003",
+        "match_score": 92,
+        "profile_id": "m3n4o5p6-4444-4000-8000-000000000004",
+        "radar_config": {
+          "id": "a1b2c3d4-1111-4000-8000-000000000001",
+          "profile_id": "m3n4o5p6-4444-4000-8000-000000000004",
+          "min_match_score": 85,
+          "is_active": true
+        }
+      }
+    ],
+    "check-threshold": [
+      {
+        "radar_config_id": "a1b2c3d4-1111-4000-8000-000000000001",
+        "posting_id": "e5f6g7h8-2222-4000-8000-000000000002",
+        "board_job_id": "i9j0k1l2-3333-4000-8000-000000000003",
+        "match_score": 92,
+        "profile_id": "m3n4o5p6-4444-4000-8000-000000000004",
+        "radar_config": {
+          "id": "a1b2c3d4-1111-4000-8000-000000000001",
+          "profile_id": "m3n4o5p6-4444-4000-8000-000000000004",
+          "min_match_score": 85,
+          "is_active": true
+        }
+      }
+    ],
+    "fetch-posting": [
+      {
+        "radar_config_id": "a1b2c3d4-1111-4000-8000-000000000001",
+        "posting_id": "e5f6g7h8-2222-4000-8000-000000000002",
+        "board_job_id": "i9j0k1l2-3333-4000-8000-000000000003",
+        "match_score": 92,
+        "profile_id": "m3n4o5p6-4444-4000-8000-000000000004",
+        "radar_config": {
+          "id": "a1b2c3d4-1111-4000-8000-000000000001",
+          "profile_id": "m3n4o5p6-4444-4000-8000-000000000004",
+          "min_match_score": 85,
+          "is_active": true
+        },
+        "posting": {
+          "id": "e5f6g7h8-2222-4000-8000-000000000002",
+          "title": "Senior Backend Engineer",
+          "company_name": "Stripe"
+        }
+      }
+    ],
+    "check-posting-exists": [
+      {
+        "radar_config_id": "a1b2c3d4-1111-4000-8000-000000000001",
+        "posting_id": "e5f6g7h8-2222-4000-8000-000000000002",
+        "board_job_id": "i9j0k1l2-3333-4000-8000-000000000003",
+        "match_score": 92,
+        "profile_id": "m3n4o5p6-4444-4000-8000-000000000004",
+        "radar_config": {
+          "id": "a1b2c3d4-1111-4000-8000-000000000001",
+          "profile_id": "m3n4o5p6-4444-4000-8000-000000000004",
+          "min_match_score": 85,
+          "is_active": true
+        },
+        "posting": {
+          "id": "e5f6g7h8-2222-4000-8000-000000000002",
+          "title": "Senior Backend Engineer",
+          "company_name": "Stripe"
+        }
+      }
+    ],
+    "calculate-badge-count": [
+      {
+        "radar_config_id": "a1b2c3d4-1111-4000-8000-000000000001",
+        "posting_id": "e5f6g7h8-2222-4000-8000-000000000002",
+        "board_job_id": "i9j0k1l2-3333-4000-8000-000000000003",
+        "match_score": 92,
+        "profile_id": "m3n4o5p6-4444-4000-8000-000000000004",
+        "radar_config": {
+          "id": "a1b2c3d4-1111-4000-8000-000000000001",
+          "profile_id": "m3n4o5p6-4444-4000-8000-000000000004",
+          "min_match_score": 85,
+          "is_active": true
+        },
+        "posting": {
+          "id": "e5f6g7h8-2222-4000-8000-000000000002",
+          "title": "Senior Backend Engineer",
+          "company_name": "Stripe"
+        },
+        "badge_count": 3
+      }
+    ],
+    "prepare-notification": [
+      {
+        "push_payload": {
+          "to": "m3n4o5p6-4444-4000-8000-000000000004",
+          "title": "\ud83c\udfaf Perfect Match Found!",
+          "body": "Senior Backend Engineer at Stripe - 92% match",
+          "data": {
+            "type": "radar_match",
+            "board_job_id": "i9j0k1l2-3333-4000-8000-000000000003",
+            "posting_id": "e5f6g7h8-2222-4000-8000-000000000002",
+            "match_score": 92
+          },
+          "badge": 3,
+          "sound": "default",
+          "priority": "high"
+        },
+        "profile_id": "m3n4o5p6-4444-4000-8000-000000000004",
+        "board_job_id": "i9j0k1l2-3333-4000-8000-000000000003",
+        "badge_count": 3,
+        "posting_title": "Senior Backend Engineer",
+        "company_name": "Stripe",
+        "match_score": 92
+      }
+    ],
+    "send-push-notification": [
+      {
+        "data": {
+          "status": "ok",
+          "id": "push-receipt-abc123"
+        }
+      }
+    ],
+    "update-notification-status": [
+      {
+        "push_payload": {
+          "to": "m3n4o5p6-4444-4000-8000-000000000004",
+          "title": "\ud83c\udfaf Perfect Match Found!",
+          "body": "Senior Backend Engineer at Stripe - 92% match",
+          "data": {
+            "type": "radar_match",
+            "board_job_id": "i9j0k1l2-3333-4000-8000-000000000003",
+            "posting_id": "e5f6g7h8-2222-4000-8000-000000000002",
+            "match_score": 92
+          },
+          "badge": 3,
+          "sound": "default",
+          "priority": "high"
+        },
+        "profile_id": "m3n4o5p6-4444-4000-8000-000000000004",
+        "board_job_id": "i9j0k1l2-3333-4000-8000-000000000003",
+        "badge_count": 3,
+        "posting_title": "Senior Backend Engineer",
+        "company_name": "Stripe",
+        "match_score": 92,
+        "update_result": {
+          "success": true,
+          "board_job_id": "i9j0k1l2-3333-4000-8000-000000000003",
+          "radar_notification_sent_at": "2025-11-26T13:40:00.000Z"
+        }
+      }
+    ],
+    "respond-200-success": [
+      {
+        "notification_sent": true,
+        "badge_count": 3,
+        "posting_title": "Senior Backend Engineer",
+        "company_name": "Stripe",
+        "match_score": 92
+      }
+    ]
+  },
+  "settings": {},
+  "tags": []
+}

@@ -304,19 +304,6 @@ export function formatExportFooter(
   return `${lines.join('\n')  }\n`;
 }
 
-/**
- * Format compact jq hint (single line)
- */
-export function formatJqHint(command: CommandType, cliCommand: string): string {
-  const recipes = getCommandRecipes(command);
-  if (recipes.length === 0) {return '';}
-  
-  const isListCommand = command.includes('list') || command.includes('search');
-  const filter = isListCommand ? '.data[]' : '.';
-  
-  return chalk.dim(`\n💡 Tip: n8n ${cliCommand} --json | jq '${filter}'\n`);
-}
-
 // ═══════════════════════════════════════════════════════════════════════════
 // LEGACY COMPATIBILITY
 // Keep old function signature for backwards compatibility

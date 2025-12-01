@@ -1,0 +1,1236 @@
+{
+  "name": "[06] [webhook] [billing] [revenuecat]",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "webhooks/revenuecat",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+      "name": "webhook-revenuecat",
+      "position": [
+        0,
+        0
+      ],
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "webhookId": "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const input = $input.item.json;\nconst authHeader = input.headers?.authorization || '';\nconst expectedToken = $env.REVENUECAT_WEBHOOK_SECRET;\n\nif (!authHeader.startsWith('Bearer ') || authHeader.slice(7) !== expectedToken) {\n  throw new Error('UNAUTHORIZED');\n}\n\nreturn { json: { ...input, auth_valid: true } };"
+      },
+      "id": "c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f",
+      "name": "validate-auth",
+      "position": [
+        220,
+        0
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{ \"error\": \"Unauthorized\", \"code\": \"AUTH_ERROR\" }",
+        "options": {
+          "responseCode": 401
+        }
+      },
+      "id": "d4e5f6a7-b8c9-4d0e-1f2a-3b4c5d6e7f8a",
+      "name": "respond-401-unauthorized",
+      "position": [
+        220,
+        200
+      ],
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const input = $input.item.json;\nconst payload = input.body;\nconst event = payload.event;\n\n// Common fields\nconst common = {\n  rc_event_id: event.id,\n  rc_api_version: payload.api_version,\n  event_type: event.type,\n  app_id: event.app_id,\n  event_timestamp_ms: event.event_timestamp_ms,\n  app_user_id: event.app_user_id,\n  original_app_user_id: event.original_app_user_id,\n  aliases: event.aliases || [],\n  product_id: event.product_id,\n  entitlement_ids: event.entitlement_ids || [],\n  store: event.store,\n  environment: event.environment,\n  purchased_at_ms: event.purchased_at_ms,\n  expiration_at_ms: event.expiration_at_ms,\n  original_purchased_at_ms: event.original_purchased_at_ms,\n  transaction_id: event.transaction_id,\n  original_transaction_id: event.original_transaction_id,\n  price_usd: event.price_in_purchased_currency,\n  currency: event.currency,\n  period_type: event.period_type,\n  is_trial_conversion: event.is_trial_conversion,\n  country_code: event.country_code,\n  takehome_percentage: event.takehome_percentage,\n  subscriber_attributes: event.subscriber_attributes,\n  raw_payload: payload\n};\n\n// Event-specific fields\nlet event_details = {};\nswitch (event.type) {\n  case 'CANCELLATION':\n    event_details = { cancel_reason: event.cancel_reason, grace_period_expiration_at_ms: event.grace_period_expiration_at_ms };\n    break;\n  case 'EXPIRATION':\n    event_details = { expiration_reason: event.expiration_reason };\n    break;\n  case 'SUBSCRIPTION_PAUSED':\n    event_details = { auto_resume_at_ms: event.auto_resume_at_ms };\n    break;\n  case 'PRODUCT_CHANGE':\n    event_details = { new_product_id: event.new_product_id, new_entitlement_ids: event.new_entitlement_ids };\n    break;\n  case 'TRANSFER':\n    event_details = { transferred_from: event.transferred_from, transferred_to: event.transferred_to };\n    break;\n  case 'BILLING_ISSUE':\n    event_details = { grace_period_expiration_at_ms: event.grace_period_expiration_at_ms };\n    break;\n  case 'REFUND_REVERSED':\n    event_details = { refunded_transaction_id: event.refunded_transaction_id };\n    break;\n  case 'INVOICE_ISSUANCE':\n    event_details = { invoice_id: event.invoice_id, invoice_url: event.invoice_url };\n    break;\n  case 'VIRTUAL_CURRENCY_TRANSACTION':\n    event_details = { virtual_currency_type: event.virtual_currency_type, virtual_currency_amount: event.virtual_currency_amount, source: event.source };\n    break;\n  case 'EXPERIMENT_ENROLLMENT':\n    event_details = { experiment_id: event.experiment_id, experiment_variant: event.experiment_variant, enrolled_at_ms: event.enrolled_at_ms };\n    break;\n}\n\nreturn { json: { ...common, event_details } };"
+      },
+      "id": "e5f6a7b8-c9d0-4e1f-2a3b-4c5d6e7f8a9b",
+      "name": "parse-payload",
+      "position": [
+        440,
+        0
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{ \"error\": \"Invalid payload\", \"code\": \"PARSE_ERROR\" }",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "id": "f6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b0c",
+      "name": "respond-400-parse-error",
+      "position": [
+        440,
+        200
+      ],
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "tableId": "core.revenuecat_event",
+        "filterType": "string",
+        "filterString": "={{ 'rc_event_id=eq.' + $json.rc_event_id }}",
+        "returnAll": false,
+        "limit": 1,
+        "useCustomSchema": true
+      },
+      "id": "a7b8c9d0-e1f2-4a3b-4c5d-6e7f8a9b0c1d",
+      "name": "check-idempotency",
+      "position": [
+        660,
+        0
+      ],
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "credentials": {
+        "supabaseApi": {
+          "id": "supabase-cred-id",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "check-id-exists",
+              "leftValue": "={{ $json.id }}",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "b8c9d0e1-f2a3-4b4c-5d6e-7f8a9b0c1d2e",
+      "name": "check-duplicate",
+      "position": [
+        880,
+        0
+      ],
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{ \"received\": true, \"duplicate\": true }",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "c9d0e1f2-a3b4-4c5d-6e7f-8a9b0c1d2e3f",
+      "name": "respond-200-duplicate",
+      "position": [
+        880,
+        200
+      ],
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const input = $('parse-payload').item.json;\nconst appUserId = input.app_user_id;\n\n// UUID v4 validation\nconst UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;\n\nif (!appUserId || !UUID_REGEX.test(appUserId)) {\n  // Anonymous ID or invalid \u2192 store with NULL profile_id\n  return { json: { ...input, profile_id: null, is_orphan: true } };\n}\n\n// Return for Supabase lookup\nreturn { json: { ...input, profile_id_candidate: appUserId, is_orphan: false } };"
+      },
+      "id": "d0e1f2a3-b4c5-4d6e-7f8a-9b0c1d2e3f4a",
+      "name": "resolve-profile",
+      "position": [
+        1100,
+        0
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "check-orphan",
+              "leftValue": "={{ $json.is_orphan }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "false"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "e1f2a3b4-c5d6-4e7f-8a9b-0c1d2e3f4a5b",
+      "name": "check-needs-lookup",
+      "position": [
+        1320,
+        0
+      ],
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "tableId": "core.profile",
+        "filterType": "string",
+        "filterString": "={{ 'id=eq.' + $json.profile_id_candidate }}",
+        "returnAll": false,
+        "limit": 1,
+        "useCustomSchema": true
+      },
+      "id": "f2a3b4c5-d6e7-4f8a-9b0c-1d2e3f4a5b6c",
+      "name": "lookup-profile",
+      "position": [
+        1540,
+        -100
+      ],
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "credentials": {
+        "supabaseApi": {
+          "id": "supabase-cred-id",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const parseData = $('parse-payload').item.json;\nconst lookupResult = $json;\nconst profileId = lookupResult?.id || null;\n\nreturn { json: { ...parseData, profile_id: profileId } };"
+      },
+      "id": "a3b4c5d6-e7f8-4a9b-0c1d-2e3f4a5b6c7d",
+      "name": "set-profile-id-from-lookup",
+      "position": [
+        1760,
+        -100
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const parseData = $('parse-payload').item.json;\nreturn { json: { ...parseData, profile_id: null } };"
+      },
+      "id": "b4c5d6e7-f8a9-4b0c-1d2e-3f4a5b6c7d8e",
+      "name": "set-profile-id-null",
+      "position": [
+        1540,
+        100
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2
+    },
+    {
+      "parameters": {},
+      "id": "c5d6e7f8-a9b0-4c1d-2e3f-4a5b6c7d8e9f",
+      "name": "merge-profile-paths",
+      "position": [
+        1980,
+        0
+      ],
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "tableId": "core.revenuecat_event",
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldName": "rc_event_id",
+              "fieldValue": "={{ $json.rc_event_id }}"
+            },
+            {
+              "fieldName": "rc_api_version",
+              "fieldValue": "={{ $json.rc_api_version }}"
+            },
+            {
+              "fieldName": "event_type",
+              "fieldValue": "={{ $json.event_type }}"
+            },
+            {
+              "fieldName": "app_id",
+              "fieldValue": "={{ $json.app_id }}"
+            },
+            {
+              "fieldName": "event_timestamp_ms",
+              "fieldValue": "={{ $json.event_timestamp_ms }}"
+            },
+            {
+              "fieldName": "app_user_id",
+              "fieldValue": "={{ $json.app_user_id }}"
+            },
+            {
+              "fieldName": "profile_id",
+              "fieldValue": "={{ $json.profile_id }}"
+            },
+            {
+              "fieldName": "product_id",
+              "fieldValue": "={{ $json.product_id }}"
+            },
+            {
+              "fieldName": "entitlement_ids",
+              "fieldValue": "={{ $json.entitlement_ids }}"
+            },
+            {
+              "fieldName": "store",
+              "fieldValue": "={{ $json.store }}"
+            },
+            {
+              "fieldName": "environment",
+              "fieldValue": "={{ $json.environment }}"
+            },
+            {
+              "fieldName": "event_details",
+              "fieldValue": "={{ $json.event_details }}"
+            },
+            {
+              "fieldName": "raw_payload",
+              "fieldValue": "={{ $json.raw_payload }}"
+            },
+            {
+              "fieldName": "processed",
+              "fieldValue": "false"
+            }
+          ]
+        },
+        "useCustomSchema": true
+      },
+      "id": "d6e7f8a9-b0c1-4d2e-3f4a-5b6c7d8e9f0a",
+      "name": "insert-revenuecat-event",
+      "position": [
+        2200,
+        0
+      ],
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "credentials": {
+        "supabaseApi": {
+          "id": "supabase-cred-id",
+          "name": "Supabase account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{ \"error\": \"Storage failed\", \"code\": \"DB_ERROR\" }",
+        "options": {
+          "responseCode": 500
+        }
+      },
+      "id": "e7f8a9b0-c1d2-4e3f-4a5b-6c7d8e9f0a1b",
+      "name": "respond-500-db",
+      "position": [
+        2200,
+        200
+      ],
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4
+    },
+    {
+      "parameters": {
+        "mode": "rules",
+        "options": {
+          "fallbackOutput": 3
+        },
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "version": 2,
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('parse-payload').item.json.event_type }}",
+                    "rightValue": "TRANSFER",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "outputIndex": 0
+            },
+            {
+              "conditions": {
+                "options": {
+                  "version": 2,
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('parse-payload').item.json.event_type }}",
+                    "rightValue": "EXPERIMENT_ENROLLMENT",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "outputIndex": 1
+            },
+            {
+              "conditions": {
+                "options": {
+                  "version": 2,
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('parse-payload').item.json.event_type }}",
+                    "rightValue": "VIRTUAL_CURRENCY_TRANSACTION",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "outputIndex": 2
+            }
+          ]
+        }
+      },
+      "id": "f8a9b0c1-d2e3-4f4a-5b6c-7d8e9f0a1b2c",
+      "name": "check-specialized-table",
+      "position": [
+        2420,
+        0
+      ],
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "tableId": "core.revenuecat_transfer",
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldName": "event_id",
+              "fieldValue": "={{ $('insert-revenuecat-event').item.json.id }}"
+            },
+            {
+              "fieldName": "transferred_from",
+              "fieldValue": "={{ $('parse-payload').item.json.event_details.transferred_from }}"
+            },
+            {
+              "fieldName": "transferred_to",
+              "fieldValue": "={{ $('parse-payload').item.json.event_details.transferred_to }}"
+            },
+            {
+              "fieldName": "to_profile_id",
+              "fieldValue": "={{ $json.profile_id }}"
+            },
+            {
+              "fieldName": "event_timestamp_ms",
+              "fieldValue": "={{ $('parse-payload').item.json.event_timestamp_ms }}"
+            },
+            {
+              "fieldName": "app_user_id",
+              "fieldValue": "={{ $('parse-payload').item.json.app_user_id }}"
+            }
+          ]
+        },
+        "useCustomSchema": true
+      },
+      "id": "a9b0c1d2-e3f4-4a5b-6c7d-8e9f0a1b2c3d",
+      "name": "insert-transfer",
+      "position": [
+        2640,
+        -200
+      ],
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "credentials": {
+        "supabaseApi": {
+          "id": "supabase-cred-id",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "tableId": "core.revenuecat_experiment",
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldName": "event_id",
+              "fieldValue": "={{ $('insert-revenuecat-event').item.json.id }}"
+            },
+            {
+              "fieldName": "profile_id",
+              "fieldValue": "={{ $json.profile_id }}"
+            },
+            {
+              "fieldName": "experiment_id",
+              "fieldValue": "={{ $('parse-payload').item.json.event_details.experiment_id }}"
+            },
+            {
+              "fieldName": "experiment_variant",
+              "fieldValue": "={{ $('parse-payload').item.json.event_details.experiment_variant }}"
+            },
+            {
+              "fieldName": "enrolled_at_ms",
+              "fieldValue": "={{ $('parse-payload').item.json.event_details.enrolled_at_ms }}"
+            },
+            {
+              "fieldName": "app_id",
+              "fieldValue": "={{ $('parse-payload').item.json.app_id }}"
+            },
+            {
+              "fieldName": "store",
+              "fieldValue": "={{ $('parse-payload').item.json.store }}"
+            },
+            {
+              "fieldName": "app_user_id",
+              "fieldValue": "={{ $('parse-payload').item.json.app_user_id }}"
+            }
+          ]
+        },
+        "useCustomSchema": true
+      },
+      "id": "b0c1d2e3-f4a5-4b6c-7d8e-9f0a1b2c3d4e",
+      "name": "insert-experiment",
+      "position": [
+        2640,
+        0
+      ],
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "credentials": {
+        "supabaseApi": {
+          "id": "supabase-cred-id",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "tableId": "core.revenuecat_virtual_currency",
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldName": "event_id",
+              "fieldValue": "={{ $('insert-revenuecat-event').item.json.id }}"
+            },
+            {
+              "fieldName": "profile_id",
+              "fieldValue": "={{ $json.profile_id }}"
+            },
+            {
+              "fieldName": "currency_type",
+              "fieldValue": "={{ $('parse-payload').item.json.event_details.virtual_currency_type }}"
+            },
+            {
+              "fieldName": "amount",
+              "fieldValue": "={{ $('parse-payload').item.json.event_details.virtual_currency_amount }}"
+            },
+            {
+              "fieldName": "source",
+              "fieldValue": "={{ $('parse-payload').item.json.event_details.source }}"
+            },
+            {
+              "fieldName": "transaction_id",
+              "fieldValue": "={{ $('parse-payload').item.json.transaction_id }}"
+            },
+            {
+              "fieldName": "product_id",
+              "fieldValue": "={{ $('parse-payload').item.json.product_id }}"
+            },
+            {
+              "fieldName": "event_timestamp_ms",
+              "fieldValue": "={{ $('parse-payload').item.json.event_timestamp_ms }}"
+            },
+            {
+              "fieldName": "app_user_id",
+              "fieldValue": "={{ $('parse-payload').item.json.app_user_id }}"
+            }
+          ]
+        },
+        "useCustomSchema": true
+      },
+      "id": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+      "name": "insert-virtual-currency",
+      "position": [
+        2640,
+        200
+      ],
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "credentials": {
+        "supabaseApi": {
+          "id": "supabase-cred-id",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "rules",
+        "options": {
+          "fallbackOutput": 2
+        },
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "version": 2,
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ ['INITIAL_PURCHASE','RENEWAL','CANCELLATION','UNCANCELLATION','EXPIRATION','BILLING_ISSUE','SUBSCRIPTION_PAUSED','SUBSCRIPTION_EXTENDED','PRODUCT_CHANGE','TEMPORARY_ENTITLEMENT_GRANT','REFUND_REVERSED','TRANSFER'].includes($('parse-payload').item.json.event_type) }}",
+                    "rightValue": true,
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "outputIndex": 0
+            },
+            {
+              "conditions": {
+                "options": {
+                  "version": 2,
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ ['NON_RENEWING_PURCHASE','VIRTUAL_CURRENCY_TRANSACTION'].includes($('parse-payload').item.json.event_type) }}",
+                    "rightValue": true,
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "outputIndex": 1
+            }
+          ]
+        }
+      },
+      "id": "d2e3f4a5-b6c7-4d8e-9f0a-1b2c3d4e5f6a",
+      "name": "route-event-type",
+      "position": [
+        2860,
+        0
+      ],
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2
+    },
+    {
+      "parameters": {
+        "source": "database",
+        "workflowId": "={{ $vars.WORKFLOW_07_ID }}",
+        "options": {}
+      },
+      "id": "e3f4a5b6-c7d8-4e9f-0a1b-2c3d4e5f6a7b",
+      "name": "trigger-workflow-07",
+      "position": [
+        3080,
+        -150
+      ],
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "source": "database",
+        "workflowId": "={{ $vars.WORKFLOW_08_ID }}",
+        "options": {}
+      },
+      "id": "f4a5b6c7-d8e9-4f0a-1b2c-3d4e5f6a7b8c",
+      "name": "trigger-workflow-08",
+      "position": [
+        3080,
+        50
+      ],
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{ \"received\": true, \"logged\": true, \"no_routing\": true }",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "a5b6c7d8-e9f0-4a1b-2c3d-4e5f6a7b8c9d",
+      "name": "respond-200-logged",
+      "position": [
+        3080,
+        250
+      ],
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"received\": true, \"event_id\": $('insert-revenuecat-event').item.json.id, \"event_type\": $('parse-payload').item.json.event_type, \"routed\": true } }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "b6c7d8e9-f0a1-4b2c-3d4e-5f6a7b8c9d0e",
+      "name": "respond-200-success",
+      "position": [
+        3300,
+        -50
+      ],
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4
+    }
+  ],
+  "connections": {
+    "webhook-revenuecat": {
+      "main": [
+        [
+          {
+            "node": "validate-auth",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "validate-auth": {
+      "main": [
+        [
+          {
+            "node": "parse-payload",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "respond-401-unauthorized",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "parse-payload": {
+      "main": [
+        [
+          {
+            "node": "check-idempotency",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "respond-400-parse-error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "check-idempotency": {
+      "main": [
+        [
+          {
+            "node": "check-duplicate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "check-duplicate": {
+      "main": [
+        [
+          {
+            "node": "respond-200-duplicate",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "resolve-profile",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "resolve-profile": {
+      "main": [
+        [
+          {
+            "node": "check-needs-lookup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "check-needs-lookup": {
+      "main": [
+        [
+          {
+            "node": "lookup-profile",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "set-profile-id-null",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "lookup-profile": {
+      "main": [
+        [
+          {
+            "node": "set-profile-id-from-lookup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "set-profile-id-from-lookup": {
+      "main": [
+        [
+          {
+            "node": "merge-profile-paths",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "set-profile-id-null": {
+      "main": [
+        [
+          {
+            "node": "merge-profile-paths",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "merge-profile-paths": {
+      "main": [
+        [
+          {
+            "node": "insert-revenuecat-event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "insert-revenuecat-event": {
+      "main": [
+        [
+          {
+            "node": "check-specialized-table",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "respond-500-db",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "check-specialized-table": {
+      "main": [
+        [
+          {
+            "node": "insert-transfer",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "insert-experiment",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "insert-virtual-currency",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "route-event-type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "insert-transfer": {
+      "main": [
+        [
+          {
+            "node": "route-event-type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "insert-experiment": {
+      "main": [
+        [
+          {
+            "node": "route-event-type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "insert-virtual-currency": {
+      "main": [
+        [
+          {
+            "node": "route-event-type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "route-event-type": {
+      "main": [
+        [
+          {
+            "node": "trigger-workflow-07",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "trigger-workflow-08",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "respond-200-logged",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "trigger-workflow-07": {
+      "main": [
+        [
+          {
+            "node": "respond-200-success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "trigger-workflow-08": {
+      "main": [
+        [
+          {
+            "node": "respond-200-success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {
+    "webhook-revenuecat": [
+      {
+        "headers": {
+          "host": "aura.zeogen.com",
+          "authorization": "Bearer rc_webhook_secret_abc123xyz",
+          "content-type": "application/json",
+          "user-agent": "RevenueCat/1.0",
+          "x-revenuecat-signature": "sha256=abc123"
+        },
+        "params": {},
+        "query": {},
+        "body": {
+          "api_version": "1.0",
+          "event": {
+            "id": "rc_evt_abc123xyz",
+            "type": "INITIAL_PURCHASE",
+            "app_id": "app1a2b3c4d",
+            "event_timestamp_ms": 1732540800000,
+            "app_user_id": "d654bdd6-17ea-4d46-8222-b29ad507b633",
+            "original_app_user_id": "d654bdd6-17ea-4d46-8222-b29ad507b633",
+            "aliases": [
+              "$RCAnonymousID:old123"
+            ],
+            "product_id": "com.aura.pro.monthly",
+            "entitlement_ids": [
+              "pro"
+            ],
+            "store": "APP_STORE",
+            "environment": "PRODUCTION",
+            "purchased_at_ms": 1732540800000,
+            "expiration_at_ms": 1735132800000,
+            "price_in_purchased_currency": 19.0,
+            "currency": "USD",
+            "period_type": "NORMAL",
+            "is_trial_conversion": false,
+            "country_code": "US",
+            "takehome_percentage": 70.0,
+            "subscriber_attributes": {
+              "$email": {
+                "value": "user@example.com"
+              }
+            }
+          }
+        },
+        "webhookUrl": "https://aura.zeogen.com/webhooks/revenuecat",
+        "executionMode": "test"
+      }
+    ],
+    "validate-auth": [
+      {
+        "headers": {
+          "host": "aura.zeogen.com",
+          "authorization": "Bearer rc_webhook_secret_abc123xyz",
+          "content-type": "application/json"
+        },
+        "body": {
+          "api_version": "1.0",
+          "event": {
+            "id": "rc_evt_abc123xyz",
+            "type": "INITIAL_PURCHASE",
+            "app_id": "app1a2b3c4d",
+            "event_timestamp_ms": 1732540800000,
+            "app_user_id": "d654bdd6-17ea-4d46-8222-b29ad507b633",
+            "product_id": "com.aura.pro.monthly",
+            "entitlement_ids": [
+              "pro"
+            ],
+            "store": "APP_STORE",
+            "environment": "PRODUCTION"
+          }
+        },
+        "auth_valid": true
+      }
+    ],
+    "parse-payload": [
+      {
+        "rc_event_id": "rc_evt_abc123xyz",
+        "rc_api_version": "1.0",
+        "event_type": "INITIAL_PURCHASE",
+        "app_id": "app1a2b3c4d",
+        "event_timestamp_ms": 1732540800000,
+        "app_user_id": "d654bdd6-17ea-4d46-8222-b29ad507b633",
+        "original_app_user_id": "d654bdd6-17ea-4d46-8222-b29ad507b633",
+        "aliases": [
+          "$RCAnonymousID:old123"
+        ],
+        "product_id": "com.aura.pro.monthly",
+        "entitlement_ids": [
+          "pro"
+        ],
+        "store": "APP_STORE",
+        "environment": "PRODUCTION",
+        "purchased_at_ms": 1732540800000,
+        "expiration_at_ms": 1735132800000,
+        "price_usd": 19.0,
+        "currency": "USD",
+        "period_type": "NORMAL",
+        "is_trial_conversion": false,
+        "country_code": "US",
+        "takehome_percentage": 70.0,
+        "event_details": {}
+      }
+    ],
+    "check-idempotency": [
+      {}
+    ],
+    "check-duplicate": [
+      {}
+    ],
+    "resolve-profile": [
+      {
+        "rc_event_id": "rc_evt_abc123xyz",
+        "event_type": "INITIAL_PURCHASE",
+        "app_user_id": "d654bdd6-17ea-4d46-8222-b29ad507b633",
+        "profile_id_candidate": "d654bdd6-17ea-4d46-8222-b29ad507b633",
+        "is_orphan": false
+      }
+    ],
+    "check-needs-lookup": [
+      {
+        "rc_event_id": "rc_evt_abc123xyz",
+        "event_type": "INITIAL_PURCHASE",
+        "app_user_id": "d654bdd6-17ea-4d46-8222-b29ad507b633",
+        "profile_id_candidate": "d654bdd6-17ea-4d46-8222-b29ad507b633",
+        "is_orphan": false
+      }
+    ],
+    "lookup-profile": [
+      {
+        "id": "d654bdd6-17ea-4d46-8222-b29ad507b633"
+      }
+    ],
+    "set-profile-id-from-lookup": [
+      {
+        "rc_event_id": "rc_evt_abc123xyz",
+        "event_type": "INITIAL_PURCHASE",
+        "app_user_id": "d654bdd6-17ea-4d46-8222-b29ad507b633",
+        "profile_id": "d654bdd6-17ea-4d46-8222-b29ad507b633",
+        "product_id": "com.aura.pro.monthly",
+        "entitlement_ids": [
+          "pro"
+        ],
+        "store": "APP_STORE",
+        "environment": "PRODUCTION"
+      }
+    ],
+    "merge-profile-paths": [
+      {
+        "rc_event_id": "rc_evt_abc123xyz",
+        "event_type": "INITIAL_PURCHASE",
+        "app_user_id": "d654bdd6-17ea-4d46-8222-b29ad507b633",
+        "profile_id": "d654bdd6-17ea-4d46-8222-b29ad507b633",
+        "product_id": "com.aura.pro.monthly"
+      }
+    ],
+    "insert-revenuecat-event": [
+      {
+        "id": "f7a8b9c0-d1e2-4f3a-4b5c-6d7e8f9a0b1c",
+        "rc_event_id": "rc_evt_abc123xyz",
+        "event_type": "INITIAL_PURCHASE",
+        "profile_id": "d654bdd6-17ea-4d46-8222-b29ad507b633",
+        "processed": false
+      }
+    ],
+    "check-specialized-table": [
+      {
+        "id": "f7a8b9c0-d1e2-4f3a-4b5c-6d7e8f9a0b1c",
+        "event_type": "INITIAL_PURCHASE",
+        "profile_id": "d654bdd6-17ea-4d46-8222-b29ad507b633"
+      }
+    ],
+    "route-event-type": [
+      {
+        "id": "f7a8b9c0-d1e2-4f3a-4b5c-6d7e8f9a0b1c",
+        "event_type": "INITIAL_PURCHASE",
+        "profile_id": "d654bdd6-17ea-4d46-8222-b29ad507b633"
+      }
+    ],
+    "trigger-workflow-07": [
+      {
+        "revenuecat_event_id": "f7a8b9c0-d1e2-4f3a-4b5c-6d7e8f9a0b1c",
+        "event_type": "INITIAL_PURCHASE",
+        "profile_id": "d654bdd6-17ea-4d46-8222-b29ad507b633"
+      }
+    ],
+    "respond-200-success": [
+      {
+        "received": true,
+        "event_id": "f7a8b9c0-d1e2-4f3a-4b5c-6d7e8f9a0b1c",
+        "event_type": "INITIAL_PURCHASE",
+        "routed": true
+      }
+    ]
+  },
+  "settings": {},
+  "tags": [],
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "d660c8d1ec82335c55c8ab9e582b0038fa983ea7127f17cbb5c7a54c713aa590"
+  }
+}

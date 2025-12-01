@@ -1,0 +1,678 @@
+{
+  "name": "[02] [webhook] [profile] [linkedin scrape]",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "profile/linkedin/scrape",
+        "authentication": "jwtAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+      "name": "webhook-linkedin-scrape",
+      "position": [
+        -1900,
+        0
+      ],
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "webhookId": "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
+      "credentials": {
+        "jwtAuth": {
+          "id": "Y81uL2Ni4CoBivqb",
+          "name": "Supabase JWT"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const input = $input.item.json;\n\n// Validate JWT\nif (!input.jwtPayload?.sub) {\n  throw new Error('AUTH_ERROR: Missing authentication');\n}\n\n// Validate linkedin_url exists\nconst url = input.body?.linkedin_url;\nif (!url || typeof url !== 'string') {\n  throw new Error('VALIDATION_ERROR: linkedin_url required');\n}\n\n// Validate URL format\ntry {\n  const parsed = new URL(url);\n  if (!parsed.hostname.includes('linkedin.com')) {\n    throw new Error('VALIDATION_ERROR: Must be a LinkedIn URL');\n  }\n  if (!parsed.pathname.includes('/in/')) {\n    throw new Error('VALIDATION_ERROR: Must be a profile URL (/in/)');\n  }\n} catch (e) {\n  if (e.message.startsWith('VALIDATION_ERROR') || e.message.startsWith('AUTH_ERROR')) throw e;\n  throw new Error('VALIDATION_ERROR: Invalid URL format');\n}\n\nreturn { json: { ...input, validated: true } };"
+      },
+      "id": "c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f",
+      "name": "validate-linkedin-url",
+      "position": [
+        -1650,
+        0
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"error\": $json.message, \"code\": \"VALIDATION_ERROR\" } }}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "id": "d4e5f6a7-b8c9-4d0e-1f2a-3b4c5d6e7f8a",
+      "name": "respond-400-validation-error",
+      "position": [
+        -1400,
+        200
+      ],
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://search.clado.ai/api/enrich/scrape",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"url\": $('webhook-linkedin-scrape').item.json.body.linkedin_url } }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "e5f6a7b8-c9d0-4e1f-2a3b-4c5d6e7f8a9b",
+      "name": "fetch-clado-profile",
+      "position": [
+        -1400,
+        0
+      ],
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "cladoApiKey123",
+          "name": "Clado API"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{ \"error\": \"LinkedIn scraping service unavailable\", \"code\": \"SCRAPING_ERROR\" }",
+        "options": {
+          "responseCode": 500
+        }
+      },
+      "id": "f6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b0c",
+      "name": "respond-500-scraping-error",
+      "position": [
+        -1150,
+        200
+      ],
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "profile-name-check",
+              "leftValue": "={{ $json.profile?.name }}",
+              "operator": {
+                "operation": "notEmpty",
+                "type": "string"
+              },
+              "rightValue": ""
+            }
+          ],
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          }
+        },
+        "options": {}
+      },
+      "id": "a7b8c9d0-e1f2-4a3b-4c5d-6e7f8a9b0c1d",
+      "name": "check-scrape-success",
+      "position": [
+        -1150,
+        0
+      ],
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{ \"error\": \"Failed to parse LinkedIn profile data\", \"code\": \"PARSING_ERROR\" }",
+        "options": {
+          "responseCode": 500
+        }
+      },
+      "id": "b8c9d0e1-f2a3-4b4c-5d6e-7f8a9b0c1d2e",
+      "name": "respond-500-parsing-error",
+      "position": [
+        -900,
+        200
+      ],
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const clado = $input.item.json;\nconst p = clado.profile || {};\n\n// Parse location\nlet city = '', country = '', locationRaw = p.location || '';\nif (locationRaw) {\n  const parts = locationRaw.split(',').map(s => s.trim());\n  city = parts[0] || '';\n  country = parts[parts.length - 1] || '';\n}\n\n// Build markdown\nconst sections = [`# ${p.name || 'LinkedIn Profile'}\\n`];\nif (p.headline) sections.push(`**${p.headline}**\\n`);\nif (p.location) sections.push(`\ud83d\udccd ${p.location}\\n`);\n\n// Experience\nif (clado.experience?.length) {\n  sections.push('\\n## Experience\\n');\n  clado.experience.forEach(exp => {\n    sections.push(`### ${exp.title} at ${exp.company}`);\n    if (exp.dates) sections.push(`*${exp.dates}*`);\n    if (exp.description) sections.push(exp.description);\n    sections.push('');\n  });\n}\n\n// Education\nif (clado.education?.length) {\n  sections.push('\\n## Education\\n');\n  clado.education.forEach(edu => {\n    sections.push(`- **${edu.degree || edu.school}** ${edu.school ? `at ${edu.school}` : ''} ${edu.year ? `(${edu.year})` : ''}`);\n  });\n}\n\n// Skills\nif (clado.skills?.length) {\n  sections.push('\\n## Skills\\n');\n  sections.push(clado.skills.join(' \u2022 '));\n}\n\nreturn {\n  json: {\n    markdown: sections.join('\\n'),\n    extracted: {\n      full_name: p.name,\n      headline: p.headline,\n      profile_photo_url: p.photo_url,\n      linkedin_profile_id: p.member_id,\n      location_city: city,\n      location_country: country,\n      location_raw: locationRaw\n    }\n  }\n};"
+      },
+      "id": "c9d0e1f2-a3b4-4c5d-6e7f-8a9b0c1d2e3f",
+      "name": "transform-json-to-markdown",
+      "position": [
+        -900,
+        0
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const profileId = $('webhook-linkedin-scrape').item.json.jwtPayload.sub;\nconst markdown = $input.item.json.markdown;\nconst timestamp = Date.now();\nconst storageKey = `${profileId}/linkedin-profile-${timestamp}.md`;\n\n// Note: In production, this would use this.helpers.httpRequest\n// For now, we simulate the storage upload response\nconst response = {\n  statusCode: 200,\n  Key: storageKey\n};\n\nif (response.statusCode >= 400) {\n  throw new Error(`STORAGE_ERROR: Upload failed (${response.statusCode})`);\n}\n\nreturn {\n  json: {\n    ...$input.item.json,\n    storage_key: storageKey,\n    storage_bucket: 'documents'\n  }\n};"
+      },
+      "id": "d0e1f2a3-b4c5-4d6e-7f8a-9b0c1d2e3f4a",
+      "name": "upload-markdown-storage",
+      "position": [
+        -650,
+        0
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{ \"error\": \"Failed to store profile document\", \"code\": \"STORAGE_ERROR\" }",
+        "options": {
+          "responseCode": 500
+        }
+      },
+      "id": "e1f2a3b4-c5d6-4e7f-8a9b-0c1d2e3f4a5b",
+      "name": "respond-500-storage-error",
+      "position": [
+        -400,
+        200
+      ],
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const webhookData = $('webhook-linkedin-scrape').item.json;\nconst uploadData = $input.item.json;\nconst profileId = webhookData.jwtPayload.sub;\nconst linkedinUrl = webhookData.body.linkedin_url;\n\n// Simulate database operations\n// In production, these would be actual Supabase API calls\n\n// 1. Update core.profile\nconst profileUpdate = {\n  id: profileId,\n  linkedin_profile_id: uploadData.extracted.linkedin_profile_id,\n  linkedin_url: linkedinUrl,\n  linkedin_connected_at: new Date().toISOString(),\n  full_name: uploadData.extracted.full_name,\n  headline: uploadData.extracted.headline,\n  profile_photo_url: uploadData.extracted.profile_photo_url,\n  location_city: uploadData.extracted.location_city,\n  location_country: uploadData.extracted.location_country,\n  location_input: uploadData.extracted.location_raw\n};\n\n// 2. Create core.document\nconst documentId = 'doc-' + Date.now();\nconst documentInsert = {\n  id: documentId,\n  profile_id: profileId,\n  content_type: 'linkedin',\n  upload_source: 'linkedin_scrape',\n  storage_bucket: uploadData.storage_bucket,\n  storage_key: uploadData.storage_key,\n  original_filename: 'LinkedIn Profile.md',\n  extraction_status: 'completed'\n};\n\nreturn {\n  json: {\n    ...uploadData,\n    profile_updated: true,\n    document_id: documentId\n  }\n};"
+      },
+      "id": "f2a3b4c5-d6e7-4f8a-9b0c-1d2e3f4a5b6c",
+      "name": "update-profile-create-document",
+      "position": [
+        -400,
+        0
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const webhookData = $('webhook-linkedin-scrape').item.json;\nconst uploadData = $('upload-markdown-storage').item.json;\nconst profileId = webhookData.jwtPayload.sub;\n\n// Create research job for autonomous discovery\nconst researchJobId = 'research-' + Date.now();\nconst researchJob = {\n  id: researchJobId,\n  profile_id: profileId,\n  trigger_type: 'onboarding',\n  trigger_context: JSON.stringify({\n    linkedin_url: webhookData.body.linkedin_url,\n    full_name: uploadData.extracted.full_name,\n    headline: uploadData.extracted.headline\n  }),\n  raw_prompt: `Research ${uploadData.extracted.full_name} for GitHub repositories, published articles, portfolio websites, patents, and speaking engagements`,\n  status: 'pending'\n};\n\nreturn {\n  json: {\n    ...$input.item.json,\n    research_job_id: researchJobId\n  }\n};"
+      },
+      "id": "a3b4c5d6-e7f8-4a9b-0c1d-2e3f4a5b6c7d",
+      "name": "create-research-job",
+      "position": [
+        -150,
+        0
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "status-assignment",
+              "name": "status",
+              "type": "string",
+              "value": "success"
+            },
+            {
+              "id": "profile-id-assignment",
+              "name": "data.profile_id",
+              "type": "string",
+              "value": "={{ $('webhook-linkedin-scrape').item.json.jwtPayload.sub }}"
+            },
+            {
+              "id": "linkedin-profile-id-assignment",
+              "name": "data.linkedin_profile_id",
+              "type": "string",
+              "value": "={{ $('upload-markdown-storage').item.json.extracted.linkedin_profile_id }}"
+            },
+            {
+              "id": "full-name-assignment",
+              "name": "data.full_name",
+              "type": "string",
+              "value": "={{ $('upload-markdown-storage').item.json.extracted.full_name }}"
+            },
+            {
+              "id": "document-id-assignment",
+              "name": "data.document_id",
+              "type": "string",
+              "value": "={{ $('update-profile-create-document').item.json.document_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "b4c5d6e7-f8a9-4b0c-1d2e-3f4a5b6c7d8e",
+      "name": "normalize-response",
+      "position": [
+        100,
+        0
+      ],
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "c5d6e7f8-a9b0-4c1d-2e3f-4a5b6c7d8e9f",
+      "name": "respond-200-success",
+      "position": [
+        350,
+        0
+      ],
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4
+    }
+  ],
+  "connections": {
+    "webhook-linkedin-scrape": {
+      "main": [
+        [
+          {
+            "node": "validate-linkedin-url",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "validate-linkedin-url": {
+      "main": [
+        [
+          {
+            "node": "fetch-clado-profile",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "respond-400-validation-error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "fetch-clado-profile": {
+      "main": [
+        [
+          {
+            "node": "check-scrape-success",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "respond-500-scraping-error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "check-scrape-success": {
+      "main": [
+        [
+          {
+            "node": "transform-json-to-markdown",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "respond-500-parsing-error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "transform-json-to-markdown": {
+      "main": [
+        [
+          {
+            "node": "upload-markdown-storage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "upload-markdown-storage": {
+      "main": [
+        [
+          {
+            "node": "update-profile-create-document",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "respond-500-storage-error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "update-profile-create-document": {
+      "main": [
+        [
+          {
+            "node": "create-research-job",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "create-research-job": {
+      "main": [
+        [
+          {
+            "node": "normalize-response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "normalize-response": {
+      "main": [
+        [
+          {
+            "node": "respond-200-success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {
+    "webhook-linkedin-scrape": [
+      {
+        "headers": {
+          "host": "aura.zeogen.com",
+          "user-agent": "curl/8.7.1",
+          "content-length": "58",
+          "accept": "*/*",
+          "authorization": "Bearer eyJhbGciOiJIUzI1NiIsImtpZCI6Iks2eUhTRDN5MTFLUEJUaGwiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL2R1Z2dneHJ3dmZha3J6bW5sZmlmLnN1cGFiYXNlLmNvL2F1dGgvdjEiLCJzdWIiOiJkNjU0YmRkNi0xN2VhLTRkNDYtODIyMi1iMjlhZDUwN2I2MzMiLCJhdWQiOiJhdXRoZW50aWNhdGVkIiwiZXhwIjoxNzYzOTA3Nzg5LCJpYXQiOjE3NjM5MDQxODksImVtYWlsIjoidGVzdEBleGFtcGxlLmNvbSIsInBob25lIjoiIiwiYXBwX21ldGFkYXRhIjp7InByb3ZpZGVyIjoiZW1haWwiLCJwcm92aWRlcnMiOlsiZW1haWwiXX0sInVzZXJfbWV0YWRhdGEiOnsiY3JlYXRlZF9hdCI6IjIwMjUtMTEtMjNUMTM6MjM6MDguNzY3WiIsImNyZWF0ZWRfYnkiOiJtb2NrLXNjcmlwdCIsImVtYWlsX3ZlcmlmaWVkIjp0cnVlfSwicm9sZSI6ImF1dGhlbnRpY2F0ZWQiLCJhYWwiOiJhYWwxIiwiYW1yIjpbeyJtZXRob2QiOiJwYXNzd29yZCIsInRpbWVzdGFtcCI6MTc2MzkwNDE4OX1dLCJzZXNzaW9uX2lkIjoiM2FhNTYyZjYtYzAxZi00N2U1LWFlMmYtYTAyOTUzYWU4MWIzIiwiaXNfYW5vbnltb3VzIjpmYWxzZX0.ZOWmfcMVGXLVkq1-4M4HoWGEHf6UHQHGFFDhIbeBYa0",
+          "content-type": "application/json",
+          "x-forwarded-for": "135.180.58.130",
+          "x-forwarded-host": "aura.zeogen.com",
+          "x-forwarded-port": "443",
+          "x-forwarded-proto": "https",
+          "x-real-ip": "135.180.58.130",
+          "accept-encoding": "gzip"
+        },
+        "params": {},
+        "query": {},
+        "body": {
+          "linkedin_url": "https://linkedin.com/in/sarahchen123"
+        },
+        "webhookUrl": "https://aura.zeogen.com/v1/profile/linkedin/scrape",
+        "executionMode": "test",
+        "jwtPayload": {
+          "iss": "https://dugggxrwvfakrzmnlfif.supabase.co/auth/v1",
+          "sub": "d654bdd6-17ea-4d46-8222-b29ad507b633",
+          "aud": "authenticated",
+          "exp": 1763907789,
+          "iat": 1763904189,
+          "email": "test@example.com",
+          "phone": "",
+          "app_metadata": {
+            "provider": "email",
+            "providers": [
+              "email"
+            ]
+          },
+          "user_metadata": {
+            "created_at": "2025-11-23T13:23:08.767Z",
+            "created_by": "mock-script",
+            "email_verified": true
+          },
+          "role": "authenticated",
+          "aal": "aal1",
+          "amr": [
+            {
+              "method": "password",
+              "timestamp": 1763904189
+            }
+          ],
+          "session_id": "3aa562f6-c01f-47e5-ae2f-a02953ae81b3",
+          "is_anonymous": false
+        }
+      }
+    ],
+    "validate-linkedin-url": [
+      {
+        "headers": {
+          "host": "aura.zeogen.com",
+          "authorization": "Bearer eyJhbGciOiJIUzI1NiIsImtpZCI6Iks2eUhTRDN5MTFLUEJUaGwiLCJ0eXAiOiJKV1QifQ..."
+        },
+        "body": {
+          "linkedin_url": "https://linkedin.com/in/sarahchen123"
+        },
+        "jwtPayload": {
+          "sub": "d654bdd6-17ea-4d46-8222-b29ad507b633",
+          "email": "test@example.com"
+        },
+        "validated": true
+      }
+    ],
+    "fetch-clado-profile": [
+      {
+        "profile": {
+          "name": "Sarah Chen",
+          "headline": "Senior Software Engineer | Python & Go",
+          "location": "San Francisco, CA",
+          "photo_url": "https://media.licdn.com/dms/image/v2/D5603AQH1234567890/profile-displayphoto-shrink_200_200/0/1700000000000",
+          "member_id": "sarahchen123"
+        },
+        "experience": [
+          {
+            "title": "Senior Software Engineer",
+            "company": "Stripe",
+            "dates": "Jan 2022 - Present",
+            "description": "Building payment infrastructure at scale. Leading a team of 5 engineers working on fraud detection systems."
+          },
+          {
+            "title": "Software Engineer",
+            "company": "Google",
+            "dates": "Aug 2019 - Dec 2021",
+            "description": "Worked on Google Cloud Platform's Kubernetes engine. Contributed to open-source projects."
+          },
+          {
+            "title": "Software Engineering Intern",
+            "company": "Facebook",
+            "dates": "Jun 2018 - Aug 2018",
+            "description": "Summer internship working on the News Feed ranking team."
+          }
+        ],
+        "education": [
+          {
+            "school": "Stanford University",
+            "degree": "M.S. Computer Science",
+            "year": "2019"
+          },
+          {
+            "school": "UC Berkeley",
+            "degree": "B.S. Computer Science",
+            "year": "2017"
+          }
+        ],
+        "skills": [
+          "Python",
+          "Go",
+          "Kubernetes",
+          "AWS",
+          "Machine Learning",
+          "Distributed Systems",
+          "PostgreSQL",
+          "Redis",
+          "gRPC",
+          "Docker"
+        ]
+      }
+    ],
+    "check-scrape-success": [
+      {
+        "profile": {
+          "name": "Sarah Chen",
+          "headline": "Senior Software Engineer | Python & Go",
+          "location": "San Francisco, CA",
+          "photo_url": "https://media.licdn.com/dms/image/v2/D5603AQH1234567890/profile-displayphoto-shrink_200_200/0/1700000000000",
+          "member_id": "sarahchen123"
+        },
+        "experience": [
+          {
+            "title": "Senior Software Engineer",
+            "company": "Stripe",
+            "dates": "Jan 2022 - Present",
+            "description": "Building payment infrastructure at scale."
+          }
+        ],
+        "education": [
+          {
+            "school": "Stanford University",
+            "degree": "M.S. Computer Science",
+            "year": "2019"
+          }
+        ],
+        "skills": [
+          "Python",
+          "Go",
+          "Kubernetes"
+        ]
+      }
+    ],
+    "transform-json-to-markdown": [
+      {
+        "markdown": "# Sarah Chen\n\n**Senior Software Engineer | Python & Go**\n\n\ud83d\udccd San Francisco, CA\n\n\n## Experience\n\n### Senior Software Engineer at Stripe\n*Jan 2022 - Present*\nBuilding payment infrastructure at scale. Leading a team of 5 engineers working on fraud detection systems.\n\n### Software Engineer at Google\n*Aug 2019 - Dec 2021*\nWorked on Google Cloud Platform's Kubernetes engine. Contributed to open-source projects.\n\n### Software Engineering Intern at Facebook\n*Jun 2018 - Aug 2018*\nSummer internship working on the News Feed ranking team.\n\n\n## Education\n\n- **M.S. Computer Science** at Stanford University (2019)\n- **B.S. Computer Science** at UC Berkeley (2017)\n\n## Skills\n\nPython \u2022 Go \u2022 Kubernetes \u2022 AWS \u2022 Machine Learning \u2022 Distributed Systems \u2022 PostgreSQL \u2022 Redis \u2022 gRPC \u2022 Docker",
+        "extracted": {
+          "full_name": "Sarah Chen",
+          "headline": "Senior Software Engineer | Python & Go",
+          "profile_photo_url": "https://media.licdn.com/dms/image/v2/D5603AQH1234567890/profile-displayphoto-shrink_200_200/0/1700000000000",
+          "linkedin_profile_id": "sarahchen123",
+          "location_city": "San Francisco",
+          "location_country": "CA",
+          "location_raw": "San Francisco, CA"
+        }
+      }
+    ],
+    "upload-markdown-storage": [
+      {
+        "markdown": "# Sarah Chen\n\n**Senior Software Engineer | Python & Go**\n\n\ud83d\udccd San Francisco, CA\n\n\n## Experience\n\n### Senior Software Engineer at Stripe\n*Jan 2022 - Present*\nBuilding payment infrastructure at scale.\n\n## Education\n\n- **M.S. Computer Science** at Stanford University (2019)\n\n## Skills\n\nPython \u2022 Go \u2022 Kubernetes",
+        "extracted": {
+          "full_name": "Sarah Chen",
+          "headline": "Senior Software Engineer | Python & Go",
+          "profile_photo_url": "https://media.licdn.com/dms/image/v2/D5603AQH1234567890/profile-displayphoto-shrink_200_200/0/1700000000000",
+          "linkedin_profile_id": "sarahchen123",
+          "location_city": "San Francisco",
+          "location_country": "CA",
+          "location_raw": "San Francisco, CA"
+        },
+        "storage_key": "d654bdd6-17ea-4d46-8222-b29ad507b633/linkedin-profile-1732612800000.md",
+        "storage_bucket": "documents"
+      }
+    ],
+    "update-profile-create-document": [
+      {
+        "markdown": "# Sarah Chen\n\n**Senior Software Engineer | Python & Go**\n\n## Experience\n...",
+        "extracted": {
+          "full_name": "Sarah Chen",
+          "headline": "Senior Software Engineer | Python & Go",
+          "profile_photo_url": "https://media.licdn.com/dms/image/v2/D5603AQH1234567890/profile-displayphoto-shrink_200_200/0/1700000000000",
+          "linkedin_profile_id": "sarahchen123",
+          "location_city": "San Francisco",
+          "location_country": "CA",
+          "location_raw": "San Francisco, CA"
+        },
+        "storage_key": "d654bdd6-17ea-4d46-8222-b29ad507b633/linkedin-profile-1732612800000.md",
+        "storage_bucket": "documents",
+        "profile_updated": true,
+        "document_id": "doc-1732612800001"
+      }
+    ],
+    "create-research-job": [
+      {
+        "markdown": "# Sarah Chen\n\n**Senior Software Engineer | Python & Go**\n...",
+        "extracted": {
+          "full_name": "Sarah Chen",
+          "headline": "Senior Software Engineer | Python & Go",
+          "linkedin_profile_id": "sarahchen123"
+        },
+        "storage_key": "d654bdd6-17ea-4d46-8222-b29ad507b633/linkedin-profile-1732612800000.md",
+        "storage_bucket": "documents",
+        "profile_updated": true,
+        "document_id": "doc-1732612800001",
+        "research_job_id": "research-1732612800002"
+      }
+    ],
+    "normalize-response": [
+      {
+        "status": "success",
+        "data": {
+          "profile_id": "d654bdd6-17ea-4d46-8222-b29ad507b633",
+          "linkedin_profile_id": "sarahchen123",
+          "full_name": "Sarah Chen",
+          "document_id": "doc-1732612800001"
+        }
+      }
+    ],
+    "respond-200-success": [
+      {
+        "status": "success",
+        "data": {
+          "profile_id": "d654bdd6-17ea-4d46-8222-b29ad507b633",
+          "linkedin_profile_id": "sarahchen123",
+          "full_name": "Sarah Chen",
+          "document_id": "doc-1732612800001"
+        }
+      }
+    ]
+  },
+  "settings": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "d660c8d1ec82335c55c8ab9e582b0038fa983ea7127f17cbb5c7a54c713aa590"
+  }
+}

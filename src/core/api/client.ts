@@ -677,9 +677,3 @@ export function getApiClient(): N8nApiClient {
   return _client;
 }
 
-/**
- * Reset API client (for testing)
- */
-export function resetApiClient(): void {
-  _client = null;
-}

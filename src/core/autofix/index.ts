@@ -61,10 +61,7 @@ export {
 } from '../versioning/index.js';
 
 // Guidance generator (Post-Update Validator)
-export {
-  generateGuidanceFromFixes,
-  generateGuidanceSummary,
-} from './guidance-generator.js';
+export { generateGuidanceFromFixes } from './guidance-generator.js';
 
 // Post-update guidance types
 export type {

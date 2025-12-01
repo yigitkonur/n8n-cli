@@ -32,20 +32,6 @@ export function sanitizeNode(node: WorkflowNode): WorkflowNode {
 }
 
 /**
- * Sanitize all nodes in a workflow
- */
-export function sanitizeWorkflowNodes(workflow: any): any {
-  if (!workflow.nodes || !Array.isArray(workflow.nodes)) {
-    return workflow;
-  }
-
-  return {
-    ...workflow,
-    nodes: workflow.nodes.map((node: any) => sanitizeNode(node))
-  };
-}
-
-/**
  * Check if node is filter-based (IF v2.2+, Switch v3.2+)
  */
 function isFilterBasedNode(nodeType: string, typeVersion: number): boolean {
@@ -251,75 +237,6 @@ function generateConditionId(): string {
   return `condition-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 }
 
-/**
- * Validate that a node has complete metadata
- * Returns array of issues found
- */
-export function validateNodeMetadata(node: WorkflowNode): string[] {
-  const issues: string[] = [];
-
-  if (!isFilterBasedNode(node.type, node.typeVersion)) {
-    return issues; // Not a filter-based node
-  }
-
-  // Check IF node
-  if (node.type === 'n8n-nodes-base.if') {
-    const {conditions} = (node.parameters as any);
-    if (!conditions?.options) {
-      issues.push('Missing conditions.options');
-    } else {
-      const required = ['version', 'leftValue', 'typeValidation', 'caseSensitive'];
-      for (const field of required) {
-        if (!(field in conditions.options)) {
-          issues.push(`Missing conditions.options.${field}`);
-        }
-      }
-    }
-
-    // Check operators
-    if (conditions?.conditions && Array.isArray(conditions.conditions)) {
-      for (let i = 0; i < conditions.conditions.length; i++) {
-        const condition = conditions.conditions[i];
-        const operatorIssues = validateOperator(condition.operator, `conditions.conditions[${i}].operator`);
-        issues.push(...operatorIssues);
-      }
-    }
-  }
-
-  // Check Switch node
-  if (node.type === 'n8n-nodes-base.switch') {
-    const {rules} = (node.parameters as any);
-    if (rules?.rules && Array.isArray(rules.rules)) {
-      for (let i = 0; i < rules.rules.length; i++) {
-        const rule = rules.rules[i];
-        if (!rule.conditions?.options) {
-          issues.push(`Missing rules.rules[${i}].conditions.options`);
-        } else {
-          const required = ['version', 'leftValue', 'typeValidation', 'caseSensitive'];
-          for (const field of required) {
-            if (!(field in rule.conditions.options)) {
-              issues.push(`Missing rules.rules[${i}].conditions.options.${field}`);
-            }
-          }
-        }
-
-        // Check operators
-        if (rule.conditions?.conditions && Array.isArray(rule.conditions.conditions)) {
-          for (let j = 0; j < rule.conditions.conditions.length; j++) {
-            const condition = rule.conditions.conditions[j];
-            const operatorIssues = validateOperator(
-              condition.operator,
-              `rules.rules[${i}].conditions.conditions[${j}].operator`
-            );
-            issues.push(...operatorIssues);
-          }
-        }
-      }
-    }
-  }
-
-  return issues;
-}
 
 /**
  * Validate operator structure

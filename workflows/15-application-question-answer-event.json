@@ -1,0 +1,731 @@
+{
+  "name": "[15] [event] [application] [question answer]",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "internal/question-answered",
+        "authentication": "jwtAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "f15a0001-ques-4a01-b001-000000000001",
+      "name": "webhook-question-answered",
+      "position": [
+        0,
+        0
+      ],
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "webhookId": "f15a0001-ques-4a01-b001-000000000002",
+      "credentials": {
+        "jwtAuth": {
+          "id": "Y81uL2Ni4CoBivqb",
+          "name": "Supabase JWT"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "check-type",
+              "leftValue": "={{ $json.type }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "rightValue": "UPDATE"
+            },
+            {
+              "id": "check-new-status",
+              "leftValue": "={{ $json.record.question_status }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "rightValue": "answered"
+            },
+            {
+              "id": "check-old-status",
+              "leftValue": "={{ $json.old_record.question_status }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "rightValue": "pending"
+            }
+          ],
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          }
+        },
+        "options": {}
+      },
+      "id": "f15a0002-ques-4a02-b002-000000000002",
+      "name": "filter-answered-update",
+      "position": [
+        250,
+        0
+      ],
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "tableId": "job.board_job",
+        "filterType": "string",
+        "filterString": "={{ 'id=eq.' + $('webhook-question-answered').item.json.record.board_job_id }}"
+      },
+      "id": "f15a0003-ques-4a03-b003-000000000003",
+      "name": "fetch-board-job",
+      "position": [
+        500,
+        0
+      ],
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "credentials": {
+        "supabaseApi": {
+          "id": "SupabaseServiceRole1",
+          "name": "Supabase account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "name": "error_type",
+              "type": "string",
+              "value": "BOARD_JOB_NOT_FOUND"
+            },
+            {
+              "name": "question_id",
+              "type": "string",
+              "value": "={{ $('webhook-question-answered').item.json.record.id }}"
+            },
+            {
+              "name": "board_job_id",
+              "type": "string",
+              "value": "={{ $('webhook-question-answered').item.json.record.board_job_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "f15a0004-ques-4a04-b004-000000000004",
+      "name": "log-error-board-job",
+      "position": [
+        750,
+        200
+      ],
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const question = $('webhook-question-answered').item.json.record;\nconst boardJob = $input.item.json;\nconst context = (question.question_context || '').toLowerCase();\nconst questionText = (question.question_text || '').toLowerCase();\n\n// Category mapping based on question patterns\nconst categoryMappings = [\n  { patterns: ['salary', 'compensation', 'pay', 'money'], category: 'compensation_expectation', section: 'preferences' },\n  { patterns: ['work authorization', 'visa', 'sponsor', 'legally'], category: 'work_authorization', section: 'logistics' },\n  { patterns: ['security clearance', 'clearance level'], category: 'certification', section: 'education' },\n  { patterns: ['notice period', 'start date', 'available', 'availability'], category: 'availability', section: 'logistics' },\n  { patterns: ['remote', 'hybrid', 'onsite', 'office', 'wfh'], category: 'work_arrangement', section: 'preferences' },\n  { patterns: ['relocat', 'move to', 'willing to move'], category: 'relocation', section: 'logistics' },\n  { patterns: ['team size', 'team preference'], category: 'team_size_pref', section: 'preferences' },\n];\n\n// Find matching category\nlet factCategory = null;\nlet shouldCreateFact = false;\n\nfor (const mapping of categoryMappings) {\n  const matchesContext = mapping.patterns.some(p => context.includes(p));\n  const matchesQuestion = mapping.patterns.some(p => questionText.includes(p));\n  \n  if (matchesContext || matchesQuestion) {\n    factCategory = mapping;\n    shouldCreateFact = true;\n    break;\n  }\n}\n\n// Default: if question is application-blocking, it's likely important\n// But only create facts for clearly reusable information\nif (!shouldCreateFact && question.answer_text && question.answer_text.length > 10) {\n  // Check if answer looks like a preference/fact (not just \"yes\"/\"no\" for one-time questions)\n  const answer = question.answer_text.toLowerCase();\n  if (!['yes', 'no', 'n/a', 'none'].includes(answer.trim())) {\n    factCategory = { category: 'deal_breaker', section: 'preferences' };\n    shouldCreateFact = true;\n  }\n}\n\nreturn {\n  json: {\n    ...boardJob,\n    question: question,\n    should_create_fact: shouldCreateFact,\n    fact_category_key: factCategory ? `${factCategory.section}.${factCategory.category}` : null,\n    fact_category_name: factCategory ? factCategory.category : null\n  }\n};"
+      },
+      "id": "f15a0005-ques-4a05-b005-000000000005",
+      "name": "determine-fact-category",
+      "position": [
+        750,
+        0
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "check-fact",
+              "leftValue": "={{ $json.should_create_fact }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              },
+              "rightValue": ""
+            }
+          ],
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          }
+        },
+        "options": {}
+      },
+      "id": "f15a0006-ques-4a06-b006-000000000006",
+      "name": "check-should-create-fact",
+      "position": [
+        1000,
+        0
+      ],
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "tableId": "core.fact",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldName": "profile_id",
+              "fieldValue": "={{ $json.profile_id }}"
+            },
+            {
+              "fieldName": "category_key",
+              "fieldValue": "={{ $json.fact_category_key }}"
+            },
+            {
+              "fieldName": "fact_title",
+              "fieldValue": "={{ $json.question.question_text.substring(0, 100) }}"
+            },
+            {
+              "fieldName": "fact_detail",
+              "fieldValue": "={{ $json.question.answer_text }}"
+            },
+            {
+              "fieldName": "extraction_source",
+              "fieldValue": "user_answer"
+            },
+            {
+              "fieldName": "source_question_id",
+              "fieldValue": "={{ $json.question.id }}"
+            },
+            {
+              "fieldName": "confidence",
+              "fieldValue": "0.95"
+            },
+            {
+              "fieldName": "flags",
+              "fieldValue": "[\"user_confirmed\"]"
+            }
+          ]
+        }
+      },
+      "id": "f15a0007-ques-4a07-b007-000000000007",
+      "name": "create-fact",
+      "position": [
+        1250,
+        0
+      ],
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "credentials": {
+        "supabaseApi": {
+          "id": "SupabaseServiceRole1",
+          "name": "Supabase account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "name": "error_type",
+              "type": "string",
+              "value": "FACT_CREATION_FAILED"
+            },
+            {
+              "name": "question_id",
+              "type": "string",
+              "value": "={{ $('webhook-question-answered').item.json.record.id }}"
+            },
+            {
+              "name": "error_details",
+              "type": "object",
+              "value": "={{ $json }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "f15a0008-ques-4a08-b008-000000000008",
+      "name": "log-error-fact-creation",
+      "position": [
+        1250,
+        250
+      ],
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "tableId": "core.memory_sync_outbox",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldName": "entity_type",
+              "fieldValue": "fact"
+            },
+            {
+              "fieldName": "entity_id",
+              "fieldValue": "={{ $('create-fact').item.json.id }}"
+            },
+            {
+              "fieldName": "operation",
+              "fieldValue": "add"
+            },
+            {
+              "fieldName": "sync_status",
+              "fieldValue": "pending"
+            },
+            {
+              "fieldName": "payload",
+              "fieldValue": "={{ JSON.stringify({ text: $('determine-fact-category').item.json.question.answer_text, metadata: { category: $('determine-fact-category').item.json.fact_category_name, source: 'quick_question_answer', question_id: $('webhook-question-answered').item.json.record.id, confidence: 0.95 } }) }}"
+            }
+          ]
+        }
+      },
+      "id": "f15a0009-ques-4a09-b009-000000000009",
+      "name": "queue-mem0-sync",
+      "position": [
+        1500,
+        0
+      ],
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "credentials": {
+        "supabaseApi": {
+          "id": "SupabaseServiceRole1",
+          "name": "Supabase account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "job.quick_question",
+        "returnAll": false,
+        "limit": 100,
+        "filterType": "string",
+        "filterString": "={{ 'board_job_id=eq.' + $('webhook-question-answered').item.json.record.board_job_id + '&' + question_status=eq.pending }}"
+      },
+      "id": "f15a0010-ques-4a10-b010-000000000010",
+      "name": "count-pending-questions",
+      "position": [
+        1750,
+        0
+      ],
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "credentials": {
+        "supabaseApi": {
+          "id": "SupabaseServiceRole1",
+          "name": "Supabase account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "check-count",
+              "leftValue": "={{ $json.length ?? $input.all().length }}",
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              },
+              "rightValue": 0
+            }
+          ],
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          }
+        },
+        "options": {}
+      },
+      "id": "f15a0011-ques-4a11-b011-000000000011",
+      "name": "check-all-answered",
+      "position": [
+        2000,
+        0
+      ],
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"status\": \"success\", \"action\": \"answer_recorded\", \"fact_created\": $('check-should-create-fact').item.json.should_create_fact ?? false, \"pending_questions_remaining\": true, \"board_job_id\": $('webhook-question-answered').item.json.record.board_job_id } }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "f15a0012-ques-4a12-b012-000000000012",
+      "name": "respond-200-partial",
+      "position": [
+        2000,
+        250
+      ],
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "job.board_job",
+        "updateKey": "id",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldName": "id",
+              "fieldValue": "={{ $('webhook-question-answered').item.json.record.board_job_id }}"
+            },
+            {
+              "fieldName": "board_status",
+              "fieldValue": "working"
+            }
+          ]
+        }
+      },
+      "id": "f15a0013-ques-4a13-b013-000000000013",
+      "name": "update-board-status",
+      "position": [
+        2250,
+        0
+      ],
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "credentials": {
+        "supabaseApi": {
+          "id": "SupabaseServiceRole1",
+          "name": "Supabase account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "workflowId": "={{ $vars.WORKFLOW_14_MATERIAL_GENERATE_ID }}",
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "id": "f15a0014-ques-4a14-b014-000000000014",
+      "name": "trigger-material-generation",
+      "position": [
+        2500,
+        0
+      ],
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"status\": \"success\", \"action\": \"workflow_resumed\", \"fact_created\": $('create-fact').item.json.id ?? null, \"all_questions_answered\": true, \"board_status\": \"working\", \"material_generation_triggered\": true, \"board_job_id\": $('webhook-question-answered').item.json.record.board_job_id } }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "f15a0015-ques-4a15-b015-000000000015",
+      "name": "respond-200-complete",
+      "position": [
+        2750,
+        0
+      ],
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"status\": \"error\", \"error\": \"Processing failed\", \"code\": \"INTERNAL_ERROR\", \"question_id\": $('webhook-question-answered').item.json.record.id } }}",
+        "options": {
+          "responseCode": 500
+        }
+      },
+      "id": "f15a0016-ques-4a16-b016-000000000016",
+      "name": "respond-500-error",
+      "position": [
+        2500,
+        250
+      ],
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4
+    }
+  ],
+  "connections": {
+    "webhook-question-answered": {
+      "main": [
+        [
+          {
+            "node": "filter-answered-update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "filter-answered-update": {
+      "main": [
+        [
+          {
+            "node": "fetch-board-job",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "fetch-board-job": {
+      "main": [
+        [
+          {
+            "node": "determine-fact-category",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "log-error-board-job",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "log-error-board-job": {
+      "main": [
+        [
+          {
+            "node": "respond-500-error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "determine-fact-category": {
+      "main": [
+        [
+          {
+            "node": "check-should-create-fact",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "check-should-create-fact": {
+      "main": [
+        [
+          {
+            "node": "create-fact",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "count-pending-questions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "create-fact": {
+      "main": [
+        [
+          {
+            "node": "queue-mem0-sync",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "log-error-fact-creation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "log-error-fact-creation": {
+      "main": [
+        [
+          {
+            "node": "count-pending-questions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "queue-mem0-sync": {
+      "main": [
+        [
+          {
+            "node": "count-pending-questions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "count-pending-questions": {
+      "main": [
+        [
+          {
+            "node": "check-all-answered",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "check-all-answered": {
+      "main": [
+        [
+          {
+            "node": "update-board-status",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "respond-200-partial",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "update-board-status": {
+      "main": [
+        [
+          {
+            "node": "trigger-material-generation",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "respond-500-error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "trigger-material-generation": {
+      "main": [
+        [
+          {
+            "node": "respond-200-complete",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {
+    "webhook-question-answered": [
+      {
+        "type": "UPDATE",
+        "table": "quick_question",
+        "schema": "job",
+        "record": {
+          "id": "question-uuid",
+          "board_job_id": "board-job-uuid",
+          "question_text": "What salary range should I enter?",
+          "question_context": "Application form has required salary field",
+          "answer_text": "$180k-$220k",
+          "question_status": "answered",
+          "answered_at": "2024-11-25T11:30:00Z"
+        },
+        "old_record": {
+          "question_status": "pending"
+        }
+      }
+    ],
+    "fetch-board-job": [
+      {
+        "id": "board-job-uuid",
+        "profile_id": "profile-uuid",
+        "posting_id": "posting-uuid",
+        "board_status": "question"
+      }
+    ],
+    "determine-fact-category": [
+      {
+        "id": "board-job-uuid",
+        "profile_id": "profile-uuid",
+        "posting_id": "posting-uuid",
+        "board_status": "question",
+        "question": {
+          "id": "question-uuid",
+          "question_text": "What salary range should I enter?",
+          "answer_text": "$180k-$220k"
+        },
+        "should_create_fact": true,
+        "fact_category_key": "preferences.compensation_expectation",
+        "fact_category_name": "compensation_expectation"
+      }
+    ],
+    "create-fact": [
+      {
+        "id": "fact-uuid",
+        "profile_id": "profile-uuid",
+        "fact_title": "What salary range should I enter?",
+        "fact_detail": "$180k-$220k"
+      }
+    ],
+    "count-pending-questions": [
+      {
+        "id": "another-pending-question-uuid"
+      }
+    ],
+    "update-board-status": [
+      {
+        "id": "board-job-uuid",
+        "board_status": "working"
+      }
+    ],
+    "trigger-material-generation": [
+      {
+        "success": true
+      }
+    ]
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "f15a9b71c3e24a72a8a62a4c9b4e9d10"
+  }
+}

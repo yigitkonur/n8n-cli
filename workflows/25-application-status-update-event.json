@@ -1,0 +1,678 @@
+{
+  "name": "[25] [event] [application] [status update]",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "internal/board-job/status",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "f25a0001-stat-4a01-b001-000000000001",
+      "name": "webhook-status-change",
+      "position": [
+        0,
+        0
+      ],
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "webhookId": "f25a0001-stat-4a01-b001-000000000002",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "InternalWebhookKey1",
+          "name": "Supabase Internal"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const input = $input.first().json.body || $input.first().json;\n\n// Validate board_job_id\nif (!input.board_job_id || !/^[0-9a-f-]{36}$/i.test(input.board_job_id)) {\n  throw new Error('Invalid or missing board_job_id');\n}\n\n// Validate new_status against enum\nconst VALID_STATUSES = [\n  'working', 'question', 'ready', 'submitted', 'withdrawn',\n  'passed', 'interviewing', 'offered', 'accepted', 'rejected', 'archived'\n];\n\nif (!input.new_status || !VALID_STATUSES.includes(input.new_status)) {\n  throw new Error(`Invalid new_status: ${input.new_status}. Must be one of: ${VALID_STATUSES.join(', ')}`);\n}\n\nreturn [{\n  json: {\n    board_job_id: input.board_job_id,\n    new_status: input.new_status,\n    trigger_source: input.trigger_source || 'unknown'\n  }\n}];"
+      },
+      "id": "f25a0002-stat-4a02-b002-000000000002",
+      "name": "validate-request",
+      "position": [
+        250,
+        0
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"error\": $json.error?.message || 'Invalid request', \"code\": \"VALIDATION_ERROR\" } }}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "id": "f25a0003-stat-4a03-b003-000000000003",
+      "name": "respond-400-validation-error",
+      "position": [
+        500,
+        200
+      ],
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "tableId": "job.board_job",
+        "filterType": "string",
+        "filterString": "={{ 'id=eq.' + $json.board_job_id }}"
+      },
+      "id": "f25a0004-stat-4a04-b004-000000000004",
+      "name": "fetch-current-state",
+      "position": [
+        500,
+        0
+      ],
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "credentials": {
+        "supabaseApi": {
+          "id": "SupabaseServiceRole1",
+          "name": "Supabase account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"error\": \"Board job not found\", \"code\": \"NOT_FOUND\", \"board_job_id\": $('validate-request').item.json.board_job_id } }}",
+        "options": {
+          "responseCode": 404
+        }
+      },
+      "id": "f25a0005-stat-4a05-b005-000000000005",
+      "name": "respond-404-not-found",
+      "position": [
+        750,
+        200
+      ],
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const currentState = $input.first().json;\nconst request = $('validate-request').first().json;\n\nconst currentStatus = currentState.board_status;\nconst newStatus = request.new_status;\n\n// State machine definition\nconst VALID_TRANSITIONS = {\n  'working':      ['question', 'ready', 'withdrawn'],\n  'question':     ['working', 'withdrawn'],\n  'ready':        ['submitted', 'withdrawn'],\n  'submitted':    ['interviewing', 'rejected', 'passed'],\n  'interviewing': ['offered', 'rejected', 'passed'],\n  'offered':      ['accepted', 'rejected'],\n  'rejected':     ['archived'],\n  'passed':       ['archived'],\n  'accepted':     ['archived'],\n  'withdrawn':    ['archived'],\n  'archived':     []\n};\n\n// Check if transition is valid\nconst allowedTargets = VALID_TRANSITIONS[currentStatus] || [];\n\nif (!allowedTargets.includes(newStatus)) {\n  // Check if it's a no-op (already in target state)\n  if (currentStatus === newStatus) {\n    throw new Error(`NO_OP: Already in status '${currentStatus}'`);\n  }\n  throw new Error(`INVALID_TRANSITION: Cannot transition from '${currentStatus}' to '${newStatus}'. Allowed: [${allowedTargets.join(', ')}]`);\n}\n\n// Determine if this transition requires prerequisite checks\nconst requiresQuestionCheck = (currentStatus === 'ready' && newStatus === 'submitted');\n\nreturn [{\n  json: {\n    ...currentState,\n    new_status: newStatus,\n    current_status: currentStatus,\n    trigger_source: request.trigger_source,\n    requires_question_check: requiresQuestionCheck\n  }\n}];"
+      },
+      "id": "f25a0006-stat-4a06-b006-000000000006",
+      "name": "validate-transition",
+      "position": [
+        750,
+        0
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"error\": $json.error?.message || 'Invalid status transition', \"code\": \"INVALID_TRANSITION\", \"current_status\": $('fetch-current-state').item.json.board_status, \"requested_status\": $('validate-request').item.json.new_status } }}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "id": "f25a0007-stat-4a07-b007-000000000007",
+      "name": "respond-400-invalid-transition",
+      "position": [
+        1000,
+        200
+      ],
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "question-check",
+              "leftValue": "={{ $json.requires_question_check }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              },
+              "rightValue": ""
+            }
+          ],
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          }
+        },
+        "options": {}
+      },
+      "id": "f25a0008-stat-4a08-b008-000000000008",
+      "name": "check-requires-question-validation",
+      "position": [
+        1000,
+        0
+      ],
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "job.quick_question",
+        "returnAll": false,
+        "limit": 10,
+        "filterType": "string",
+        "filterString": "={{ 'board_job_id=eq.' + $json.id + '&' + question_status=eq.pending }}"
+      },
+      "id": "f25a0009-stat-4a09-b009-000000000009",
+      "name": "verify-no-pending-questions",
+      "position": [
+        1250,
+        0
+      ],
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "credentials": {
+        "supabaseApi": {
+          "id": "SupabaseServiceRole1",
+          "name": "Supabase account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "count-check",
+              "leftValue": "={{ $json.length ?? $input.all().length }}",
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              },
+              "rightValue": 0
+            }
+          ],
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          }
+        },
+        "options": {}
+      },
+      "id": "f25a0010-stat-4a10-b010-000000000010",
+      "name": "check-questions-answered",
+      "position": [
+        1500,
+        0
+      ],
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"error\": \"Cannot submit: pending questions must be answered first\", \"code\": \"PRECONDITION_FAILED\", \"pending_questions\": $('verify-no-pending-questions').all().length, \"board_job_id\": $('validate-transition').item.json.id } }}",
+        "options": {
+          "responseCode": 409
+        }
+      },
+      "id": "f25a0011-stat-4a11-b011-000000000011",
+      "name": "respond-409-precondition-failed",
+      "position": [
+        1750,
+        200
+      ],
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Get context from appropriate source\nconst context = $('validate-transition').first().json;\nconst newStatus = context.new_status;\nconst now = new Date().toISOString();\n\n// Build update fields\nconst updateFields = {\n  board_status: newStatus\n};\n\n// Set submitted_at only when transitioning TO submitted (and not already set)\nif (newStatus === 'submitted' && !context.submitted_at) {\n  updateFields.submitted_at = now;\n}\n\n// Set withdrawn_at only when transitioning TO withdrawn (and not already set)\nif (newStatus === 'withdrawn' && !context.withdrawn_at) {\n  updateFields.withdrawn_at = now;\n}\n\n// Determine notification needs\nconst NOTIFY_TRANSITIONS = {\n  'ready': { type: 'application_ready', message: 'Your application is ready to submit' },\n  'submitted': { type: 'application_submitted', message: 'Application submitted successfully' },\n  'interviewing': { type: 'interview_scheduled', message: 'Great news! Interview scheduled' },\n  'offered': { type: 'offer_received', message: 'You received a job offer!' },\n  'rejected': { type: 'application_rejected', message: 'Application update' },\n  'accepted': { type: 'offer_accepted', message: 'Congratulations on your new role!' }\n};\n\nconst notification = NOTIFY_TRANSITIONS[newStatus] || null;\n\nreturn [{\n  json: {\n    board_job_id: context.id,\n    profile_id: context.profile_id,\n    posting_id: context.posting_id,\n    current_status: context.current_status,\n    new_status: newStatus,\n    update_fields: updateFields,\n    should_notify: notification !== null,\n    notification_type: notification?.type,\n    notification_message: notification?.message,\n    trigger_source: context.trigger_source\n  }\n}];"
+      },
+      "id": "f25a0012-stat-4a12-b012-000000000012",
+      "name": "build-update-payload",
+      "position": [
+        1750,
+        0
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "job.board_job",
+        "updateKey": "id",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldName": "id",
+              "fieldValue": "={{ $json.board_job_id }}"
+            },
+            {
+              "fieldName": "board_status",
+              "fieldValue": "={{ $json.update_fields.board_status }}"
+            },
+            {
+              "fieldName": "submitted_at",
+              "fieldValue": "={{ $json.update_fields.submitted_at ?? null }}"
+            },
+            {
+              "fieldName": "withdrawn_at",
+              "fieldValue": "={{ $json.update_fields.withdrawn_at ?? null }}"
+            }
+          ]
+        }
+      },
+      "id": "f25a0013-stat-4a13-b013-000000000013",
+      "name": "apply-status-update",
+      "position": [
+        2000,
+        0
+      ],
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "credentials": {
+        "supabaseApi": {
+          "id": "SupabaseServiceRole1",
+          "name": "Supabase account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"error\": \"Failed to update board job status\", \"code\": \"UPDATE_FAILED\", \"board_job_id\": $('build-update-payload').item.json.board_job_id } }}",
+        "options": {
+          "responseCode": 500
+        }
+      },
+      "id": "f25a0014-stat-4a14-b014-000000000014",
+      "name": "respond-500-update-failed",
+      "position": [
+        2250,
+        200
+      ],
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "notify-check",
+              "leftValue": "={{ $json.should_notify }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              },
+              "rightValue": ""
+            }
+          ],
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          }
+        },
+        "options": {}
+      },
+      "id": "f25a0015-stat-4a15-b015-000000000015",
+      "name": "check-should-notify",
+      "position": [
+        2250,
+        0
+      ],
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "tableId": "job.posting",
+        "filterType": "string",
+        "filterString": "={{ 'id=eq.' + $('build-update-payload').item.json.posting_id }}"
+      },
+      "id": "f25a0016-stat-4a16-b016-000000000016",
+      "name": "fetch-job-details-for-notification",
+      "position": [
+        2500,
+        0
+      ],
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "credentials": {
+        "supabaseApi": {
+          "id": "SupabaseServiceRole1",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.NOTIFICATION_SERVICE_URL }}/send",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"profile_id\": \"{{ $('build-update-payload').item.json.profile_id }}\",\n  \"notification_type\": \"{{ $('build-update-payload').item.json.notification_type }}\",\n  \"title\": \"{{ $('build-update-payload').item.json.notification_type.replace('_', ' ').toUpperCase() }}\",\n  \"body\": \"{{ $('build-update-payload').item.json.notification_message + ' for ' + $('fetch-job-details-for-notification').item.json.title + ' at ' + $('fetch-job-details-for-notification').item.json.company_name }}\",\n  \"data\": {\n    \"board_job_id\": \"{{ $('build-update-payload').item.json.board_job_id }}\",\n    \"action\": \"open_board_job\"\n  }\n}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "f25a0017-stat-4a17-b017-000000000017",
+      "name": "send-push-notification",
+      "position": [
+        2750,
+        0
+      ],
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "retryOnFail": true,
+      "maxTries": 2,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "InternalWebhookKey1",
+          "name": "Supabase Internal"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"status\": \"success\", \"board_job_id\": $('build-update-payload').item.json.board_job_id, \"previous_status\": $('build-update-payload').item.json.current_status, \"new_status\": $('build-update-payload').item.json.new_status, \"timestamps_updated\": { \"submitted_at\": $('build-update-payload').item.json.update_fields.submitted_at ?? null, \"withdrawn_at\": $('build-update-payload').item.json.update_fields.withdrawn_at ?? null }, \"notification_sent\": $('build-update-payload').item.json.should_notify } }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "f25a0018-stat-4a18-b018-000000000018",
+      "name": "respond-200-success",
+      "position": [
+        3000,
+        0
+      ],
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4
+    }
+  ],
+  "connections": {
+    "webhook-status-change": {
+      "main": [
+        [
+          {
+            "node": "validate-request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "validate-request": {
+      "main": [
+        [
+          {
+            "node": "fetch-current-state",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "respond-400-validation-error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "fetch-current-state": {
+      "main": [
+        [
+          {
+            "node": "validate-transition",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "respond-404-not-found",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "validate-transition": {
+      "main": [
+        [
+          {
+            "node": "check-requires-question-validation",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "respond-400-invalid-transition",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "check-requires-question-validation": {
+      "main": [
+        [
+          {
+            "node": "verify-no-pending-questions",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "build-update-payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "verify-no-pending-questions": {
+      "main": [
+        [
+          {
+            "node": "check-questions-answered",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "check-questions-answered": {
+      "main": [
+        [
+          {
+            "node": "build-update-payload",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "respond-409-precondition-failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "build-update-payload": {
+      "main": [
+        [
+          {
+            "node": "apply-status-update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "apply-status-update": {
+      "main": [
+        [
+          {
+            "node": "check-should-notify",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "respond-500-update-failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "check-should-notify": {
+      "main": [
+        [
+          {
+            "node": "fetch-job-details-for-notification",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "respond-200-success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "fetch-job-details-for-notification": {
+      "main": [
+        [
+          {
+            "node": "send-push-notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "send-push-notification": {
+      "main": [
+        [
+          {
+            "node": "respond-200-success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {
+    "webhook-status-change": [
+      {
+        "body": {
+          "board_job_id": "board-uuid-1",
+          "new_status": "submitted",
+          "trigger_source": "user_action"
+        }
+      }
+    ],
+    "validate-request": [
+      {
+        "board_job_id": "board-uuid-1",
+        "new_status": "submitted",
+        "trigger_source": "user_action"
+      }
+    ],
+    "fetch-current-state": [
+      {
+        "id": "board-uuid-1",
+        "profile_id": "profile-uuid-1",
+        "posting_id": "posting-uuid-1",
+        "board_status": "ready"
+      }
+    ],
+    "validate-transition": [
+      {
+        "id": "board-uuid-1",
+        "profile_id": "profile-uuid-1",
+        "posting_id": "posting-uuid-1",
+        "current_status": "ready",
+        "new_status": "submitted",
+        "trigger_source": "user_action",
+        "requires_question_check": true
+      }
+    ],
+    "verify-no-pending-questions": [],
+    "check-questions-answered": [
+      {
+        "json": {}
+      }
+    ],
+    "build-update-payload": [
+      {
+        "board_job_id": "board-uuid-1",
+        "profile_id": "profile-uuid-1",
+        "posting_id": "posting-uuid-1",
+        "new_status": "submitted",
+        "update_fields": {
+          "board_status": "submitted",
+          "submitted_at": "2024-11-26T12:00:00Z"
+        },
+        "should_notify": true,
+        "notification_type": "application_submitted",
+        "notification_message": "Application submitted successfully"
+      }
+    ],
+    "apply-status-update": [
+      {
+        "id": "board-uuid-1",
+        "board_status": "submitted",
+        "submitted_at": "2024-11-26T12:00:00Z"
+      }
+    ],
+    "fetch-job-details-for-notification": [
+      {
+        "title": "Senior Engineer",
+        "company_name": "Stripe"
+      }
+    ],
+    "send-push-notification": [
+      {
+        "success": true
+      }
+    ]
+  }
+}

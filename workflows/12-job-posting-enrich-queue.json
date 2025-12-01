@@ -1,0 +1,900 @@
+{
+  "name": "[12] [queue] [job] [posting enrich]",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 5
+            }
+          ]
+        }
+      },
+      "id": "f1a00001-job-4a01-b001-000000000001",
+      "name": "schedule-enrichment-queue",
+      "position": [
+        0,
+        0
+      ],
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "job.posting_raw",
+        "returnAll": false,
+        "limit": 10,
+        "sort": {
+          "values": [
+            {
+              "field": "created_at",
+              "direction": "ASC"
+            }
+          ]
+        },
+        "filterType": "string",
+        "filterString": "extraction_status=eq.pending"
+      },
+      "id": "f1a00002-job-4a02-b002-000000000002",
+      "name": "fetch-pending-raw-postings",
+      "position": [
+        250,
+        0
+      ],
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "credentials": {
+        "supabaseApi": {
+          "id": "SupabaseServiceRole1",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "has-pending",
+              "leftValue": "={{ $json.id }}",
+              "operator": {
+                "type": "string",
+                "operation": "isNotEmpty"
+              },
+              "rightValue": ""
+            }
+          ],
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          }
+        },
+        "options": {}
+      },
+      "id": "f1a00003-job-4a03-b003-000000000003",
+      "name": "check-has-pending",
+      "position": [
+        500,
+        0
+      ],
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {
+          "reset": false
+        }
+      },
+      "id": "f1a00004-job-4a04-b004-000000000004",
+      "name": "loop-over-postings",
+      "position": [
+        750,
+        0
+      ],
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "job.posting_raw",
+        "updateKey": "id",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldName": "id",
+              "fieldValue": "={{ $json.id }}"
+            },
+            {
+              "fieldName": "extraction_status",
+              "fieldValue": "processing"
+            },
+            {
+              "fieldName": "extraction_attempts",
+              "fieldValue": "={{ ($json.extraction_attempts || 0) + 1 }}"
+            },
+            {
+              "fieldName": "last_extraction_at",
+              "fieldValue": "={{ $now.toISO() }}"
+            }
+          ]
+        }
+      },
+      "id": "f1a00005-job-4a05-b005-000000000005",
+      "name": "lock-posting-for-processing",
+      "position": [
+        1000,
+        0
+      ],
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "credentials": {
+        "supabaseApi": {
+          "id": "SupabaseServiceRole1",
+          "name": "Supabase account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "lock-check",
+              "leftValue": "={{ $json.id }}",
+              "operator": {
+                "type": "string",
+                "operation": "isNotEmpty"
+              },
+              "rightValue": ""
+            }
+          ],
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          }
+        },
+        "options": {}
+      },
+      "id": "f1a00006-job-4a06-b006-000000000006",
+      "name": "check-lock-acquired",
+      "position": [
+        1250,
+        0
+      ],
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "tableId": "job.posting_raw",
+        "filterType": "string",
+        "filterString": "={{ 'id=eq.' + $('loop-over-postings').item.json.id }}"
+      },
+      "id": "f1a00007-job-4a07-b007-000000000007",
+      "name": "fetch-raw-content",
+      "position": [
+        1500,
+        0
+      ],
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "credentials": {
+        "supabaseApi": {
+          "id": "SupabaseServiceRole1",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptPath": "job-posting-extract",
+        "parametersUi": {
+          "parameter": [
+            {
+              "name": "raw_content",
+              "value": "={{ $json.markdown_content || JSON.stringify($json.raw_json) }}"
+            },
+            {
+              "name": "source_platform",
+              "value": "={{ $json.source_platform }}"
+            }
+          ]
+        }
+      },
+      "id": "f1a00008-job-4a08-b008-000000000008",
+      "name": "latitude-extract-job-data",
+      "position": [
+        1750,
+        0
+      ],
+      "type": "n8n-nodes-latitude.latitude",
+      "typeVersion": 1,
+      "credentials": {
+        "latitudeApi": {
+          "id": "LatitudeApi1",
+          "name": "Latitude account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "name": "error_type",
+              "type": "string",
+              "value": "LLM_EXTRACTION_FAILED"
+            },
+            {
+              "name": "posting_raw_id",
+              "type": "string",
+              "value": "={{ $('fetch-raw-content').item.json.id }}"
+            },
+            {
+              "name": "error_message",
+              "type": "string",
+              "value": "={{ $json.message || 'Unknown LLM error' }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "f1a00009-job-4a09-b009-000000000009",
+      "name": "set-llm-error",
+      "position": [
+        1750,
+        250
+      ],
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "job.posting_raw",
+        "updateKey": "id",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldName": "id",
+              "fieldValue": "={{ $json.posting_raw_id }}"
+            },
+            {
+              "fieldName": "extraction_status",
+              "fieldValue": "failed"
+            },
+            {
+              "fieldName": "extraction_error",
+              "fieldValue": "={{ $json.error_message }}"
+            }
+          ]
+        }
+      },
+      "id": "f1a00010-job-4a10-b010-000000000010",
+      "name": "update-raw-failed",
+      "position": [
+        2000,
+        250
+      ],
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "credentials": {
+        "supabaseApi": {
+          "id": "SupabaseServiceRole1",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const raw = $('fetch-raw-content').item.json;\nconst extracted = $json.object;\nconst usage = $json.usage || {};\n\n// === NORMALIZE COMPANY NAME ===\nconst companyName = extracted.company_name || '';\nconst companyNameNormalized = companyName\n  .toLowerCase()\n  .replace(/[^a-z0-9]/g, '');\n\n// === NORMALIZE TITLE ===\nconst title = extracted.title || '';\nconst titleNormalized = title\n  .toLowerCase()\n  .replace(/\\s+/g, '_')\n  .replace(/[^a-z0-9_]/g, '');\n\n// === MAP SENIORITY ===\nconst seniorityMap = {\n  'intern': 'intern', 'internship': 'intern',\n  'entry': 'entry', 'entry-level': 'entry', 'entry level': 'entry',\n  'junior': 'junior', 'jr': 'junior',\n  'mid': 'mid', 'mid-level': 'mid', 'middle': 'mid',\n  'senior': 'senior', 'sr': 'senior',\n  'lead': 'lead', 'tech lead': 'lead',\n  'staff': 'staff',\n  'principal': 'principal',\n  'director': 'director',\n  'vp': 'vp', 'vice president': 'vp',\n  'c-level': 'c_level', 'cto': 'c_level', 'ceo': 'c_level'\n};\nconst rawSeniority = (extracted.seniority_level || '').toLowerCase();\nconst seniorityLevel = seniorityMap[rawSeniority] || 'mid';\n\n// === MAP WORK ARRANGEMENT ===\nconst workArrangementMap = {\n  'remote': 'remote', 'fully remote': 'remote', 'work from home': 'remote',\n  'hybrid': 'hybrid', 'flexible': 'flexible',\n  'onsite': 'onsite', 'on-site': 'onsite', 'in-office': 'onsite', 'office': 'onsite'\n};\nconst rawLocation = (extracted.location_type || '').toLowerCase();\nconst locationType = workArrangementMap[rawLocation] || 'onsite';\n\n// === CALCULATE UNIQUE HASH ===\nasync function calculateHash() {\n  const hashInput = [\n    title,\n    companyName,\n    extracted.location_city || '',\n    extracted.posted_at || ''\n  ].join('|');\n\n  const encoder = new TextEncoder();\n  const data = encoder.encode(hashInput);\n  const hashBuffer = await crypto.subtle.digest('SHA-256', data);\n  return Array.from(new Uint8Array(hashBuffer))\n    .map(b => b.toString(16).padStart(2, '0')).join('');\n}\n\n// Return logic wrapped for async\nreturn calculateHash().then(hash => ({\n  json: {\n    posting_raw_id: raw.id,\n    source_platform: raw.source_platform,\n    external_url: raw.external_url,\n    unique_hash: hash,\n    title: title,\n    title_normalized: titleNormalized,\n    company_name: companyName,\n    company_name_normalized: companyNameNormalized,\n    seniority_level: seniorityLevel,\n    location_type: locationType,\n    location_city: extracted.location_city || null,\n    location_state: extracted.location_state || null,\n    location_country: extracted.location_country || null,\n    salary_min: extracted.salary_min || null,\n    salary_max: extracted.salary_max || null,\n    salary_currency: extracted.salary_currency || 'USD',\n    required_skills: extracted.required_skills || [],\n    preferred_skills: extracted.preferred_skills || [],\n    tools_technologies: extracted.tools_technologies || [],\n    description_full: extracted.description_full || null,\n    description_summary: extracted.description_summary || null,\n    posted_at: extracted.posted_at || null,\n    extraction_model: 'claude-3.5-sonnet',\n    extraction_prompt_version: 'v1.0',\n    extraction_cost_usd: usage.cost_usd || 0,\n    extraction_confidence: extracted.extraction_confidence || {}\n  }\n}));"
+      },
+      "id": "f1a00011-job-4a11-b011-000000000011",
+      "name": "normalize-data",
+      "position": [
+        2000,
+        0
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/job_company",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Prefer",
+              "value": "resolution=merge-duplicates,return=representation"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"name\": \"{{ $json.company_name }}\",\n  \"normalized_name\": \"{{ $json.company_name_normalized }}\"\n}",
+        "options": {}
+      },
+      "id": "f1a00012-job-4a12-b012-000000000012",
+      "name": "resolve-company",
+      "position": [
+        2250,
+        0
+      ],
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "SupabaseServiceRole1",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "tableId": "job.posting",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldName": "posting_raw_id",
+              "fieldValue": "={{ $('normalize-data').item.json.posting_raw_id }}"
+            },
+            {
+              "fieldName": "source_platform",
+              "fieldValue": "={{ $('normalize-data').item.json.source_platform }}"
+            },
+            {
+              "fieldName": "external_url",
+              "fieldValue": "={{ $('normalize-data').item.json.external_url }}"
+            },
+            {
+              "fieldName": "unique_hash",
+              "fieldValue": "={{ $('normalize-data').item.json.unique_hash }}"
+            },
+            {
+              "fieldName": "title",
+              "fieldValue": "={{ $('normalize-data').item.json.title }}"
+            },
+            {
+              "fieldName": "title_normalized",
+              "fieldValue": "={{ $('normalize-data').item.json.title_normalized }}"
+            },
+            {
+              "fieldName": "seniority_level",
+              "fieldValue": "={{ $('normalize-data').item.json.seniority_level }}"
+            },
+            {
+              "fieldName": "company_id",
+              "fieldValue": "={{ $json.id }}"
+            },
+            {
+              "fieldName": "company_name",
+              "fieldValue": "={{ $('normalize-data').item.json.company_name }}"
+            },
+            {
+              "fieldName": "company_name_normalized",
+              "fieldValue": "={{ $('normalize-data').item.json.company_name_normalized }}"
+            },
+            {
+              "fieldName": "location_type",
+              "fieldValue": "={{ $('normalize-data').item.json.location_type }}"
+            },
+            {
+              "fieldName": "location_city",
+              "fieldValue": "={{ $('normalize-data').item.json.location_city }}"
+            },
+            {
+              "fieldName": "location_state",
+              "fieldValue": "={{ $('normalize-data').item.json.location_state }}"
+            },
+            {
+              "fieldName": "location_country",
+              "fieldValue": "={{ $('normalize-data').item.json.location_country }}"
+            },
+            {
+              "fieldName": "salary_min",
+              "fieldValue": "={{ $('normalize-data').item.json.salary_min }}"
+            },
+            {
+              "fieldName": "salary_max",
+              "fieldValue": "={{ $('normalize-data').item.json.salary_max }}"
+            },
+            {
+              "fieldName": "salary_currency",
+              "fieldValue": "={{ $('normalize-data').item.json.salary_currency }}"
+            },
+            {
+              "fieldName": "required_skills",
+              "fieldValue": "={{ $('normalize-data').item.json.required_skills }}"
+            },
+            {
+              "fieldName": "preferred_skills",
+              "fieldValue": "={{ $('normalize-data').item.json.preferred_skills }}"
+            },
+            {
+              "fieldName": "tools_technologies",
+              "fieldValue": "={{ $('normalize-data').item.json.tools_technologies }}"
+            },
+            {
+              "fieldName": "description_full",
+              "fieldValue": "={{ $('normalize-data').item.json.description_full }}"
+            },
+            {
+              "fieldName": "description_summary",
+              "fieldValue": "={{ $('normalize-data').item.json.description_summary }}"
+            },
+            {
+              "fieldName": "posted_at",
+              "fieldValue": "={{ $('normalize-data').item.json.posted_at }}"
+            },
+            {
+              "fieldName": "extraction_model",
+              "fieldValue": "={{ $('normalize-data').item.json.extraction_model }}"
+            },
+            {
+              "fieldName": "extraction_prompt_version",
+              "fieldValue": "={{ $('normalize-data').item.json.extraction_prompt_version }}"
+            },
+            {
+              "fieldName": "extraction_cost_usd",
+              "fieldValue": "={{ $('normalize-data').item.json.extraction_cost_usd }}"
+            },
+            {
+              "fieldName": "extraction_confidence",
+              "fieldValue": "={{ $('normalize-data').item.json.extraction_confidence }}"
+            }
+          ]
+        },
+        "options": {
+          "onConflict": "doNothing"
+        }
+      },
+      "id": "f1a00013-job-4a13-b013-000000000013",
+      "name": "insert-posting",
+      "position": [
+        2500,
+        0
+      ],
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "credentials": {
+        "supabaseApi": {
+          "id": "SupabaseServiceRole1",
+          "name": "Supabase account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "new-check",
+              "leftValue": "={{ $json.id }}",
+              "operator": {
+                "type": "string",
+                "operation": "isNotEmpty"
+              },
+              "rightValue": ""
+            }
+          ],
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          }
+        },
+        "options": {}
+      },
+      "id": "f1a00014-job-4a14-b014-000000000014",
+      "name": "check-is-new-posting",
+      "position": [
+        2750,
+        0
+      ],
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "job.posting_raw",
+        "updateKey": "id",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldName": "id",
+              "fieldValue": "={{ $('normalize-data').item.json.posting_raw_id }}"
+            },
+            {
+              "fieldName": "extraction_status",
+              "fieldValue": "skipped"
+            }
+          ]
+        }
+      },
+      "id": "f1a00015-job-4a15-b015-000000000015",
+      "name": "update-raw-skipped",
+      "position": [
+        3000,
+        200
+      ],
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "credentials": {
+        "supabaseApi": {
+          "id": "SupabaseServiceRole1",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "job.posting_raw",
+        "updateKey": "id",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldName": "id",
+              "fieldValue": "={{ $('normalize-data').item.json.posting_raw_id }}"
+            },
+            {
+              "fieldName": "extraction_status",
+              "fieldValue": "completed"
+            },
+            {
+              "fieldName": "posting_id",
+              "fieldValue": "={{ $json.id }}"
+            }
+          ]
+        }
+      },
+      "id": "f1a00016-job-4a16-b016-000000000016",
+      "name": "update-raw-completed",
+      "position": [
+        3000,
+        0
+      ],
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "credentials": {
+        "supabaseApi": {
+          "id": "SupabaseServiceRole1",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.N8N_WEBHOOK_BASE_URL }}/internal/match-score/calculate",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"posting_id\": \"{{ $('insert-posting').item.json.id }}\",\n  \"trigger\": \"new_posting\"\n}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "f1a00017-job-4a17-b017-000000000017",
+      "name": "queue-match-scoring",
+      "position": [
+        3250,
+        0
+      ],
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "InternalWebhookKey1",
+          "name": "Internal API Key"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "schedule-enrichment-queue": {
+      "main": [
+        [
+          {
+            "node": "fetch-pending-raw-postings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "fetch-pending-raw-postings": {
+      "main": [
+        [
+          {
+            "node": "check-has-pending",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "check-has-pending": {
+      "main": [
+        [
+          {
+            "node": "loop-over-postings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "loop-over-postings": {
+      "main": [
+        [
+          {
+            "node": "lock-posting-for-processing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "lock-posting-for-processing": {
+      "main": [
+        [
+          {
+            "node": "check-lock-acquired",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "check-lock-acquired": {
+      "main": [
+        [
+          {
+            "node": "fetch-raw-content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "fetch-raw-content": {
+      "main": [
+        [
+          {
+            "node": "latitude-extract-job-data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "latitude-extract-job-data": {
+      "main": [
+        [
+          {
+            "node": "normalize-data",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "set-llm-error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "set-llm-error": {
+      "main": [
+        [
+          {
+            "node": "update-raw-failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "update-raw-failed": {
+      "main": [
+        [
+          {
+            "node": "loop-over-postings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "normalize-data": {
+      "main": [
+        [
+          {
+            "node": "resolve-company",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "resolve-company": {
+      "main": [
+        [
+          {
+            "node": "insert-posting",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "insert-posting": {
+      "main": [
+        [
+          {
+            "node": "check-is-new-posting",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "check-is-new-posting": {
+      "main": [
+        [
+          {
+            "node": "update-raw-completed",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "update-raw-skipped",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "update-raw-skipped": {
+      "main": [
+        [
+          {
+            "node": "loop-over-postings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "update-raw-completed": {
+      "main": [
+        [
+          {
+            "node": "queue-match-scoring",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "queue-match-scoring": {
+      "main": [
+        [
+          {
+            "node": "loop-over-postings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {
+    "fetch-pending-raw-postings": [
+      {
+        "id": "raw-posting-uuid-123",
+        "extraction_status": "pending",
+        "created_at": "2024-11-26T10:00:00Z",
+        "source_platform": "linkedin",
+        "external_url": "https://www.linkedin.com/jobs/view/123456789",
+        "markdown_content": "## Senior Backend Engineer at Stripe\n\n**Location:** San Francisco, CA (Hybrid)\n**Salary:** $180k - $250k\n\nJoin us to build the future of payments..."
+      }
+    ],
+    "fetch-raw-content": [
+      {
+        "id": "raw-posting-uuid-123",
+        "source_platform": "linkedin",
+        "external_url": "https://www.linkedin.com/jobs/view/123456789",
+        "markdown_content": "## Senior Backend Engineer at Stripe\n\n**Location:** San Francisco, CA (Hybrid)\n**Salary:** $180k - $250k\n\nJoin us to build the future of payments...",
+        "raw_json": {}
+      }
+    ],
+    "latitude-extract-job-data": [
+      {
+        "object": {
+          "title": "Senior Backend Engineer",
+          "company_name": "Stripe",
+          "seniority_level": "senior",
+          "location_type": "hybrid",
+          "location_city": "San Francisco",
+          "location_country": "US",
+          "salary_min": 180000,
+          "salary_max": 250000,
+          "salary_currency": "USD",
+          "required_skills": [
+            "Python",
+            "PostgreSQL"
+          ],
+          "preferred_skills": [
+            "Go",
+            "AWS"
+          ],
+          "description_summary": "Join Stripe to build payment infrastructure.",
+          "posted_at": "2024-11-26T09:00:00Z",
+          "extraction_confidence": {
+            "salary": 0.95
+          }
+        },
+        "usage": {
+          "cost_usd": 0.0045
+        }
+      }
+    ],
+    "normalize-data": [
+      {
+        "posting_raw_id": "raw-posting-uuid-123",
+        "unique_hash": "a1b2c3d4e5f6...",
+        "title": "Senior Backend Engineer",
+        "title_normalized": "senior_backend_engineer",
+        "company_name": "Stripe",
+        "company_name_normalized": "stripe",
+        "location_type": "hybrid"
+      }
+    ],
+    "resolve-company": [
+      {
+        "id": "company-uuid-stripe"
+      }
+    ],
+    "insert-posting": [
+      {
+        "id": "posting-uuid-new"
+      }
+    ]
+  }
+}

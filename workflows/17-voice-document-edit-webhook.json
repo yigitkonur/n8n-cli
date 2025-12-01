@@ -1,0 +1,712 @@
+{
+  "name": "[17] [webhook] [voice] [document edit]",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "document/voice-edit",
+        "authentication": "jwtAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "11111111-1111-1111-1111-111111111111",
+      "name": "webhook-voice-document-edit",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "22222222-2222-2222-2222-222222222222",
+      "credentials": {
+        "jwtAuth": {
+          "id": "supabase-jwt",
+          "name": "Supabase JWT"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const input = $input.item.json;\nconst UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;\n\n// Validate JWT\nif (!input.jwtPayload?.sub) {\n  throw new Error('AUTH_ERROR: Authentication required');\n}\n\n// Validate voice_transcript_id\nif (!input.body?.voice_transcript_id) {\n  throw new Error('VALIDATION_ERROR: voice_transcript_id required');\n}\nif (!UUID_REGEX.test(input.body.voice_transcript_id)) {\n  throw new Error('VALIDATION_ERROR: voice_transcript_id must be valid UUID');\n}\n\n// Validate board_job_document_id\nif (!input.body?.board_job_document_id) {\n  throw new Error('VALIDATION_ERROR: board_job_document_id required');\n}\nif (!UUID_REGEX.test(input.body.board_job_document_id)) {\n  throw new Error('VALIDATION_ERROR: board_job_document_id must be valid UUID');\n}\n\nreturn {\n  json: {\n    profile_id: input.jwtPayload.sub,\n    voice_transcript_id: input.body.voice_transcript_id,\n    board_job_document_id: input.body.board_job_document_id\n  }\n};"
+      },
+      "id": "33333333-3333-3333-3333-333333333333",
+      "name": "validate-request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        250,
+        0
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ {\n  \"error\": $json.error?.message || 'Invalid request',\n  \"code\": \"VALIDATION_ERROR\"\n} }}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "id": "44444444-4444-4444-4444-444444444444",
+      "name": "respond-400-validation-error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        250,
+        250
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "tableId": "core.voice_transcript",
+        "rowId": "={{ $('validate-request').item.json.voice_transcript_id }}"
+      },
+      "id": "55555555-5555-5555-5555-555555555555",
+      "name": "fetch-voice-transcript",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        500,
+        0
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "supabase-account",
+          "name": "Supabase account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\n  \"error\": \"Voice transcript not found\",\n  \"code\": \"TRANSCRIPT_NOT_FOUND\"\n}",
+        "options": {
+          "responseCode": 404
+        }
+      },
+      "id": "66666666-6666-6666-6666-666666666666",
+      "name": "respond-404-transcript-not-found",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        500,
+        250
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.processing_status }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "rightValue": "completed"
+            },
+            {
+              "id": "c2",
+              "leftValue": "={{ $json.enhanced_transcript?.length }}",
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              },
+              "rightValue": 4
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "77777777-7777-7777-7777-777777777777",
+      "name": "check-transcript-status",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        750,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\n  \"error\": \"Voice transcript still processing or invalid\",\n  \"code\": \"TRANSCRIPT_PENDING\"\n}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "id": "88888888-8888-8888-8888-888888888888",
+      "name": "respond-400-transcript-pending",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        750,
+        250
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Complex query requires Supabase REST API via Code node\nconst supabaseUrl = $env.SUPABASE_URL;\nconst supabaseKey = $env.SUPABASE_SERVICE_ROLE_KEY;\nconst documentId = $('validate-request').item.json.board_job_document_id;\n\n// Query: Get latest version of selected document with ownership info\nconst query = `\n  id,\n  content_markdown,\n  version_number,\n  board_job_document_id,\n  board_job_document:board_job_document_id(\n    id,\n    document_type,\n    is_selected,\n    board_job:board_job_id(\n      id,\n      profile_id,\n      posting:posting_id(\n        company_name,\n        job_title\n      )\n    )\n  )\n`;\n\nconst response = await this.helpers.httpRequest({\n  method: 'GET',\n  url: `${supabaseUrl}/rest/v1/document_version`,\n  qs: {\n    select: query,\n    'board_job_document_id': `eq.${documentId}`,\n    order: 'version_number.desc',\n    limit: 1\n  },\n  headers: {\n    'apikey': supabaseKey,\n    'Authorization': `Bearer ${supabaseKey}`,\n    'Content-Type': 'application/json'\n  },\n  json: true\n});\n\nif (!response || response.length === 0) {\n  throw new Error('DOCUMENT_NOT_FOUND: No document version found');\n}\n\nconst version = response[0];\nconst doc = version.board_job_document;\n\nif (!doc?.is_selected) {\n  throw new Error('DOCUMENT_NOT_FOUND: Document not selected');\n}\n\nreturn {\n  json: {\n    current_version_id: version.id,\n    content_markdown: version.content_markdown,\n    version_number: version.version_number,\n    document_type: doc.document_type,\n    owner_profile_id: doc.board_job?.profile_id,\n    company_name: doc.board_job?.posting?.company_name || 'the company',\n    job_title: doc.board_job?.posting?.job_title || 'the position'\n  }\n};"
+      },
+      "id": "99999999-9999-9999-9999-999999999999",
+      "name": "fetch-current-document-version",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1000,
+        0
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\n  \"error\": \"Document not found or not selected\",\n  \"code\": \"DOCUMENT_NOT_FOUND\"\n}",
+        "options": {
+          "responseCode": 404
+        }
+      },
+      "id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+      "name": "respond-404-document-not-found",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        1000,
+        250
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.owner_profile_id }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "rightValue": "={{ $('validate-request').item.json.profile_id }}"
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+      "name": "check-ownership",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1250,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\n  \"error\": \"You don't have access to this document\",\n  \"code\": \"FORBIDDEN\"\n}",
+        "options": {
+          "responseCode": 403
+        }
+      },
+      "id": "cccccccc-cccc-cccc-cccc-cccccccccccc",
+      "name": "respond-403-forbidden",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        1250,
+        250
+      ]
+    },
+    {
+      "parameters": {
+        "promptPath": "voice-document-edit-apply",
+        "parametersUi": {
+          "parameter": [
+            {
+              "name": "document_type",
+              "value": "={{ $('fetch-current-document-version').item.json.document_type }}"
+            },
+            {
+              "name": "current_content",
+              "value": "={{ $('fetch-current-document-version').item.json.content_markdown }}"
+            },
+            {
+              "name": "edit_instruction",
+              "value": "={{ $('fetch-voice-transcript').item.json.enhanced_transcript }}"
+            },
+            {
+              "name": "company_name",
+              "value": "={{ $('fetch-current-document-version').item.json.company_name }}"
+            },
+            {
+              "name": "job_title",
+              "value": "={{ $('fetch-current-document-version').item.json.job_title }}"
+            }
+          ]
+        }
+      },
+      "id": "dddddddd-dddd-dddd-dddd-dddddddddddd",
+      "name": "latitude-apply-voice-edit",
+      "type": "n8n-nodes-latitude.latitude",
+      "typeVersion": 1,
+      "position": [
+        1500,
+        0
+      ],
+      "credentials": {
+        "latitudeApi": {
+          "id": "latitude-account",
+          "name": "Latitude account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\n  \"error\": \"Failed to apply edit\",\n  \"code\": \"AI_ERROR\"\n}",
+        "options": {
+          "responseCode": 500
+        }
+      },
+      "id": "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee",
+      "name": "respond-500-ai-error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        1500,
+        250
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "tableId": "job.document_version",
+        "columnsUi": {
+          "columnValues": [
+            {
+              "fieldId": "board_job_document_id",
+              "value": "={{ $('validate-request').item.json.board_job_document_id }}"
+            },
+            {
+              "fieldId": "parent_version_id",
+              "value": "={{ $('fetch-current-document-version').item.json.current_version_id }}"
+            },
+            {
+              "fieldId": "version_number",
+              "value": "={{ $('fetch-current-document-version').item.json.version_number + 1 }}"
+            },
+            {
+              "fieldId": "content_markdown",
+              "value": "={{ $('latitude-apply-voice-edit').item.json.object.edited_content }}"
+            },
+            {
+              "fieldId": "llm_model",
+              "value": "latitude/llama-3.3-70b"
+            },
+            {
+              "fieldId": "edit_type",
+              "value": "voice_edit"
+            },
+            {
+              "fieldId": "edit_instruction",
+              "value": "={{ $('fetch-voice-transcript').item.json.enhanced_transcript }}"
+            },
+            {
+              "fieldId": "voice_transcript_id",
+              "value": "={{ $('validate-request').item.json.voice_transcript_id }}"
+            }
+          ]
+        }
+      },
+      "id": "ffffffff-ffff-ffff-ffff-ffffffffffff",
+      "name": "insert-new-version",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1750,
+        0
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "supabase-account",
+          "name": "Supabase account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\n  \"error\": \"Failed to save new version\",\n  \"code\": \"DB_ERROR\"\n}",
+        "options": {
+          "responseCode": 500
+        }
+      },
+      "id": "00000000-0000-0000-0000-000000000001",
+      "name": "respond-500-db-error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        1750,
+        250
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "name": "status",
+              "type": "string",
+              "value": "success"
+            },
+            {
+              "name": "version_id",
+              "type": "string",
+              "value": "={{ $json.id }}"
+            },
+            {
+              "name": "version_number",
+              "type": "number",
+              "value": "={{ $json.version_number }}"
+            },
+            {
+              "name": "document_type",
+              "type": "string",
+              "value": "={{ $('fetch-current-document-version').item.json.document_type }}"
+            },
+            {
+              "name": "changes_made",
+              "type": "string",
+              "value": "={{ $('latitude-apply-voice-edit').item.json.object.changes_made }}"
+            },
+            {
+              "name": "created_at",
+              "type": "string",
+              "value": "={{ $json.created_at }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "00000000-0000-0000-0000-000000000002",
+      "name": "normalize-response",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2000,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "00000000-0000-0000-0000-000000000003",
+      "name": "respond-200-success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        2250,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "webhook-voice-document-edit": {
+      "main": [
+        [
+          {
+            "node": "validate-request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "validate-request": {
+      "main": [
+        [
+          {
+            "node": "fetch-voice-transcript",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "respond-400-validation-error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "fetch-voice-transcript": {
+      "main": [
+        [
+          {
+            "node": "check-transcript-status",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "respond-404-transcript-not-found",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "check-transcript-status": {
+      "main": [
+        [
+          {
+            "node": "fetch-current-document-version",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "respond-400-transcript-pending",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "fetch-current-document-version": {
+      "main": [
+        [
+          {
+            "node": "check-ownership",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "respond-404-document-not-found",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "check-ownership": {
+      "main": [
+        [
+          {
+            "node": "latitude-apply-voice-edit",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "respond-403-forbidden",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "latitude-apply-voice-edit": {
+      "main": [
+        [
+          {
+            "node": "insert-new-version",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "respond-500-ai-error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "insert-new-version": {
+      "main": [
+        [
+          {
+            "node": "normalize-response",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "respond-500-db-error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "normalize-response": {
+      "main": [
+        [
+          {
+            "node": "respond-200-success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {
+    "webhook-voice-document-edit": [
+      {
+        "json": {
+          "headers": {
+            "authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+          },
+          "body": {
+            "voice_transcript_id": "a1b2c3d4-e5f6-4g7h-8i9j-k0l1m2n3o4p5",
+            "board_job_document_id": "e5f6g7h8-i9j0-k1l2-m3n4-o5p6q7r8s9t0"
+          },
+          "jwtPayload": {
+            "sub": "d654bdd6-17ea-4d46-8222-b29ad507b633",
+            "email": "user@example.com",
+            "role": "authenticated"
+          }
+        }
+      }
+    ],
+    "validate-request": [
+      {
+        "json": {
+          "profile_id": "d654bdd6-17ea-4d46-8222-b29ad507b633",
+          "voice_transcript_id": "a1b2c3d4-e5f6-4g7h-8i9j-k0l1m2n3o4p5",
+          "board_job_document_id": "e5f6g7h8-i9j0-k1l2-m3n4-o5p6q7r8s9t0"
+        }
+      }
+    ],
+    "fetch-voice-transcript": [
+      {
+        "json": {
+          "id": "a1b2c3d4-e5f6-4g7h-8i9j-k0l1m2n3o4p5",
+          "profile_id": "d654bdd6-17ea-4d46-8222-b29ad507b633",
+          "enhanced_transcript": "Make the second paragraph more confident and mention my work at Wope",
+          "processing_status": "completed",
+          "usage_context": "document_edit",
+          "created_at": "2023-11-26T10:00:00.000Z"
+        }
+      }
+    ],
+    "check-transcript-status": [
+      {
+        "json": {
+          "id": "a1b2c3d4-e5f6-4g7h-8i9j-k0l1m2n3o4p5",
+          "profile_id": "d654bdd6-17ea-4d46-8222-b29ad507b633",
+          "enhanced_transcript": "Make the second paragraph more confident and mention my work at Wope",
+          "processing_status": "completed",
+          "usage_context": "document_edit",
+          "created_at": "2023-11-26T10:00:00.000Z"
+        }
+      }
+    ],
+    "fetch-current-document-version": [
+      {
+        "json": {
+          "current_version_id": "v1v1v1v1-v1v1-v1v1-v1v1-v1v1v1v1v1v1",
+          "content_markdown": "# Cover Letter\n\nDear Hiring Manager,\n\nI am writing to apply...",
+          "version_number": 1,
+          "document_type": "cover_letter",
+          "owner_profile_id": "d654bdd6-17ea-4d46-8222-b29ad507b633",
+          "company_name": "Stripe",
+          "job_title": "Senior Software Engineer"
+        }
+      }
+    ],
+    "check-ownership": [
+      {
+        "json": {
+          "current_version_id": "v1v1v1v1-v1v1-v1v1-v1v1-v1v1v1v1v1v1",
+          "content_markdown": "# Cover Letter\n\nDear Hiring Manager,\n\nI am writing to apply...",
+          "version_number": 1,
+          "document_type": "cover_letter",
+          "owner_profile_id": "d654bdd6-17ea-4d46-8222-b29ad507b633",
+          "company_name": "Stripe",
+          "job_title": "Senior Software Engineer"
+        }
+      }
+    ],
+    "latitude-apply-voice-edit": [
+      {
+        "json": {
+          "object": {
+            "edited_content": "# Cover Letter\n\nDear Hiring Manager,\n\nI am writing to apply... [Edited content with Wope experience]",
+            "changes_made": "Made second paragraph more confident and added Wope experience",
+            "confidence": 0.92
+          },
+          "usage": {
+            "prompt_tokens": 500,
+            "completion_tokens": 300,
+            "total_tokens": 800
+          }
+        }
+      }
+    ],
+    "insert-new-version": [
+      {
+        "json": {
+          "id": "new1new1-new1-new1-new1-new1new1new1",
+          "board_job_document_id": "e5f6g7h8-i9j0-k1l2-m3n4-o5p6q7r8s9t0",
+          "parent_version_id": "v1v1v1v1-v1v1-v1v1-v1v1-v1v1v1v1v1v1",
+          "version_number": 2,
+          "content_markdown": "# Cover Letter\n\nDear Hiring Manager,\n\nI am writing to apply... [Edited content with Wope experience]",
+          "edit_type": "voice_edit",
+          "created_at": "2023-11-26T10:00:05.000Z"
+        }
+      }
+    ],
+    "normalize-response": [
+      {
+        "json": {
+          "status": "success",
+          "version_id": "new1new1-new1-new1-new1-new1new1new1",
+          "version_number": 2,
+          "document_type": "cover_letter",
+          "changes_made": "Made second paragraph more confident and added Wope experience",
+          "created_at": "2023-11-26T10:00:05.000Z"
+        }
+      }
+    ]
+  },
+  "active": false,
+  "settings": {},
+  "tags": []
+}

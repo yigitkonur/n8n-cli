@@ -1,0 +1,812 @@
+{
+  "name": "[08] [event] [credit] [purchase process]",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "a1b2c3d4-0801-4a01-8001-000000000001",
+      "name": "trigger-subworkflow",
+      "position": [
+        0,
+        0
+      ],
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "core.credit_purchase",
+        "returnAll": false,
+        "limit": 1,
+        "filterType": "string",
+        "filterString": "={{ 'rc_transaction_id=eq.' + $json.rc_transaction_id }}"
+      },
+      "id": "a1b2c3d4-0801-4a02-8002-000000000002",
+      "name": "check-idempotency",
+      "position": [
+        250,
+        0
+      ],
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "credentials": {
+        "supabaseApi": {
+          "id": "supabaseApiCred",
+          "name": "Supabase account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "check-duplicate",
+              "leftValue": "={{ $json.id ? 1 : 0 }}",
+              "operator": {
+                "operation": "equals",
+                "type": "number"
+              },
+              "rightValue": 1
+            }
+          ],
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          }
+        },
+        "options": {}
+      },
+      "id": "a1b2c3d4-0801-4a03-8003-000000000003",
+      "name": "if-already-processed",
+      "position": [
+        500,
+        0
+      ],
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "status-assign",
+              "name": "status",
+              "type": "string",
+              "value": "success"
+            },
+            {
+              "id": "duplicate-assign",
+              "name": "duplicate",
+              "type": "boolean",
+              "value": "true"
+            },
+            {
+              "id": "purchase-id-assign",
+              "name": "purchase_id",
+              "type": "string",
+              "value": "={{ $('check-idempotency').item.json.id }}"
+            },
+            {
+              "id": "message-assign",
+              "name": "message",
+              "type": "string",
+              "value": "Transaction already processed"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a1b2c3d4-0801-4a04-8004-000000000004",
+      "name": "set-duplicate-response",
+      "position": [
+        750,
+        -150
+      ],
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"status\": $json.status, \"duplicate\": true, \"purchase_id\": $json.purchase_id, \"message\": $json.message } }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "a1b2c3d4-0801-4a05-8005-000000000005",
+      "name": "respond-200-duplicate",
+      "position": [
+        1000,
+        -150
+      ],
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const input = $input.item.json;\nconst productId = input.product_id;\n\n// Pattern: com.aura.credits.{type}_{amount}\n// Valid types: apply, boost, radar (NOT rewind - that's subscription-only)\nconst regex = /^com\\.aura\\.credits\\.(apply|boost|radar)_(\\d+)$/;\nconst match = productId.match(regex);\n\nif (!match) {\n  throw new Error(`Invalid product ID format: ${productId}. Expected pattern: com.aura.credits.{apply|boost|radar}_{amount}`);\n}\n\nconst creditType = match[1];\nconst creditsGranted = parseInt(match[2], 10);\n\n// Validate credit amount is reasonable (known product SKUs)\nconst validAmounts = {\n  apply: [50, 100, 150],\n  boost: [15, 30, 60],\n  radar: [10, 20, 30]\n};\n\nif (!validAmounts[creditType].includes(creditsGranted)) {\n  throw new Error(`Invalid credit amount ${creditsGranted} for type ${creditType}. Valid: ${validAmounts[creditType].join(', ')}`);\n}\n\nreturn {\n  json: {\n    ...input,\n    credit_type: creditType,\n    credits_granted: creditsGranted\n  }\n};"
+      },
+      "id": "a1b2c3d4-0801-4a06-8006-000000000006",
+      "name": "parse-product-id",
+      "position": [
+        750,
+        100
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "error-assign",
+              "name": "error",
+              "type": "string",
+              "value": "INVALID_PRODUCT"
+            },
+            {
+              "id": "message-assign",
+              "name": "message",
+              "type": "string",
+              "value": "={{ $json.message }}"
+            },
+            {
+              "id": "product-id-assign",
+              "name": "product_id",
+              "type": "string",
+              "value": "={{ $('trigger-subworkflow').item.json.product_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a1b2c3d4-0801-4a07-8007-000000000007",
+      "name": "set-parse-error",
+      "position": [
+        1000,
+        300
+      ],
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"status\": \"error\", \"code\": \"INVALID_PRODUCT\", \"message\": $json.message, \"product_id\": $json.product_id } }}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "id": "a1b2c3d4-0801-4a08-8008-000000000008",
+      "name": "respond-400-invalid-product",
+      "position": [
+        1250,
+        300
+      ],
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "tableId": "core.credit_purchase",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldName": "profile_id",
+              "fieldValue": "={{ $json.profile_id }}"
+            },
+            {
+              "fieldName": "revenuecat_event_id",
+              "fieldValue": "={{ $json.revenuecat_event_id }}"
+            },
+            {
+              "fieldName": "rc_transaction_id",
+              "fieldValue": "={{ $json.rc_transaction_id }}"
+            },
+            {
+              "fieldName": "product_id",
+              "fieldValue": "={{ $json.product_id }}"
+            },
+            {
+              "fieldName": "credit_type",
+              "fieldValue": "={{ $json.credit_type }}"
+            },
+            {
+              "fieldName": "credits_granted",
+              "fieldValue": "={{ $json.credits_granted }}"
+            },
+            {
+              "fieldName": "price_usd",
+              "fieldValue": "={{ $json.price_usd }}"
+            },
+            {
+              "fieldName": "currency",
+              "fieldValue": "={{ $json.currency }}"
+            },
+            {
+              "fieldName": "store",
+              "fieldValue": "={{ $json.store }}"
+            },
+            {
+              "fieldName": "purchased_at",
+              "fieldValue": "={{ $json.purchased_at }}"
+            }
+          ]
+        }
+      },
+      "id": "a1b2c3d4-0801-4a09-8009-000000000009",
+      "name": "insert-credit-purchase",
+      "position": [
+        1000,
+        100
+      ],
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "credentials": {
+        "supabaseApi": {
+          "id": "supabaseApiCred",
+          "name": "Supabase account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "error-assign",
+              "name": "error",
+              "type": "string",
+              "value": "DATABASE_ERROR"
+            },
+            {
+              "id": "message-assign",
+              "name": "message",
+              "type": "string",
+              "value": "Failed to create purchase record"
+            },
+            {
+              "id": "details-assign",
+              "name": "details",
+              "type": "string",
+              "value": "={{ $json.message }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a1b2c3d4-0801-4a10-8010-000000000010",
+      "name": "set-db-error",
+      "position": [
+        1250,
+        250
+      ],
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"status\": \"error\", \"code\": \"DATABASE_ERROR\", \"message\": $json.message } }}",
+        "options": {
+          "responseCode": 500
+        }
+      },
+      "id": "a1b2c3d4-0801-4a11-8011-000000000011",
+      "name": "respond-500-database-error",
+      "position": [
+        1500,
+        250
+      ],
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "tableId": "core.credit_transaction",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldName": "profile_id",
+              "fieldValue": "={{ $('parse-product-id').item.json.profile_id }}"
+            },
+            {
+              "fieldName": "credit_type",
+              "fieldValue": "={{ $('parse-product-id').item.json.credit_type }}"
+            },
+            {
+              "fieldName": "transaction_type",
+              "fieldValue": "purchase"
+            },
+            {
+              "fieldName": "amount",
+              "fieldValue": "={{ $('parse-product-id').item.json.credits_granted }}"
+            },
+            {
+              "fieldName": "related_entity_type",
+              "fieldValue": "purchase"
+            },
+            {
+              "fieldName": "related_entity_id",
+              "fieldValue": "={{ $json.id }}"
+            },
+            {
+              "fieldName": "description",
+              "fieldValue": "={{ 'Credit pack purchase: +' + $('parse-product-id').item.json.credits_granted + ' ' + $('parse-product-id').item.json.credit_type }}"
+            }
+          ]
+        }
+      },
+      "id": "a1b2c3d4-0801-4a12-8012-000000000012",
+      "name": "insert-credit-transaction",
+      "position": [
+        1250,
+        100
+      ],
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "credentials": {
+        "supabaseApi": {
+          "id": "supabaseApiCred",
+          "name": "Supabase account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "error-assign",
+              "name": "error",
+              "type": "string",
+              "value": "LEDGER_ERROR"
+            },
+            {
+              "id": "message-assign",
+              "name": "message",
+              "type": "string",
+              "value": "Failed to grant credits"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a1b2c3d4-0801-4a13-8013-000000000013",
+      "name": "set-ledger-error",
+      "position": [
+        1500,
+        200
+      ],
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"status\": \"error\", \"code\": \"LEDGER_ERROR\", \"message\": $json.message } }}",
+        "options": {
+          "responseCode": 500
+        }
+      },
+      "id": "a1b2c3d4-0801-4a14-8014-000000000014",
+      "name": "respond-500-ledger-error",
+      "position": [
+        1750,
+        200
+      ],
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "status-assign",
+              "name": "status",
+              "type": "string",
+              "value": "success"
+            },
+            {
+              "id": "purchase-id-assign",
+              "name": "purchase_id",
+              "type": "string",
+              "value": "={{ $('insert-credit-purchase').item.json.id }}"
+            },
+            {
+              "id": "transaction-id-assign",
+              "name": "transaction_id",
+              "type": "string",
+              "value": "={{ $json.id }}"
+            },
+            {
+              "id": "credit-type-assign",
+              "name": "credit_type",
+              "type": "string",
+              "value": "={{ $('parse-product-id').item.json.credit_type }}"
+            },
+            {
+              "id": "credits-granted-assign",
+              "name": "credits_granted",
+              "type": "number",
+              "value": "={{ $('parse-product-id').item.json.credits_granted }}"
+            },
+            {
+              "id": "balance-after-assign",
+              "name": "balance_after",
+              "type": "number",
+              "value": "={{ $json.balance_after }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a1b2c3d4-0801-4a15-8015-000000000015",
+      "name": "set-success-response",
+      "position": [
+        1500,
+        100
+      ],
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"status\": \"success\", \"data\": { \"purchase_id\": $json.purchase_id, \"transaction_id\": $json.transaction_id, \"credit_type\": $json.credit_type, \"credits_granted\": $json.credits_granted, \"balance_after\": $json.balance_after } } }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "a1b2c3d4-0801-4a16-8016-000000000016",
+      "name": "respond-200-success",
+      "position": [
+        1750,
+        100
+      ],
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4
+    }
+  ],
+  "connections": {
+    "trigger-subworkflow": {
+      "main": [
+        [
+          {
+            "node": "check-idempotency",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "check-idempotency": {
+      "main": [
+        [
+          {
+            "node": "if-already-processed",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "respond-500-database-error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "if-already-processed": {
+      "main": [
+        [
+          {
+            "node": "set-duplicate-response",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "parse-product-id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "set-duplicate-response": {
+      "main": [
+        [
+          {
+            "node": "respond-200-duplicate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "parse-product-id": {
+      "main": [
+        [
+          {
+            "node": "insert-credit-purchase",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "set-parse-error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "set-parse-error": {
+      "main": [
+        [
+          {
+            "node": "respond-400-invalid-product",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "insert-credit-purchase": {
+      "main": [
+        [
+          {
+            "node": "insert-credit-transaction",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "set-db-error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "set-db-error": {
+      "main": [
+        [
+          {
+            "node": "respond-500-database-error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "insert-credit-transaction": {
+      "main": [
+        [
+          {
+            "node": "set-success-response",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "set-ledger-error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "set-ledger-error": {
+      "main": [
+        [
+          {
+            "node": "respond-500-ledger-error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "set-success-response": {
+      "main": [
+        [
+          {
+            "node": "respond-200-success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {
+    "trigger-subworkflow": [
+      {
+        "revenuecat_event_id": "evt_abc123def456",
+        "profile_id": "d654bdd6-17ea-4d46-8222-b29ad507b633",
+        "product_id": "com.aura.credits.apply_50",
+        "rc_transaction_id": "1000000123456789",
+        "price_usd": 3.0,
+        "currency": "USD",
+        "store": "APP_STORE",
+        "purchased_at": "2024-11-25T10:30:00Z"
+      }
+    ],
+    "check-idempotency": [
+      {
+        "revenuecat_event_id": "evt_abc123def456",
+        "profile_id": "d654bdd6-17ea-4d46-8222-b29ad507b633",
+        "product_id": "com.aura.credits.apply_50",
+        "rc_transaction_id": "1000000123456789",
+        "price_usd": 3.0,
+        "currency": "USD",
+        "store": "APP_STORE",
+        "purchased_at": "2024-11-25T10:30:00Z"
+      }
+    ],
+    "if-already-processed": [
+      {
+        "revenuecat_event_id": "evt_abc123def456",
+        "profile_id": "d654bdd6-17ea-4d46-8222-b29ad507b633",
+        "product_id": "com.aura.credits.apply_50",
+        "rc_transaction_id": "1000000123456789",
+        "price_usd": 3.0,
+        "currency": "USD",
+        "store": "APP_STORE",
+        "purchased_at": "2024-11-25T10:30:00Z"
+      }
+    ],
+    "parse-product-id": [
+      {
+        "revenuecat_event_id": "evt_abc123def456",
+        "profile_id": "d654bdd6-17ea-4d46-8222-b29ad507b633",
+        "product_id": "com.aura.credits.apply_50",
+        "rc_transaction_id": "1000000123456789",
+        "price_usd": 3.0,
+        "currency": "USD",
+        "store": "APP_STORE",
+        "purchased_at": "2024-11-25T10:30:00Z",
+        "credit_type": "apply",
+        "credits_granted": 50
+      }
+    ],
+    "insert-credit-purchase": [
+      {
+        "id": "purchase-uuid-001",
+        "profile_id": "d654bdd6-17ea-4d46-8222-b29ad507b633",
+        "revenuecat_event_id": "evt_abc123def456",
+        "rc_transaction_id": "1000000123456789",
+        "product_id": "com.aura.credits.apply_50",
+        "credit_type": "apply",
+        "credits_granted": 50,
+        "price_usd": 3.0,
+        "currency": "USD",
+        "store": "APP_STORE",
+        "purchased_at": "2024-11-25T10:30:00Z",
+        "created_at": "2024-11-25T10:30:05Z"
+      }
+    ],
+    "insert-credit-transaction": [
+      {
+        "id": "txn-uuid-001",
+        "profile_id": "d654bdd6-17ea-4d46-8222-b29ad507b633",
+        "credit_type": "apply",
+        "transaction_type": "purchase",
+        "amount": 50,
+        "balance_after": 50,
+        "related_entity_type": "purchase",
+        "related_entity_id": "purchase-uuid-001",
+        "description": "Credit pack purchase: +50 apply",
+        "created_at": "2024-11-25T10:30:06Z"
+      }
+    ],
+    "set-success-response": [
+      {
+        "status": "success",
+        "purchase_id": "purchase-uuid-001",
+        "transaction_id": "txn-uuid-001",
+        "credit_type": "apply",
+        "credits_granted": 50,
+        "balance_after": 50
+      }
+    ],
+    "respond-200-success": [
+      {
+        "status": "success",
+        "data": {
+          "purchase_id": "purchase-uuid-001",
+          "transaction_id": "txn-uuid-001",
+          "credit_type": "apply",
+          "credits_granted": 50,
+          "balance_after": 50
+        }
+      }
+    ],
+    "set-duplicate-response": [
+      {
+        "status": "success",
+        "duplicate": true,
+        "purchase_id": "purchase-uuid-existing",
+        "message": "Transaction already processed"
+      }
+    ],
+    "respond-200-duplicate": [
+      {
+        "status": "success",
+        "duplicate": true,
+        "purchase_id": "purchase-uuid-existing",
+        "message": "Transaction already processed"
+      }
+    ],
+    "set-parse-error": [
+      {
+        "error": "INVALID_PRODUCT",
+        "message": "Invalid product ID format: com.aura.credits.invalid_99. Expected pattern: com.aura.credits.{apply|boost|radar}_{amount}",
+        "product_id": "com.aura.credits.invalid_99"
+      }
+    ],
+    "respond-400-invalid-product": [
+      {
+        "status": "error",
+        "code": "INVALID_PRODUCT",
+        "message": "Invalid product ID format: com.aura.credits.invalid_99. Expected pattern: com.aura.credits.{apply|boost|radar}_{amount}",
+        "product_id": "com.aura.credits.invalid_99"
+      }
+    ],
+    "set-db-error": [
+      {
+        "error": "DATABASE_ERROR",
+        "message": "Failed to create purchase record",
+        "details": "Foreign key violation: profile_id does not exist"
+      }
+    ],
+    "respond-500-database-error": [
+      {
+        "status": "error",
+        "code": "DATABASE_ERROR",
+        "message": "Failed to create purchase record"
+      }
+    ],
+    "set-ledger-error": [
+      {
+        "error": "LEDGER_ERROR",
+        "message": "Failed to grant credits"
+      }
+    ],
+    "respond-500-ledger-error": [
+      {
+        "status": "error",
+        "code": "LEDGER_ERROR",
+        "message": "Failed to grant credits"
+      }
+    ]
+  },
+  "settings": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "d660c8d1ec82335c55c8ab9e582b0038fa983ea7127f17cbb5c7a54c713aa590"
+  }
+}

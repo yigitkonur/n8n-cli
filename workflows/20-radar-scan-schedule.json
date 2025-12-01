@@ -1,0 +1,948 @@
+{
+  "name": "[20] [schedule] [radar] [scan]",
+  "nodes": [
+    {
+      "id": "a1111111-1111-1111-1111-111111111111",
+      "name": "schedule-radar-scan",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 */6 * * *"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "a2222222-2222-2222-2222-222222222222",
+      "name": "fetch-active-radars",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        250,
+        0
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "supabase-cred",
+          "name": "Supabase account"
+        }
+      },
+      "parameters": {
+        "operation": "getMany",
+        "tableId": "job.radar_config",
+        "returnAll": false,
+        "limit": 100,
+        "filterType": "string",
+        "matchType": "allFilters",
+        "options": {},
+        "filterString": "=eq.&=eq."
+      }
+    },
+    {
+      "id": "a3333333-3333-3333-3333-333333333333",
+      "name": "check-radars-exist",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        500,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "condition-1",
+              "leftValue": "={{ $input.all().length }}",
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              },
+              "rightValue": 0
+            }
+          ],
+          "options": {
+            "version": 2,
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          }
+        }
+      }
+    },
+    {
+      "id": "a4444444-4444-4444-4444-444444444444",
+      "name": "end-no-active-radars",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        750,
+        150
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "a5555555-5555-5555-5555-555555555555",
+      "name": "loop-radars",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        750,
+        0
+      ],
+      "parameters": {
+        "batchSize": 1,
+        "options": {
+          "reset": true
+        }
+      }
+    },
+    {
+      "id": "a6666666-6666-6666-6666-666666666666",
+      "name": "fetch-profile",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1000,
+        0
+      ],
+      "onError": "continueErrorOutput",
+      "credentials": {
+        "supabaseApi": {
+          "id": "supabase-cred",
+          "name": "Supabase account"
+        }
+      },
+      "parameters": {
+        "operation": "getMany",
+        "tableId": "core.profile",
+        "returnAll": false,
+        "limit": 1,
+        "filterType": "string",
+        "matchType": "allFilters",
+        "options": {},
+        "filterString": "=eq."
+      }
+    },
+    {
+      "id": "a7777777-7777-7777-7777-777777777777",
+      "name": "set-profile-error",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1250,
+        150
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "name": "error_type",
+              "type": "string",
+              "value": "PROFILE_FETCH_ERROR"
+            },
+            {
+              "name": "radar_config_id",
+              "type": "string",
+              "value": "={{ $('loop-radars').item.json.id }}"
+            },
+            {
+              "name": "profile_id",
+              "type": "string",
+              "value": "={{ $('loop-radars').item.json.profile_id }}"
+            },
+            {
+              "name": "error_message",
+              "type": "string",
+              "value": "={{ $json.message || 'Profile data unavailable' }}"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "a8888888-8888-8888-8888-888888888888",
+      "name": "fetch-profile-facts",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1250,
+        0
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "supabase-cred",
+          "name": "Supabase account"
+        }
+      },
+      "parameters": {
+        "operation": "getMany",
+        "tableId": "core.fact",
+        "returnAll": false,
+        "limit": 200,
+        "filterType": "string",
+        "matchType": "allFilters",
+        "options": {},
+        "filterString": "=eq."
+      }
+    },
+    {
+      "id": "a9999999-9999-9999-9999-999999999999",
+      "name": "build-profile-markdown",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1500,
+        0
+      ],
+      "onError": "continueErrorOutput",
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const radar = $('loop-radars').item.json;\nconst profile = $('fetch-profile').first().json;\nconst facts = $('fetch-profile-facts').all().map(f => f.json);\n\n// Group facts by category\nconst skills = facts.filter(f => f.category_id?.includes('skill')).slice(0, 20);\nconst experience = facts.filter(f => f.category_id?.includes('work_experience')).slice(0, 10);\nconst preferences = facts.filter(f => f.category_id?.includes('preference')).slice(0, 5);\n\nconst markdown = `# ${profile.full_name || 'Candidate Profile'}\n\n## Current Role\n**Title:** ${profile.current_title || 'Professional'}\n**Location:** ${profile.current_location || 'Not specified'}\n\n## Target Roles\n${radar.target_roles?.map(r => `- ${r}`).join('\\n') || '- Not specified'}\n\n## Target Locations\n${radar.target_locations?.map(l => `- ${l}`).join('\\n') || '- Flexible'}\n\n## Key Skills\n${skills.map(s => `- ${s.content}`).join('\\n') || '- Skills being assessed'}\n\n## Experience Highlights\n${experience.map(e => `- ${e.content}`).join('\\n') || '- Experience being processed'}\n\n## Work Preferences\n${preferences.map(p => `- ${p.content}`).join('\\n') || '- Open to opportunities'}\n\n## Additional Filters\n- Minimum Match Score: ${radar.min_match_score || 70}%\n${radar.salary_min ? `- Minimum Salary: $${radar.salary_min.toLocaleString()}` : ''}\n${radar.company_sizes?.length ? `- Company Sizes: ${radar.company_sizes.join(', ')}` : ''}\n${radar.excluded_companies?.length ? `- Excluded: ${radar.excluded_companies.join(', ')}` : ''}\n`;\n\nreturn {\n  json: {\n    markdown,\n    radar_config_id: radar.id,\n    profile_id: radar.profile_id,\n    min_match_score: radar.min_match_score || 70,\n    target_locations: radar.target_locations || []\n  }\n};"
+      }
+    },
+    {
+      "id": "b1111111-1111-1111-1111-111111111111",
+      "name": "latitude-generate-queries",
+      "type": "n8n-nodes-latitude.latitude",
+      "typeVersion": 1,
+      "position": [
+        1750,
+        0
+      ],
+      "onError": "continueErrorOutput",
+      "credentials": {
+        "latitudeApi": {
+          "id": "latitude-cred",
+          "name": "Latitude account"
+        }
+      },
+      "parameters": {
+        "promptPath": "generate-job-search-queries",
+        "parametersUi": {
+          "parameter": [
+            {
+              "name": "markdown",
+              "value": "={{ $json.markdown }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "b2222222-2222-2222-2222-222222222222",
+      "name": "set-latitude-error",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2000,
+        150
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "name": "error_type",
+              "type": "string",
+              "value": "QUERY_GENERATION_ERROR"
+            },
+            {
+              "name": "radar_config_id",
+              "type": "string",
+              "value": "={{ $('build-profile-markdown').item.json.radar_config_id }}"
+            },
+            {
+              "name": "error_message",
+              "type": "string",
+              "value": "={{ $json.message || 'Query generation failed' }}"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "b3333333-3333-3333-3333-333333333333",
+      "name": "check-queries-generated",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2000,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "condition-2",
+              "leftValue": "={{ $json.object?.search_queries?.length || 0 }}",
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              },
+              "rightValue": 0
+            }
+          ],
+          "options": {
+            "version": 2,
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          }
+        }
+      }
+    },
+    {
+      "id": "b4444444-4444-4444-4444-444444444444",
+      "name": "split-queries",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        2250,
+        0
+      ],
+      "parameters": {
+        "fieldToSplitOut": "object.search_queries",
+        "include": "selectedOtherFields",
+        "fieldsToInclude": {
+          "fields": [
+            {
+              "fieldName": "radar_config_id"
+            },
+            {
+              "fieldName": "profile_id"
+            },
+            {
+              "fieldName": "min_match_score"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "b5555555-5555-5555-5555-555555555555",
+      "name": "trigger-apify-actor",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        2500,
+        0
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "onError": "continueErrorOutput",
+      "credentials": {
+        "httpQueryAuth": {
+          "id": "apify-cred",
+          "name": "Apify API"
+        }
+      },
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.apify.com/v2/acts/{{ $env.APIFY_INDEED_ACTOR_ID }}/runs",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "searchQueries",
+              "value": "={{ [{term: $json.title, location: $json.location, country: $json.country}] }}"
+            },
+            {
+              "name": "maxItems",
+              "value": "={{ $json.limit }}"
+            },
+            {
+              "name": "datePosted",
+              "value": "={{ $json.datePosted }}d"
+            },
+            {
+              "name": "proxy",
+              "value": "={{ {useApifyProxy: true} }}"
+            },
+            {
+              "name": "customData",
+              "value": "={{ {radar_config_id: $('build-profile-markdown').item.json.radar_config_id, profile_id: $('build-profile-markdown').item.json.profile_id, min_match_score: $('build-profile-markdown').item.json.min_match_score, query_importance: $json.importance, query_reasoning: $json.reasoning} }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      }
+    },
+    {
+      "id": "b6666666-6666-6666-6666-666666666666",
+      "name": "set-apify-error",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2750,
+        150
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "name": "error_type",
+              "type": "string",
+              "value": "APIFY_TRIGGER_ERROR"
+            },
+            {
+              "name": "radar_config_id",
+              "type": "string",
+              "value": "={{ $('build-profile-markdown').item.json.radar_config_id }}"
+            },
+            {
+              "name": "query_title",
+              "type": "string",
+              "value": "={{ $json.title }}"
+            },
+            {
+              "name": "query_location",
+              "type": "string",
+              "value": "={{ $json.location }}"
+            },
+            {
+              "name": "error_message",
+              "type": "string",
+              "value": "={{ $json.message || 'Apify trigger failed' }}"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "b7777777-7777-7777-7777-777777777777",
+      "name": "aggregate-apify-runs",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        2750,
+        0
+      ],
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "options": {}
+      }
+    },
+    {
+      "id": "b8888888-8888-8888-8888-888888888888",
+      "name": "update-last-scan",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 2,
+      "position": [
+        3000,
+        0
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "supabase-cred",
+          "name": "Supabase account"
+        }
+      },
+      "parameters": {
+        "operation": "update",
+        "tableId": "job.radar_config",
+        "filterType": "string",
+        "filterString": "=eq.",
+        "dataToSend": "defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldName": "last_scan_at",
+              "fieldValue": "={{ $now.toISO() }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "b9999999-9999-9999-9999-999999999999",
+      "name": "end-scan-complete",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        3250,
+        0
+      ],
+      "parameters": {}
+    }
+  ],
+  "connections": {
+    "schedule-radar-scan": {
+      "main": [
+        [
+          {
+            "node": "fetch-active-radars",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "fetch-active-radars": {
+      "main": [
+        [
+          {
+            "node": "check-radars-exist",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "check-radars-exist": {
+      "main": [
+        [
+          {
+            "node": "loop-radars",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "end-no-active-radars",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "loop-radars": {
+      "main": [
+        [
+          {
+            "node": "fetch-profile",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "fetch-profile": {
+      "main": [
+        [
+          {
+            "node": "fetch-profile-facts",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "set-profile-error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "set-profile-error": {
+      "main": [
+        [
+          {
+            "node": "update-last-scan",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "fetch-profile-facts": {
+      "main": [
+        [
+          {
+            "node": "build-profile-markdown",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "build-profile-markdown": {
+      "main": [
+        [
+          {
+            "node": "latitude-generate-queries",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "set-profile-error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "latitude-generate-queries": {
+      "main": [
+        [
+          {
+            "node": "check-queries-generated",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "set-latitude-error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "set-latitude-error": {
+      "main": [
+        [
+          {
+            "node": "update-last-scan",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "check-queries-generated": {
+      "main": [
+        [
+          {
+            "node": "split-queries",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "update-last-scan",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "split-queries": {
+      "main": [
+        [
+          {
+            "node": "trigger-apify-actor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "trigger-apify-actor": {
+      "main": [
+        [
+          {
+            "node": "aggregate-apify-runs",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "set-apify-error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "set-apify-error": {
+      "main": [
+        [
+          {
+            "node": "aggregate-apify-runs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "aggregate-apify-runs": {
+      "main": [
+        [
+          {
+            "node": "update-last-scan",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "update-last-scan": {
+      "main": [
+        [
+          {
+            "node": "loop-radars",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {},
+  "pinData": {
+    "schedule-radar-scan": [
+      {
+        "json": {}
+      }
+    ],
+    "fetch-active-radars": [
+      {
+        "json": {
+          "id": "radar-001",
+          "profile_id": "prof-123",
+          "target_roles": [
+            "Senior Backend Engineer",
+            "Staff Engineer"
+          ],
+          "target_locations": [
+            "San Francisco",
+            "Remote"
+          ],
+          "min_match_score": 85,
+          "salary_min": 150000,
+          "company_sizes": [
+            "50-200",
+            "200-500"
+          ],
+          "industries": [
+            "Technology",
+            "SaaS"
+          ],
+          "excluded_companies": [
+            "Company X"
+          ],
+          "is_active": true,
+          "expires_at": "2025-12-31T00:00:00Z"
+        }
+      }
+    ],
+    "check-radars-exist": [
+      {
+        "json": {
+          "id": "radar-001",
+          "profile_id": "prof-123",
+          "target_roles": [
+            "Senior Backend Engineer",
+            "Staff Engineer"
+          ],
+          "target_locations": [
+            "San Francisco",
+            "Remote"
+          ],
+          "min_match_score": 85
+        }
+      }
+    ],
+    "loop-radars": [
+      {
+        "json": {
+          "id": "radar-001",
+          "profile_id": "prof-123",
+          "target_roles": [
+            "Senior Backend Engineer",
+            "Staff Engineer"
+          ],
+          "target_locations": [
+            "San Francisco",
+            "Remote"
+          ],
+          "min_match_score": 85,
+          "salary_min": 150000
+        }
+      }
+    ],
+    "fetch-profile": [
+      {
+        "json": {
+          "id": "prof-123",
+          "full_name": "Alex Rivera",
+          "current_title": "Senior Software Engineer",
+          "current_location": "San Francisco, CA",
+          "target_titles": [
+            "Staff Engineer",
+            "Principal Engineer"
+          ],
+          "work_arrangement_preferences": [
+            "Remote",
+            "Hybrid"
+          ]
+        }
+      }
+    ],
+    "fetch-profile-facts": [
+      {
+        "json": {
+          "id": "fact-001",
+          "category_id": "skill_python",
+          "content": "7 years Python experience",
+          "importance_score": 95
+        }
+      },
+      {
+        "json": {
+          "id": "fact-002",
+          "category_id": "work_experience",
+          "content": "Led migration of monolith to microservices at TechCorp",
+          "importance_score": 90
+        }
+      },
+      {
+        "json": {
+          "id": "fact-003",
+          "category_id": "preference",
+          "content": "Prefers remote work with flexible hours",
+          "importance_score": 85
+        }
+      }
+    ],
+    "build-profile-markdown": [
+      {
+        "json": {
+          "markdown": "# Alex Rivera\n\n## Current Role\n**Title:** Senior Software Engineer\n**Location:** San Francisco, CA\n\n## Target Roles\n- Senior Backend Engineer\n- Staff Engineer\n\n## Target Locations\n- San Francisco\n- Remote\n\n## Key Skills\n- 7 years Python experience\n\n## Experience Highlights\n- Led migration of monolith to microservices at TechCorp\n\n## Work Preferences\n- Prefers remote work with flexible hours\n\n## Additional Filters\n- Minimum Match Score: 85%\n- Minimum Salary: $150,000",
+          "radar_config_id": "radar-001",
+          "profile_id": "prof-123",
+          "min_match_score": 85,
+          "target_locations": [
+            "San Francisco",
+            "Remote"
+          ]
+        }
+      }
+    ],
+    "latitude-generate-queries": [
+      {
+        "json": {
+          "object": {
+            "total_limit_used": 250,
+            "search_queries": [
+              {
+                "country": "US",
+                "title": "Senior Backend Engineer",
+                "location": "San Francisco",
+                "limit": 100,
+                "datePosted": "30",
+                "importance": 100,
+                "reasoning": "Exact match for primary target role and location"
+              },
+              {
+                "country": "US",
+                "title": "Staff Engineer",
+                "location": "Remote",
+                "limit": 75,
+                "datePosted": "30",
+                "importance": 95,
+                "reasoning": "Career progression role with remote flexibility"
+              },
+              {
+                "country": "US",
+                "title": "Senior Software Engineer Python",
+                "location": "San Francisco Bay Area",
+                "limit": 75,
+                "datePosted": "30",
+                "importance": 90,
+                "reasoning": "Core skill match with expanded location"
+              }
+            ]
+          },
+          "text": "Generated 3 search queries totaling 250 results",
+          "usage": {
+            "total_tokens": 1250
+          }
+        }
+      }
+    ],
+    "check-queries-generated": [
+      {
+        "json": {
+          "object": {
+            "search_queries": [
+              {
+                "country": "US",
+                "title": "Senior Backend Engineer",
+                "location": "San Francisco",
+                "limit": 100,
+                "datePosted": "30",
+                "importance": 100
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "split-queries": [
+      {
+        "json": {
+          "country": "US",
+          "title": "Senior Backend Engineer",
+          "location": "San Francisco",
+          "limit": 100,
+          "datePosted": "30",
+          "importance": 100,
+          "reasoning": "Exact match for primary target role and location",
+          "radar_config_id": "radar-001",
+          "profile_id": "prof-123",
+          "min_match_score": 85
+        }
+      }
+    ],
+    "trigger-apify-actor": [
+      {
+        "json": {
+          "data": {
+            "id": "apify-run-xyz123",
+            "actId": "apify/indeed-scraper",
+            "status": "READY",
+            "startedAt": "2024-11-26T14:03:00.000Z",
+            "defaultDatasetId": "dataset-abc456"
+          }
+        }
+      }
+    ],
+    "aggregate-apify-runs": [
+      {
+        "json": {
+          "apify_runs": [
+            {
+              "run_id": "apify-run-xyz123",
+              "query": "Senior Backend Engineer"
+            }
+          ]
+        }
+      }
+    ],
+    "update-last-scan": [
+      {
+        "json": {
+          "id": "radar-001",
+          "last_scan_at": "2024-11-26T14:03:00.000Z",
+          "updated_at": "2024-11-26T14:03:00.000Z"
+        }
+      }
+    ]
+  },
+  "tags": []
+}

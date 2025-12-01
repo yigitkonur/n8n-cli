@@ -452,33 +452,3 @@ function estimateTime(
   return '20+ minutes';
 }
 
-/**
- * Generate a human-readable summary of guidance
- */
-export function generateGuidanceSummary(guidance: PostUpdateGuidance): string {
-  const lines: string[] = [];
-
-  lines.push(`Node "${guidance.nodeName}" (${guidance.nodeType})`);
-  lines.push(`Status: ${guidance.migrationStatus.toUpperCase()}`);
-  lines.push(`Confidence: ${guidance.confidence}`);
-  lines.push(`Estimated time: ${guidance.estimatedTime}`);
-
-  if (guidance.requiredActions.length > 0) {
-    lines.push(`\nRequired actions: ${guidance.requiredActions.length}`);
-    for (const action of guidance.requiredActions.slice(0, 3)) {
-      lines.push(`  - [${action.priority}] ${action.property}: ${action.reason}`);
-    }
-    if (guidance.requiredActions.length > 3) {
-      lines.push(`  ... and ${guidance.requiredActions.length - 3} more`);
-    }
-  }
-
-  if (guidance.behaviorChanges.length > 0) {
-    lines.push(`\nBehavior changes: ${guidance.behaviorChanges.length}`);
-    for (const change of guidance.behaviorChanges) {
-      lines.push(`  - ${change.aspect}: ${change.newBehavior}`);
-    }
-  }
-
-  return lines.join('\n');
-}

@@ -524,68 +524,8 @@ export function applyExperimentalFixes(
   return mergeFixResults(results);
 }
 
-/**
- * Apply all experimental fixes including async ones (like node type correction)
- * This is the recommended function for autofix command
- */
-export async function applyExperimentalFixesAsync(
-  workflow: Workflow,
-  options?: {
-    includeNodeTypeCorrection?: boolean;
-    similarityService?: NodeSimilarityService;
-    nodeRepository?: NodeRepository;
-  },
-): Promise<FixResult> {
-  const results: FixResult[] = [];
-
-  // Apply sync fixes first
-  for (const fix of defaultExperimentalFixes) {
-    results.push(fix.apply(workflow));
-  }
-
-  // Apply node type correction if requested
-  if (options?.includeNodeTypeCorrection !== false) {
-    results.push(await fixNodeTypeCorrection(
-      workflow,
-      options?.similarityService,
-      options?.nodeRepository,
-    ));
-  }
-
-  return mergeFixResults(results);
-}
-
 export function fixInvalidOptionsFields(workflow: Workflow): FixResult {
   return fixEmptyOptionsOnConditionalNodes.apply(workflow);
-}
-
-/**
- * Get an experimental fix by its ID
- */
-export function getExperimentalFixById(id: string): ExperimentalFix | undefined {
-  return allExperimentalFixes.find(fix => fix.id === id);
-}
-
-/**
- * Get experimental fixes by IDs (for --fix-types filtering)
- */
-export function getExperimentalFixesByIds(ids: string[]): ExperimentalFix[] {
-  return allExperimentalFixes.filter(fix => ids.includes(fix.id));
-}
-
-/**
- * Apply specific fixes by ID
- */
-export function applyFixesByIds(workflow: Workflow, fixIds: string[]): FixResult {
-  const fixes = getExperimentalFixesByIds(fixIds);
-  return applyExperimentalFixes(workflow, fixes);
-}
-
-/**
- * Apply typeversion upgrades specifically
- */
-export function applyTypeVersionUpgrades(workflow: Workflow): FixResult {
-  return fixOutdatedTypeVersions.apply(workflow);
 }
 
 export { 

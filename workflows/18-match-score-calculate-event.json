@@ -1,0 +1,790 @@
+{
+  "name": "[18] [event] [match] [score calculate]",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "internal/match-score/calculate",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "af66c98a-81ff-4a97-8e60-027a2424fa14",
+      "name": "webhook-match-score",
+      "position": [
+        0,
+        0
+      ],
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "webhookId": "f18a0001-scor-4a01-b001-000000000002",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "InternalWebhookKey1",
+          "name": "Internal API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const input = $input.item.json.body;\n\n// Must have exactly one of posting_id or profile_id\nconst hasPosting = input.posting_id && /^[0-9a-f-]{36}$/i.test(input.posting_id);\nconst hasProfile = input.profile_id && /^[0-9a-f-]{36}$/i.test(input.profile_id);\n\nif (!hasPosting && !hasProfile) {\n  throw new Error('Either posting_id or profile_id required (UUID format)');\n}\nif (hasPosting && hasProfile) {\n  throw new Error('Provide only ONE of posting_id or profile_id');\n}\n\nreturn {\n  json: {\n    mode: hasPosting ? 'new_job' : 'profile_update',\n    posting_id: input.posting_id || null,\n    profile_id: input.profile_id || null,\n    force_refresh: input.force_refresh || false\n  }\n};"
+      },
+      "id": "02f95787-b887-4d2f-8c21-6b5303699d8f",
+      "name": "validate-input",
+      "position": [
+        250,
+        0
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"error\": $json.message, \"code\": \"VALIDATION_ERROR\" } }}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "id": "435e5e7b-2562-4370-8001-8cfce2d14f12",
+      "name": "respond-400-validation-error",
+      "position": [
+        500,
+        200
+      ],
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "id": "new-job",
+                    "leftValue": "={{ $json.mode }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "new_job"
+                  }
+                ],
+                "options": {
+                  "version": 2,
+                  "leftValue": "",
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
+                }
+              },
+              "renameOutput": true,
+              "outputKey": "new_job"
+            }
+          ]
+        },
+        "mode": "rules",
+        "options": {
+          "fallbackOutput": "profile_update"
+        }
+      },
+      "id": "127e0521-edff-4968-af8e-3754e7d34acf",
+      "name": "route-by-mode",
+      "position": [
+        500,
+        0
+      ],
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/rpc/get_scoring_targets_job",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"posting_id\": \"{{ $json.posting_id }}\",\n  \"force_refresh\": {{ $json.force_refresh }}\n}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "32eb095f-375c-416a-b0e2-03f78398b0f8",
+      "name": "fetch-profiles-for-job",
+      "position": [
+        750,
+        -100
+      ],
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "SupabaseServiceRole1",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/rpc/get_scoring_targets_profile",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"profile_id\": \"{{ $json.profile_id }}\",\n  \"force_refresh\": {{ $json.force_refresh }}\n}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "f11fd343-abee-4da8-8811-b7baf3653bc0",
+      "name": "fetch-jobs-for-profile",
+      "position": [
+        750,
+        100
+      ],
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "SupabaseServiceRole1",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "append",
+        "mergeByFields": {
+          "values": []
+        },
+        "options": {}
+      },
+      "id": "ed21e1a0-905a-4d94-99d7-4659eb3d3055",
+      "name": "merge-targets",
+      "position": [
+        1000,
+        0
+      ],
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "check-length",
+              "leftValue": "={{ $input.all().length }}",
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              },
+              "rightValue": 0
+            }
+          ],
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          }
+        }
+      },
+      "id": "d39590a9-6df6-436a-912a-d9b85d693ae9",
+      "name": "check-has-targets",
+      "position": [
+        1250,
+        0
+      ],
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{ \"status\": \"success\", \"scores_computed\": 0, \"message\": \"All scores cached\" }",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "bcdbb076-81f9-4a27-953a-5aa7803a65a5",
+      "name": "respond-200-no-work",
+      "position": [
+        1500,
+        200
+      ],
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4
+    },
+    {
+      "parameters": {
+        "batchSize": 5,
+        "options": {
+          "reset": true
+        }
+      },
+      "id": "8214c1da-de8d-4184-9677-7b21bba8a773",
+      "name": "loop-scoring-targets",
+      "position": [
+        1500,
+        0
+      ],
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "tableId": "job.posting",
+        "filterType": "string",
+        "filterString": "={{ 'id=eq.' + $json.posting_id }}"
+      },
+      "id": "78e5ce4d-efdc-4811-a6b4-03b11e7908d4",
+      "name": "fetch-job-data",
+      "position": [
+        1750,
+        0
+      ],
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "credentials": {
+        "supabaseApi": {
+          "id": "SupabaseServiceRole1",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/rpc/get_profile_scoring_context",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"profile_id\": \"{{ $('loop-scoring-targets').item.json.profile_id }}\"\n}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "50e3ade4-a94d-4d47-8c9c-93a130938b4c",
+      "name": "fetch-profile-context",
+      "position": [
+        2000,
+        0
+      ],
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "SupabaseServiceRole1",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.mem0.ai/v1/memories/search",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"query\": \"{{ 'Relevant experience and skills for: ' + $('fetch-job-data').item.json.title + ' at ' + $('fetch-job-data').item.json.company_name }}\",\n  \"user_id\": \"{{ $('loop-scoring-targets').item.json.profile_id }}\",\n  \"limit\": 10\n}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "88778c0e-c97f-4af7-bdb6-a9f36fed1111",
+      "name": "query-mem0-context",
+      "position": [
+        2250,
+        0
+      ],
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 2000,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "Mem0ApiKey1",
+          "name": "Mem0 API"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const job = $('fetch-job-data').item.json;\nconst profile = $('fetch-profile-context').item.json;\nconst mem0Result = $('query-mem0-context').item.json;\n\n// Extract Mem0 memories or fallback to raw facts\nconst mem0Context = mem0Result?.memories?.map(m => m.memory).join('\\n') || '';\nconst factsContext = mem0Context || profile.facts || 'No facts available';\n\n// Build job posting string\nconst jobPost = `\n**${job.title}** at **${job.company_name}**\nLocation: ${job.location_city || 'Not specified'} (${job.location_type})\nSalary: ${job.salary_min ? `$${job.salary_min}-${job.salary_max}K` : 'Not disclosed'}\nLevel: ${job.seniority_level || 'Not specified'}\nRequired Skills: ${job.required_skills?.join(', ') || 'Not specified'}\nPreferred: ${job.preferred_skills?.join(', ') || 'None listed'}\n\n${job.description_summary || ''}\n`.trim();\n\n// Track token estimate\nconst inputTokenEstimate = Math.ceil((factsContext.length + jobPost.length + (profile.qa || '').length) / 4);\n\nreturn {\n  json: {\n    profile_id: $('loop-scoring-targets').item.json.profile_id,\n    posting_id: job.id,\n    prompt_vars: {\n      full_cv: `${profile.full_name || 'Candidate'}\\n${profile.headline || ''}\\n${profile.location_city || ''}`,\n      facts: factsContext,\n      questions_answers: profile.qa || 'No Q&A available',\n      job_post: jobPost\n    },\n    input_token_estimate: inputTokenEstimate,\n    mem0_used: !!mem0Context\n  }\n};"
+      },
+      "id": "188e1c1a-9bbf-41ba-8121-20bc1d6c6617",
+      "name": "build-prompt-context",
+      "position": [
+        2500,
+        0
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "promptPath": "analyze-job-fit",
+        "parametersUi": {
+          "parameter": [
+            {
+              "name": "full_cv",
+              "value": "={{ $json.prompt_vars.full_cv }}"
+            },
+            {
+              "name": "facts",
+              "value": "={{ $json.prompt_vars.facts }}"
+            },
+            {
+              "name": "questions_answers",
+              "value": "={{ $json.prompt_vars.questions_answers }}"
+            },
+            {
+              "name": "job_post",
+              "value": "={{ $json.prompt_vars.job_post }}"
+            }
+          ]
+        }
+      },
+      "id": "00573f64-680c-4840-a045-52d33aaed978",
+      "name": "latitude-analyze-fit",
+      "position": [
+        2750,
+        0
+      ],
+      "type": "n8n-nodes-latitude.latitude",
+      "typeVersion": 1,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "latitudeApi": {
+          "id": "LatitudeApi1",
+          "name": "Latitude account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "name": "error",
+              "type": "string",
+              "value": "LLM_FAILED"
+            },
+            {
+              "name": "profile_id",
+              "type": "string",
+              "value": "={{ $('loop-scoring-targets').item.json.profile_id }}"
+            },
+            {
+              "name": "posting_id",
+              "type": "string",
+              "value": "={{ $('loop-scoring-targets').item.json.posting_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "8111e3c9-7718-43ac-bc52-6003502845a7",
+      "name": "set-llm-error",
+      "position": [
+        2750,
+        250
+      ],
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const llmResult = $json.object || $json;\nconst context = $('build-prompt-context').item.json;\nconst tags = llmResult.top_six_tags || [];\n\n// Transform tags\nconst labels = tags.slice(0, 6).map(t => ({\n  text: t.tag_name,\n  emoji: t.emoji\n}));\n\nconst pros = [];\nconst cons = [];\n\nfor (const tag of tags) {\n  const isWarning = (tag.category?.toLowerCase().includes('warning') ||\n                     tag.subcategory?.toLowerCase().includes('warning') ||\n                     tag.tag_name?.toLowerCase().includes('required') ||\n                     tag.tag_name?.toLowerCase().includes('mismatch'));\n  \n  const reasonSnippet = tag.reasoning?.split('.')[0]?.substring(0, 50) || tag.tag_name;\n  \n  if (isWarning) {\n    cons.push(reasonSnippet);\n  } else {\n    pros.push(reasonSnippet);\n  }\n}\n\n// Calculate score\nconst baseScore = 70;\nconst positiveCount = pros.length;\nconst negativeCount = cons.length;\nconst calculatedScore = Math.min(100, Math.max(1, baseScore + (positiveCount * 5) - (negativeCount * 10)));\n\nconst matchInsights = {\n  labels: labels,\n  reasons: {\n    pro: pros.slice(0, 5),\n    con: cons.slice(0, 3)\n  }\n};\n\n// Cost calc\nconst inputTokens = context.input_token_estimate || 2000;\nconst outputTokens = JSON.stringify(llmResult).length / 4;\nconst costUsd = ((inputTokens * 0.00000015) + (outputTokens * 0.0000006)).toFixed(6);\n\nreturn {\n  json: {\n    profile_id: context.profile_id,\n    posting_id: context.posting_id,\n    match_score: calculatedScore,\n    match_insights: matchInsights,\n    computation_model: 'google/gemini-2.5-flash',\n    computation_cost_usd: parseFloat(costUsd),\n    mem0_used: context.mem0_used\n  }\n};"
+      },
+      "id": "0a1215d8-c0cb-4eda-a36c-db8b4b0e7a3b",
+      "name": "transform-to-insights",
+      "position": [
+        3000,
+        0
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SUPABASE_URL }}/rest/v1/rpc/upsert_match_score",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"profile_id\": \"{{ $json.profile_id }}\",\n  \"posting_id\": \"{{ $json.posting_id }}\",\n  \"match_score\": {{ $json.match_score }},\n  \"match_insights\": {{ JSON.stringify($json.match_insights) }},\n  \"computation_model\": \"{{ $json.computation_model }}\",\n  \"computation_cost_usd\": {{ $json.computation_cost_usd }}\n}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "2762332e-c4f1-4f4f-8dcf-8f817fc720c5",
+      "name": "upsert-match-score",
+      "position": [
+        3250,
+        0
+      ],
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "SupabaseServiceRole1",
+          "name": "Supabase account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const allResults = $input.all();\nconst successful = allResults.filter(r => r.json.id);\nconst failed = allResults.filter(r => r.json.error);\n\nconst totalCost = successful.reduce((sum, r) => sum + (r.json.computation_cost_usd || 0), 0);\n\nreturn [{\n  json: {\n    status: 'success',\n    scores_computed: successful.length,\n    scores_failed: failed.length,\n    total_cost_usd: totalCost.toFixed(4),\n    failed_pairs: failed.map(f => ({ profile_id: f.json.profile_id, posting_id: f.json.posting_id }))\n  }\n}];"
+      },
+      "id": "716249ab-a1b2-4e6e-a5b2-4b3b904dc825",
+      "name": "aggregate-results",
+      "position": [
+        3500,
+        0
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "51174245-a461-42d1-9293-2ddcb9f1875e",
+      "name": "respond-200-success",
+      "position": [
+        3750,
+        0
+      ],
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4
+    }
+  ],
+  "connections": {
+    "webhook-match-score": {
+      "main": [
+        [
+          {
+            "node": "validate-input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "validate-input": {
+      "main": [
+        [
+          {
+            "node": "route-by-mode",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "respond-400-validation-error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "route-by-mode": {
+      "main": [
+        [
+          {
+            "node": "fetch-profiles-for-job",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "fetch-jobs-for-profile",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "fetch-profiles-for-job": {
+      "main": [
+        [
+          {
+            "node": "merge-targets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "fetch-jobs-for-profile": {
+      "main": [
+        [
+          {
+            "node": "merge-targets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "merge-targets": {
+      "main": [
+        [
+          {
+            "node": "check-has-targets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "check-has-targets": {
+      "main": [
+        [
+          {
+            "node": "loop-scoring-targets",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "respond-200-no-work",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "loop-scoring-targets": {
+      "main": [
+        [
+          {
+            "node": "fetch-job-data",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "aggregate-results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "fetch-job-data": {
+      "main": [
+        [
+          {
+            "node": "fetch-profile-context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "fetch-profile-context": {
+      "main": [
+        [
+          {
+            "node": "query-mem0-context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "query-mem0-context": {
+      "main": [
+        [
+          {
+            "node": "build-prompt-context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "build-prompt-context": {
+      "main": [
+        [
+          {
+            "node": "latitude-analyze-fit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "latitude-analyze-fit": {
+      "main": [
+        [
+          {
+            "node": "transform-to-insights",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "set-llm-error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "set-llm-error": {
+      "main": [
+        [
+          {
+            "node": "upsert-match-score",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "transform-to-insights": {
+      "main": [
+        [
+          {
+            "node": "upsert-match-score",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "upsert-match-score": {
+      "main": [
+        [
+          {
+            "node": "loop-scoring-targets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "aggregate-results": {
+      "main": [
+        [
+          {
+            "node": "respond-200-success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {
+    "webhook-match-score": [
+      {
+        "body": {
+          "posting_id": "posting-uuid-stripe-backend",
+          "force_refresh": true
+        }
+      }
+    ],
+    "validate-input": [
+      {
+        "mode": "new_job",
+        "posting_id": "posting-uuid-stripe-backend",
+        "force_refresh": true
+      }
+    ],
+    "fetch-profiles-for-job": [
+      {
+        "profile_id": "profile-uuid-sarah",
+        "posting_id": "posting-uuid-stripe-backend"
+      },
+      {
+        "profile_id": "profile-uuid-mike",
+        "posting_id": "posting-uuid-stripe-backend"
+      }
+    ],
+    "fetch-job-data": [
+      {
+        "id": "posting-uuid-stripe-backend",
+        "title": "Senior Backend Engineer",
+        "company_name": "Stripe",
+        "location_city": "San Francisco",
+        "required_skills": [
+          "Python",
+          "PostgreSQL"
+        ],
+        "description_summary": "Build payment infra."
+      }
+    ],
+    "fetch-profile-context": [
+      {
+        "id": "profile-uuid-sarah",
+        "full_name": "Sarah Chen",
+        "facts": "Experience: 5 years Python\nRole: Senior Engineer",
+        "qa": "Q: Salary? A: $200k"
+      }
+    ],
+    "query-mem0-context": [
+      {
+        "memories": [
+          {
+            "memory": "Built payment systems at PayPal"
+          }
+        ]
+      }
+    ],
+    "latitude-analyze-fit": [
+      {
+        "object": {
+          "top_six_tags": [
+            {
+              "tag_name": "Skill Match",
+              "emoji": "✅",
+              "category": "Technical",
+              "reasoning": "Python match."
+            }
+          ]
+        }
+      }
+    ],
+    "upsert-match-score": [
+      {
+        "id": "score-uuid",
+        "match_score": 95
+      }
+    ]
+  }
+}

@@ -105,13 +105,6 @@ export function setExitCode(code: ExitCode): void {
 }
 
 /**
- * Exit with a specific code (use sparingly - prefer setExitCode)
- */
-export function exitWithCode(code: ExitCode): never {
-  process.exit(code);
-}
-
-/**
  * Get human-readable description of exit code
  * Useful for --verbose output
  */
