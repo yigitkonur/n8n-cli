@@ -1,8 +1,8 @@
-<h1 align="center">n8n-cli</h1>
+<h1 align="center">cli-n8n</h1>
 <h3 align="center">The Agent-First CLI for n8n Workflow Automation</h3>
 
 <p align="center">
-  <a href="https://www.npmjs.com/package/n8n-cli"><img alt="npm version" src="https://img.shields.io/npm/v/n8n-cli.svg?style=flat-square"></a>
+  <a href="https://www.npmjs.com/package/cli-n8n"><img alt="npm version" src="https://img.shields.io/npm/v/cli-n8n.svg?style=flat-square"></a>
   <a href="#"><img alt="Node.js" src="https://img.shields.io/badge/node-≥18-blue.svg?style=flat-square"></a>
   <a href="#"><img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-5.3-blue.svg?style=flat-square"></a>
   <a href="https://opensource.org/licenses/MIT"><img alt="License" src="https://img.shields.io/badge/License-MIT-green.svg?style=flat-square"></a>
@@ -27,7 +27,7 @@
   <strong>🤖 AI-Native</strong> — Every command returns structured JSON for machine consumption<br/>
   <strong>⚡ Offline-First</strong> — 800+ nodes bundled locally, no API needed for validation<br/>
   <strong>🔒 Production-Ready</strong> — POSIX exit codes, backups, confirmations, and safety rails<br/>
-  <strong>📦 Zero Config</strong> — Works immediately with <code>npx n8n-cli</code>
+  <strong>📦 Zero Config</strong> — Works immediately with <code>npx cli-n8n</code>
 </p>
 
 ---
@@ -196,9 +196,9 @@ This CLI is designed from the ground up for **AI agents** that generate n8n work
 
 ```bash
 # Run any command without installing
-npx n8n-cli --help
-npx n8n-cli nodes search "slack"
-npx n8n-cli workflows validate workflow.json --json
+npx cli-n8n --help
+npx cli-n8n nodes search "slack"
+npx cli-n8n workflows validate workflow.json --json
 ```
 
 > **💡 Best for:** Quick testing, CI/CD pipelines, one-off commands
@@ -207,7 +207,7 @@ npx n8n-cli workflows validate workflow.json --json
 
 ```bash
 # Install globally
-npm install -g n8n-cli
+npm install -g cli-n8n
 
 # Verify installation
 n8n --version
@@ -365,7 +365,7 @@ n8n nodes show googleSheets --mode docs
 **Step 1: Install the CLI**
 
 ```bash
-npm install -g n8n-cli
+npm install -g cli-n8n
 ```
 
 **Step 2: Configure Connection (for API commands)**
@@ -3648,7 +3648,7 @@ jobs:
           node-version: '20'
       
       - name: Install n8n-cli
-        run: npm install -g n8n-cli
+        run: npm install -g cli-n8n
       
       - name: Validate Workflows
         run: |
@@ -3663,7 +3663,7 @@ jobs:
 validate-workflows:
   image: node:20
   script:
-    - npm install -g n8n-cli
+    - npm install -g cli-n8n
     - |
       for f in workflows/*.json; do
         n8n workflows validate "$f" --profile strict
