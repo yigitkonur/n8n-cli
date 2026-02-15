@@ -1,6 +1,6 @@
 {
   "name": "n8n-cli",
-  "version": "1.9.1",
+  "version": "1.9.2",
   "description": "Full-featured n8n CLI - workflow management, validation, node search, and more",
   "type": "module",
   "main": "dist/index.js",
