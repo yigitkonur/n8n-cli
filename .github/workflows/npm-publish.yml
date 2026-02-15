@@ -59,6 +59,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           BUMP="${{ inputs.bump || 'patch' }}"
+          git checkout -- . 2>/dev/null || true
           npm version "$BUMP" -m "chore: bump to v%s [skip ci]"
           git push && git push --tags
           echo "bumped=true" >> "$GITHUB_OUTPUT"
