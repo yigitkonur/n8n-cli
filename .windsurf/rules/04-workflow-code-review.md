@@ -93,7 +93,7 @@ description: you MUST read this rule WHEN user wants opinion only, 'review this'
 
 **⚠️ ONLY if user explicitly asks:**
 1. edit_file (see 10-tools-morph-mcp.md) — apply fix
-2. run_command — verify: `npm test && npm run lint`
+2. run_command — verify: `pnpm test && pnpm lint`
 
 ---
 

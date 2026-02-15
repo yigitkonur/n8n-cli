@@ -39,11 +39,11 @@
 node --version  # Must be ≥18
 
 # 2. Installation Options
-npm install -g n8n-cli          # Global install
+pnpm add -g n8n-cli          # Global install
 # OR
 npx n8n-cli --help              # No install (ephemeral)
 # OR (for development)
-git clone <repo> && npm link    # Local development
+git clone <repo> && pnpm link --global    # Local development
 
 # 3. n8n Instance (for API tests)
 # Option A: Docker

@@ -84,8 +84,8 @@ Optional: web_search + search_reddit for migration stories.
 3. **Document chunks** to `notes/04-current-task.md`:
    | # | Chunk | Files | Test | Rollback |
    |---|-------|-------|------|----------|
-   | 1 | Create new util | utils/new.ts | npm test | delete file |
-   | 2 | Migrate auth.ts | services/auth.ts | npm test -- auth | git checkout |
+   | 1 | Create new util | utils/new.ts | pnpm test | delete file |
+   | 2 | Migrate auth.ts | services/auth.ts | pnpm test -- auth | git checkout |
 
 **⛔ STOP. Wait for "proceed".**
 
@@ -107,7 +107,7 @@ Optional: web_search + search_reddit for migration stories.
 
 ## PHASE 5: FINAL VALIDATION
 
-- **Full test suite** — run_command: `npm run test:all && npm run lint`
+- **Full test suite** — run_command: `pnpm test:all && pnpm lint`
 - **Rerun tests** — testsprite_rerun_tests (see 14-tools-testsprite.md)
 - **Save patterns** to `notes/03-memory.md`:
   - Old vs new pattern

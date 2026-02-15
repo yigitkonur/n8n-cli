@@ -207,7 +207,7 @@ npx cli-n8n workflows validate workflow.json --json
 
 ```bash
 # Install globally
-npm install -g cli-n8n
+pnpm add -g cli-n8n
 
 # Verify installation
 n8n --version
@@ -238,7 +238,7 @@ n8n --version
 
 ```bash
 # Add to project dependencies
-npm install --save-dev n8n-cli
+pnpm add -D n8n-cli
 
 # Run via npx in project
 npx n8n --help
@@ -365,7 +365,7 @@ n8n nodes show googleSheets --mode docs
 **Step 1: Install the CLI**
 
 ```bash
-npm install -g cli-n8n
+pnpm add -g cli-n8n
 ```
 
 **Step 2: Configure Connection (for API commands)**
@@ -3648,7 +3648,7 @@ jobs:
           node-version: '20'
       
       - name: Install n8n-cli
-        run: npm install -g cli-n8n
+        run: pnpm add -g cli-n8n
       
       - name: Validate Workflows
         run: |
@@ -3663,7 +3663,7 @@ jobs:
 validate-workflows:
   image: node:20
   script:
-    - npm install -g cli-n8n
+    - pnpm add -g cli-n8n
     - |
       for f in workflows/*.json; do
         n8n workflows validate "$f" --profile strict
@@ -3797,19 +3797,18 @@ git clone https://github.com/yigitkonur/n8n-cli.git
 cd n8n-cli
 
 # Install dependencies
-npm install
-
+pnpm install
 # Build
-npm run build
+pnpm build
 
 # Run locally
 node dist/cli.js --help
 
 # Type check
-npm run typecheck
+pnpm typecheck
 
 # Run tests
-npm test
+pnpm test
 ```
 
 ### Project Structure

@@ -30,8 +30,8 @@ Use for all terminal/shell interactions.
 ### Safe to auto-run (SafeToAutoRun=true)
 - Read-only: `ls`, `cat`, `echo`, `pwd`
 - Status checks: `git status`, `git diff`, `git log -n 10`
-- Build/lint: `npm test`, `npm run lint`, `npm run build`
-- Type checks: `npm run typecheck`, `tsc --noEmit`
+- Build/lint: `pnpm test`, `pnpm lint`, `pnpm build`
+- Type checks: `pnpm typecheck`, `tsc --noEmit`
 
 ### Unsafe (SafeToAutoRun=false) — need approval
 - Deletions: `rm`, `git reset --hard`

@@ -67,7 +67,7 @@ description: you MUST read this rule WHEN user needs documentation, 'write READM
 
 ## Quick Start
 ```bash
-npm install project-name
+pnpm add project-name
 npx project-name init
 ```
 

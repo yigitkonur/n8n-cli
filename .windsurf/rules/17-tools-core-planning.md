@@ -62,7 +62,7 @@ Task <ID>: <Title> → [1]<Step1> → [2]<Step2> → ... → [N]<StepN> (DoD:<cr
 - **Title**: What this task achieves
 - **[n]Steps**: Atomic, executable actions
 - **DoD**: Definition of Done — verifiable criteria (not "looks good")
-- **Test**: Command to verify (e.g., `npm test`, `curl -I /api`)
+- **Test**: Command to verify (e.g., `pnpm test`, `curl -I /api`)
 - **Fail**: Recovery action if test fails
 
 ### Example
@@ -77,7 +77,7 @@ Task <ID>: <Title> → [1]<Step1> → [2]<Step2> → ... → [N]<StepN> (DoD:<cr
 - ❌ `"Fix the bug"` → too vague
 - ❌ `"Setup everything"` → not atomic
 - ❌ `"DoD: works"` → not verifiable
-- ✅ `"[1]Add null check line 45 → [2]Add error log (DoD:No null pointer exception|Test:npm test auth.spec.ts)"`
+- ✅ `"[1]Add null check line 45 → [2]Add error log (DoD:No null pointer exception|Test:pnpm test auth.spec.ts)"`
 
 ---
 
